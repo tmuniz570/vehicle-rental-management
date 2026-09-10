@@ -511,6 +511,24 @@ def detalhe_contrato(id):
     transacoes = FinancialTransaction.query.filter_by(id_contrato=id).all()
     vistorias = Inspection.query.filter_by(id_contrato=id).all()
     
+    # Contabilidade do Depósito (Depósito Inicial - Deduções de multas/danos pagos com depósito)
+    deposito_pago = 0.0
+    deducoes_deposito = 0.0
+    deducoes_lista = []
+    for t in transacoes:
+        if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
+                deposito_pago += float(t.valor)
+            elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
+                deducoes_deposito += float(t.valor)
+                deducoes_lista.append({
+                    'id': t.id,
+                    'tipo': t.tipo,
+                    'valor': float(t.valor),
+                    'data_pagamento': t.data_pagamento.strftime('%d/%m/%Y') if t.data_pagamento else None
+                })
+    saldo_deposito = max(0.0, deposito_pago - deducoes_deposito)
+    
     return jsonify({
         'id': c.id,
         'cliente': cliente.nome if cliente else f'ID {c.id_cliente}',
@@ -526,6 +544,10 @@ def detalhe_contrato(id):
         'status': c.status,
         'url_seguro': c.url_seguro,
         'url_comprovante_deposito': c.url_comprovante_deposito,
+        'deposito_pago': deposito_pago,
+        'deducoes_deposito': deducoes_deposito,
+        'saldo_deposito': saldo_deposito,
+        'deducoes_lista': deducoes_lista,
         'transacoes': [{
             'id': t.id,
             'tipo': t.tipo,
@@ -826,11 +848,17 @@ def get_dashboard():
     
     contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
     quarentenas_count = len(contratos_quarentena)
-    quarentenas_valor = 0
+    quarentenas_valor = 0.0
     for cq in contratos_quarentena:
+        dep_pago = 0.0
+        deducoes = 0.0
         for t in cq.transacoes:
-            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito'] and t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
-                quarentenas_valor += float(t.valor)
+            if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
+                    dep_pago += float(t.valor)
+                elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
+                    deducoes += float(t.valor)
+        quarentenas_valor += max(0.0, dep_pago - deducoes)
                 
     # Últimas vistorias
     recent_inspections = []
@@ -923,11 +951,37 @@ def finalizar_quarentena(id):
     contrato.url_comprovante_deposito = url_comprovante
     contrato.status = ContractStatus.COMPLETED.value
     
-    # Mark deposit refund transactions as paid
+    # Calculate net deposit refund
+    deposito_pago = 0.0
+    deducoes = 0.0
     for t in contrato.transacoes:
-        if t.tipo in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'] and t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
+        if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
+                deposito_pago += float(t.valor)
+            elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
+                deducoes += float(t.valor)
+    saldo_restituivel = max(0.0, deposito_pago - deducoes)
+    
+    # Mark existing refund or create a paid Deposit_Refund transaction if saldo > 0
+    refund_encontrado = False
+    for t in contrato.transacoes:
+        if t.tipo in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']:
             t.status = TransactionStatus.PAID.value
             t.data_pagamento = datetime.utcnow()
+            t.valor = saldo_restituivel
+            refund_encontrado = True
+            
+    if not refund_encontrado and saldo_restituivel > 0:
+        devolucao_tx = FinancialTransaction(
+            id_contrato=contrato.id,
+            tipo=TransactionType.DEPOSIT_REFUND.value,
+            valor=saldo_restituivel,
+            data_vencimento=datetime.utcnow(),
+            data_pagamento=datetime.utcnow(),
+            status=TransactionStatus.PAID.value,
+            forma_pagamento='Bank Transfer'
+        )
+        db.session.add(devolucao_tx)
             
     db.session.commit()
     return jsonify({'message': 'Deposit hold finalized successfully', 'mensagem': 'Quarentena finalizada com sucesso'})
@@ -1035,16 +1089,20 @@ def _processar_quarentenas_logic():
     for contrato in contratos_quarentena:
         transacoes = FinancialTransaction.query.filter_by(id_contrato=contrato.id).all()
         
-        deposito = 0
-        multas_e_danos_pendentes = 0
+        deposito = 0.0
+        deducoes_pagas = 0.0
+        multas_e_danos_pendentes = 0.0
         
         for t in transacoes:
-            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito'] and t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
-                deposito += float(t.valor)
+            if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
+                    deposito += float(t.valor)
+                elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
+                    deducoes_pagas += float(t.valor)
             elif t.tipo in [TransactionType.FINE.value, TransactionType.DAMAGE.value, 'Fine', 'Damage', 'Multa', 'Dano'] and t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
                 multas_e_danos_pendentes += float(t.valor)
         
-        saldo_a_devolver = deposito - multas_e_danos_pendentes
+        saldo_a_devolver = max(0.0, deposito - deducoes_pagas - multas_e_danos_pendentes)
         
         if saldo_a_devolver > 0:
             devolucao = FinancialTransaction(

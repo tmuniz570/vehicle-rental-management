@@ -159,12 +159,71 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
+        // Deposit Accounting Details
+        const boxDep = document.getElementById('box_deposito_info');
+        const depOriginal = data.deposito_pago || 0;
+        const depDeducoes = data.deducoes_deposito || 0;
+        const depSaldo = data.saldo_deposito !== undefined ? data.saldo_deposito : Math.max(0, depOriginal - depDeducoes);
+
+        if (boxDep && depOriginal > 0) {
+            boxDep.style.display = 'block';
+            document.getElementById('dep_original_valor').textContent = formatoMoeda.format(depOriginal);
+            
+            const dedRow = document.getElementById('dep_deducoes_row');
+            if (depDeducoes > 0) {
+                dedRow.style.display = 'flex';
+                document.getElementById('dep_deducoes_valor').textContent = `-${formatoMoeda.format(depDeducoes)}`;
+            } else {
+                dedRow.style.display = 'none';
+            }
+            
+            document.getElementById('dep_saldo_valor').textContent = formatoMoeda.format(depSaldo);
+            
+            const badgeStatus = document.getElementById('dep_badge_status');
+            if (badgeStatus) {
+                if (stLower === 'completed' || stLower === 'finalizado') {
+                    badgeStatus.textContent = 'Refunded/Closed';
+                    badgeStatus.style.background = 'rgba(34, 197, 94, 0.15)';
+                    badgeStatus.style.color = '#4ade80';
+                    badgeStatus.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                } else if (stLower === 'deposit_hold' || stLower === 'quarentena_deposito') {
+                    badgeStatus.textContent = 'Deposit Hold';
+                    badgeStatus.style.background = 'rgba(245, 158, 11, 0.15)';
+                    badgeStatus.style.color = '#f59e0b';
+                    badgeStatus.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+                } else {
+                    badgeStatus.textContent = 'Active Held';
+                    badgeStatus.style.background = 'rgba(59, 130, 246, 0.15)';
+                    badgeStatus.style.color = '#60a5fa';
+                    badgeStatus.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                }
+            }
+        }
+
         // Release Deposit Hold
         const btnDevolverDeposito = document.getElementById('btnDevolverDeposito');
         if (btnDevolverDeposito) {
             if (stLower === 'deposit_hold' || stLower === 'quarentena_deposito') {
                 btnDevolverDeposito.style.display = 'block';
-                btnDevolverDeposito.addEventListener('click', () => abrirModal('devolverDepositoModal'));
+                if (depSaldo > 0) {
+                    btnDevolverDeposito.textContent = `Refund Deposit (${formatoMoeda.format(depSaldo)}) & Finalize`;
+                    btnDevolverDeposito.style.background = 'var(--success)';
+                } else {
+                    btnDevolverDeposito.textContent = 'Finalize Contract (Deposit Fully Consumed)';
+                    btnDevolverDeposito.style.background = '#475569';
+                }
+                btnDevolverDeposito.onclick = () => {
+                    document.getElementById('modal_dep_orig').textContent = formatoMoeda.format(depOriginal);
+                    const modalDedRow = document.getElementById('modal_dep_ded_row');
+                    if (depDeducoes > 0) {
+                        modalDedRow.style.display = 'flex';
+                        document.getElementById('modal_dep_ded').textContent = `-${formatoMoeda.format(depDeducoes)}`;
+                    } else {
+                        modalDedRow.style.display = 'none';
+                    }
+                    document.getElementById('modal_dep_net').textContent = formatoMoeda.format(depSaldo);
+                    abrirModal('devolverDepositoModal');
+                };
             } else {
                 btnDevolverDeposito.style.display = 'none';
             }
@@ -269,7 +328,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Statement Summary Header
             const resumoExtrato = document.getElementById('resumoExtrato');
             if (resumoExtrato) {
-                resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>`;
+                let depSummary = '';
+                if (depOriginal > 0) {
+                    depSummary = ` &bull; Deposit Balance: <strong style="color:var(--success);">${formatoMoeda.format(depSaldo)}</strong>`;
+                }
+                resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>${depSummary}`;
             }
 
             // Pay Modal Logic

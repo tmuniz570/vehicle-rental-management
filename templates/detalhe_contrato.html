@@ -71,6 +71,26 @@
             <div style="color: var(--text-secondary); font-size: 0.9rem;">
                 Due Day: <strong id="info_dia_venc" style="color: var(--text-primary);">-</strong>
             </div>
+
+            <!-- Deposit Accounting Breakdown -->
+            <div id="box_deposito_info" style="display:none; margin-top: 0.85rem; padding: 0.85rem 1rem; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.35rem;">
+                    <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Security Deposit</span>
+                    <span id="dep_badge_status" class="badge" style="font-size: 0.7rem; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">Held</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
+                    <span style="color: var(--text-secondary);">Original Paid:</span>
+                    <strong id="dep_original_valor" style="color: var(--text-primary);">-</strong>
+                </div>
+                <div id="dep_deducoes_row" style="display:none; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.25rem; color: #f87171;">
+                    <span>Deductions (Fines/Damages):</span>
+                    <strong id="dep_deducoes_valor">-</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px dashed var(--border-color);">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Refundable Balance:</span>
+                    <strong id="dep_saldo_valor" style="font-size: 1.15rem; color: var(--success);">-</strong>
+                </div>
+            </div>
         </div>
 
         <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
@@ -348,7 +368,23 @@
             <button id="closeDevolverDepositoModal" class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
-            <p style="color:var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem; line-height: 1.4;">
+            <!-- Deposit calculation summary box -->
+            <div id="modal_deposit_calc_box" style="background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 12px; padding: 1rem; margin-bottom: 1.25rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.85rem;">
+                    <span style="color:var(--text-secondary);">Original Deposit Paid:</span>
+                    <strong id="modal_dep_orig" style="color:var(--text-primary);">-</strong>
+                </div>
+                <div id="modal_dep_ded_row" style="display:none; justify-content:space-between; margin-bottom: 0.35rem; font-size: 0.85rem; color:#f87171;">
+                    <span>Deductions Applied:</span>
+                    <strong id="modal_dep_ded">-</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-color);">
+                    <span style="font-weight:600; font-size:0.9rem; color:var(--text-primary);">Total Refund to Client:</span>
+                    <strong id="modal_dep_net" style="font-size:1.35rem; color:var(--success);">-</strong>
+                </div>
+            </div>
+
+            <p style="color:var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.85rem; line-height: 1.4;">
                 Upon confirmation, this contract will be completed. You can attach proof of the bank transfer for the deposit refund.
             </p>
             <form id="formDevolverDeposito" class="modern-form">
@@ -391,5 +427,5 @@
 <script>
     const CONTRATO_ID = {{ contrato_id }};
 </script>
-<script src="/static/js/detalhe_contrato.js?v=4"></script>
+<script src="/static/js/detalhe_contrato.js?v=5"></script>
 {% endblock %}
