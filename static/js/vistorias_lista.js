@@ -5,17 +5,79 @@ let dataFiltro = '';
 let contratoFiltro = '';
 let vistoriasCache = [];
 
-function atualizarBadgeContrato() {
+async function atualizarBannerEControlesContrato() {
+    const banner = document.getElementById('contractContextBanner');
     const badge = document.getElementById('contratoBadge');
     const badgeId = document.getElementById('contratoBadgeId');
+    const btnNewInsp = document.getElementById('btnNewInspection');
+    const btnNewInspText = document.getElementById('btnNewInspectionText');
+    
+    if (!contratoFiltro) {
+        if (banner) banner.style.display = 'none';
+        if (badge) badge.style.display = 'none';
+        if (btnNewInsp) btnNewInsp.href = '/vistorias/nova';
+        if (btnNewInspText) btnNewInspText.textContent = 'New Inspection';
+        return;
+    }
+
+    // Show filter badge
     if (badge && badgeId) {
-        if (contratoFiltro) {
-            badgeId.textContent = contratoFiltro;
-            badge.style.display = 'inline-flex';
-        } else {
-            badge.style.display = 'none';
+        badgeId.textContent = contratoFiltro;
+        badge.style.display = 'inline-flex';
+    }
+
+    // Update New Inspection button to pre-fill contract
+    if (btnNewInsp) {
+        btnNewInsp.href = `/vistorias/nova?contrato_id=${contratoFiltro}`;
+    }
+    if (btnNewInspText) {
+        btnNewInspText.textContent = `New Inspection (#${contratoFiltro})`;
+    }
+
+    // Setup Context Banner
+    if (banner) {
+        banner.style.display = 'flex';
+        const bannerContractId = document.getElementById('bannerContractId');
+        const btnBackToContract = document.getElementById('btnBackToContract');
+        const btnBackContractId = document.getElementById('btnBackContractId');
+        const bannerPlateBadge = document.getElementById('bannerPlateBadge');
+        const bannerCustomerName = document.getElementById('bannerCustomerName');
+        const bannerStatusBadge = document.getElementById('bannerStatusBadge');
+
+        if (bannerContractId) bannerContractId.textContent = contratoFiltro;
+        if (btnBackContractId) btnBackContractId.textContent = contratoFiltro;
+        if (btnBackToContract) btnBackToContract.href = `/contratos/${contratoFiltro}`;
+
+        // Fetch contract details for rich context
+        try {
+            const res = await fetch(`/api/contratos/${contratoFiltro}`);
+            if (res.ok) {
+                const c = await res.json();
+                const nomeCliente = c.cliente || c.cliente_nome;
+                if (bannerPlateBadge) bannerPlateBadge.textContent = c.placa || '-';
+                if (bannerCustomerName) bannerCustomerName.textContent = nomeCliente ? `• ${nomeCliente}` : '';
+                if (bannerStatusBadge) {
+                    bannerStatusBadge.textContent = c.status || '';
+                    const st = (c.status || '').toLowerCase();
+                    bannerStatusBadge.className = 'badge ' + (st === 'active' || st === 'ativo' ? 'badge-success' : 'badge-warning');
+                }
+            }
+        } catch (e) {
+            console.error("Error fetching contract info for banner:", e);
         }
     }
+}
+
+function limparFiltroContrato() {
+    contratoFiltro = '';
+    paginaAtual = 1;
+    if (window.history.replaceState) {
+        const url = new URL(window.location);
+        url.searchParams.delete('contrato_id');
+        url.searchParams.delete('contrato');
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
+    }
+    carregarVistorias();
 }
 
 async function carregarVistorias() {
@@ -27,7 +89,7 @@ async function carregarVistorias() {
     if (btnClear) {
         btnClear.style.display = (termoBusca || tipoFiltro || dataFiltro || contratoFiltro) ? 'inline-block' : 'none';
     }
-    atualizarBadgeContrato();
+    atualizarBannerEControlesContrato();
 
     try {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-secondary);">Loading inspections...</td></tr>';
@@ -93,7 +155,7 @@ async function carregarVistorias() {
                     </a>
                 </td>
                 <td><span class="badge-plate">${v.placa || '-'}</span></td>
-                <td style="font-weight: 500; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${v.cliente || ''}">${v.cliente || '-'}</td>
+                <td style="font-weight: 500; white-space: nowrap;" title="${v.cliente || ''}">${v.cliente || '-'}</td>
                 <td>${tipoBadge}</td>
                 <td>${obsSnippet}</td>
                 <td style="text-align: right; white-space: nowrap;">
@@ -254,17 +316,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Remove Contract Filter Badge Button
     const btnRemoveContrato = document.getElementById('btnRemoveContratoFiltro');
     if (btnRemoveContrato) {
-        btnRemoveContrato.addEventListener('click', () => {
-            contratoFiltro = '';
-            paginaAtual = 1;
-            if (window.history.replaceState) {
-                const url = new URL(window.location);
-                url.searchParams.delete('contrato_id');
-                url.searchParams.delete('contrato');
-                window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
-            }
-            carregarVistorias();
-        });
+        btnRemoveContrato.addEventListener('click', limparFiltroContrato);
+    }
+
+    // Exit Contract Filter Button on Banner
+    const btnExitContract = document.getElementById('btnExitContractFilter');
+    if (btnExitContract) {
+        btnExitContract.addEventListener('click', limparFiltroContrato);
     }
 
     // Clear Filters Button

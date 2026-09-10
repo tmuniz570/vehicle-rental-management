@@ -120,12 +120,18 @@
 
     <!-- Inspections -->
     <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column;">
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
             <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Inspections</h3>
-            <button id="btnNovaOcorr" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; width: auto; display: inline-flex; align-items: center; gap: 0.4rem;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                Incident
-            </button>
+            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <a href="/vistorias/nova?contrato_id={{ contrato_id }}" class="btn-primary" style="padding: 0.5rem 0.85rem; font-size: 0.82rem; width: auto; display: inline-flex; align-items: center; gap: 0.35rem; text-decoration: none;">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    Inspection
+                </a>
+                <button id="btnNovaOcorr" class="btn-primary" style="padding: 0.5rem 0.85rem; font-size: 0.82rem; width: auto; display: inline-flex; align-items: center; gap: 0.35rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    Incident
+                </button>
+            </div>
         </div>
 
         <div id="vistoriasList" style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem;">

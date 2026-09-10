@@ -25,11 +25,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (contratoSelect) contratoSelect.style.display = 'none';
         if (contratoInfoFixed) {
             contratoInfoFixed.style.display = 'block';
-            contratoInfoFixed.textContent = `Contract #${idUrl}`;
+            contratoInfoFixed.innerHTML = `Loading Contract #${idUrl}...`;
         }
         if (!tipoUrl) {
             selectTipo.value = 'Check-in'; // Default when returning a bike
         }
+
+        // Update back navigation button
+        const btnBack = document.getElementById('btnBackNav');
+        if (btnBack) {
+            btnBack.href = `/contratos/${idUrl}`;
+            btnBack.innerHTML = `&larr; Back to Contract #${idUrl}`;
+        }
+
+        // Fetch contract details to show motorbike plate and customer
+        fetch(`/api/contratos/${idUrl}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(c => {
+                if (c && contratoInfoFixed) {
+                    const st = (c.status || '').toLowerCase();
+                    const badgeClass = (st === 'active' || st === 'ativo') ? 'badge-success' : 'badge-warning';
+                    contratoInfoFixed.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                            <span>Contract #${idUrl} &bull; <strong style="color: #60a5fa;">${c.placa || '-'}</strong> (${c.cliente || c.cliente_nome || '-'})</span>
+                            <span class="badge ${badgeClass}">${c.status || ''}</span>
+                        </div>
+                    `;
+                }
+            })
+            .catch(err => console.error("Error fetching contract info:", err));
     } else {
         // Load contracts
         try {
@@ -137,7 +161,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (response.ok) {
                 showFeedback('Inspection saved successfully! Redirecting...', 'success');
-                setTimeout(() => window.location.href = '/vistorias', 1500);
+                const redirectUrl = idUrl ? `/vistorias?contrato_id=${idUrl}` : '/vistorias';
+                setTimeout(() => window.location.href = redirectUrl, 1500);
             } else {
                 showFeedback(result.message || result.mensagem || result.error || result.erro || 'Failed to record inspection', 'error');
             }

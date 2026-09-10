@@ -38,15 +38,11 @@ async function carregarContratos() {
                 statusBadge = `<span class="badge">${c.status}</span>`;
             }
             
-            let nomeCurto = c.cliente_nome || '-';
-            const nomeParts = nomeCurto.trim().split(' ');
-            if (nomeParts.length > 2) {
-                nomeCurto = `${nomeParts[0]} ${nomeParts[nomeParts.length - 1]}`;
-            }
+            const nomeCliente = c.cliente_nome || '-';
             
             tr.innerHTML = `
                 <td>#${c.id}</td>
-                <td style="font-weight:600; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${c.cliente_nome || ''}">${nomeCurto}</td>
+                <td style="font-weight:600; white-space: nowrap;" title="${nomeCliente}">${nomeCliente}</td>
                 <td style="font-weight:600;">${c.placa}</td>
                 <td>${dataRetirada}</td>
                 <td>${diaVenc}</td>
