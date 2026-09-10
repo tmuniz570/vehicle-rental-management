@@ -3,79 +3,538 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Overview</h1>
+<!-- Top Header & Quick Actions -->
+<div class="page-header" style="flex-wrap: wrap; gap: 1rem; align-items: flex-start;">
+    <div>
+        <h1 style="margin: 0; font-weight: 700; letter-spacing: -0.02em;">Overview</h1>
+        <p style="color: var(--text-secondary); margin: 0.35rem 0 0 0; font-size: 0.95rem;">
+            Real-time control of fleet status, contracts, maintenance, and revenue.
+        </p>
+    </div>
+    
+    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+        <a href="/contratos/novo" class="btn-primary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <span>+</span> New Contract
+        </a>
+        <a href="/vistorias/nova" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <span>🔍</span> New Inspection
+        </a>
+        <a href="/clientes/novo" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+            <span>👤</span> Add Customer
+        </a>
+        <a href="/relatorios/vencidos" target="_blank" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; color: #f87171; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 6px;">
+            <span>⚠️</span> Overdue Report
+        </a>
+    </div>
 </div>
 
-<div class="dashboard-grid">
-    <a href="/motos" class="stat-card interactive">
-        <div class="stat-title">Total Motorbikes</div>
+<!-- Row 1: Fleet & Contract Status -->
+<div class="dashboard-grid" style="margin-bottom: 1.5rem;">
+    <!-- Total Motorbikes -->
+    <a href="/motos" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Total Fleet</span>
+            <span style="font-size: 1.25rem;">🛵</span>
+        </div>
         <div class="stat-value" id="total_motos">-</div>
+        <div class="stat-desc">Total motorbikes in system</div>
     </a>
-    <a href="/motos" class="stat-card interactive">
-        <div class="stat-title">Available Motorbikes</div>
-        <div class="stat-value" id="motos_disponiveis">-</div>
+
+    <!-- Available to Rent -->
+    <a href="/motos" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Available to Rent</span>
+            <span style="font-size: 1.25rem;">✅</span>
+        </div>
+        <div class="stat-value" style="color: var(--success);" id="motos_disponiveis">-</div>
+        <div class="stat-desc">Ready for immediate pickup</div>
     </a>
-    <a href="/contratos" class="stat-card interactive">
-        <div class="stat-title">Active Contracts</div>
-        <div class="stat-value" id="contratos_ativos">-</div>
+
+    <!-- Rented (On Road) -->
+    <a href="/contratos" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Rented (Active)</span>
+            <span style="font-size: 1.25rem;">🚀</span>
+        </div>
+        <div class="stat-value" style="color: var(--accent);" id="motos_alugadas">-</div>
+        <div class="stat-desc">Currently on the road</div>
     </a>
-    <a href="/financeiro" class="stat-card interactive">
-        <div class="stat-title">Expected Weekly Revenue</div>
-        <div class="stat-value" style="color: var(--accent);" id="receita_semanal">-</div>
-    </a>
-    <a href="/financeiro" class="stat-card interactive">
-        <div class="stat-title">Pending Receivables</div>
-        <div class="stat-value" style="color: var(--success);" id="receita_pendente">-</div>
-    </a>
-    <a href="/contratos" class="stat-card interactive">
-        <div class="stat-title">Deposit Holds</div>
-        <div class="stat-value" style="color: var(--warning);" id="quarentenas_count">-</div>
-        <div class="stat-title" id="quarentenas_valor" style="margin-top: 5px;">-</div>
+
+    <!-- In Maintenance (Motos em Manutenção) -->
+    <a href="#maintenanceSection" class="stat-card interactive" id="cardManutencao" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title" style="color: #f59e0b;">In Maintenance</span>
+            <span style="font-size: 1.25rem;">🔧</span>
+        </div>
+        <div class="stat-value" style="color: #f59e0b;" id="motos_manutencao">-</div>
+        <div class="stat-desc" id="motos_manutencao_desc">Bikes in workshop/check-in</div>
     </a>
 </div>
 
-<div id="alertasContainer" style="margin-top: 2rem;"></div>
+<!-- Row 2: Financial & Arrears -->
+<div class="dashboard-grid" style="margin-bottom: 1.75rem;">
+    <!-- Active Contracts -->
+    <a href="/contratos" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Active Contracts</span>
+            <span style="font-size: 1.25rem;">📑</span>
+        </div>
+        <div class="stat-value" id="contratos_ativos">-</div>
+        <div class="stat-desc">Ongoing client rentals</div>
+    </a>
 
+    <!-- Expected Weekly Revenue -->
+    <a href="/financeiro" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Weekly Revenue</span>
+            <span style="font-size: 1.25rem;">💷</span>
+        </div>
+        <div class="stat-value" style="color: var(--accent);" id="receita_semanal">-</div>
+        <div class="stat-desc">Expected rent each week</div>
+    </a>
+
+    <!-- Pending Receivables -->
+    <a href="/financeiro" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Pending Receivables</span>
+            <span style="font-size: 1.25rem;">⏳</span>
+        </div>
+        <div class="stat-value" style="color: #38bdf8;" id="receita_pendente">-</div>
+        <div class="stat-desc">Uncollected rent & charges</div>
+    </a>
+
+    <!-- Deposit Holds -->
+    <a href="/contratos" class="stat-card interactive" style="text-decoration: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="stat-title">Deposit Holds</span>
+            <span style="font-size: 1.25rem;">🔒</span>
+        </div>
+        <div class="stat-value" style="color: var(--warning);" id="quarentenas_count">-</div>
+        <div class="stat-desc" id="quarentenas_valor">Total Held: £0.00</div>
+    </a>
+</div>
+
+<!-- Fleet Allocation Bar -->
+<div class="fleet-bar-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>📊</span> Fleet Distribution
+        </h4>
+        <span id="fleetPercentSummary" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">-</span>
+    </div>
+    <div class="fleet-bar-track">
+        <div id="barRented" class="fleet-bar-segment" style="background: var(--accent); width: 0%;" title="Rented"></div>
+        <div id="barAvailable" class="fleet-bar-segment" style="background: var(--success); width: 0%;" title="Available"></div>
+        <div id="barMaintenance" class="fleet-bar-segment" style="background: #f59e0b; width: 0%;" title="Maintenance"></div>
+    </div>
+    <div class="fleet-bar-legend">
+        <div class="fleet-bar-legend-item">
+            <span class="fleet-bar-dot" style="background: var(--accent);"></span>
+            <span>Rented: <strong id="legendRented" style="color: var(--text-primary);">0</strong></span>
+        </div>
+        <div class="fleet-bar-legend-item">
+            <span class="fleet-bar-dot" style="background: var(--success);"></span>
+            <span>Available: <strong id="legendAvailable" style="color: var(--text-primary);">0</strong></span>
+        </div>
+        <div class="fleet-bar-legend-item">
+            <span class="fleet-bar-dot" style="background: #f59e0b;"></span>
+            <span>In Maintenance: <strong id="legendMaintenance" style="color: var(--text-primary);">0</strong></span>
+        </div>
+    </div>
+</div>
+
+<!-- Two-Column Operations Layout -->
+<div class="dashboard-split-grid">
+    <!-- Left Column: Maintenance Fleet & Recent Inspections -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- CARD: Bikes in Maintenance -->
+        <div id="maintenanceSection" class="stat-card" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #f59e0b;">
+                        <span>🔧</span> Motorbikes in Maintenance
+                    </h3>
+                    <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                        Bikes currently in workshop, inspection check-in, or awaiting service.
+                    </p>
+                </div>
+                <a href="/motos" class="btn-action" style="font-size: 0.8rem; padding: 6px 12px; text-decoration: none; border-color: rgba(245,158,11,0.4); color: #f59e0b;">
+                    Fleet View &rarr;
+                </a>
+            </div>
+
+            <div id="maintenanceListContainer">
+                <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+                    Loading maintenance status...
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD: Recent Inspections -->
+        <div class="stat-card" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
+                        <span>📋</span> Recent Inspections
+                    </h3>
+                    <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                        Latest check-outs, check-ins, and incident reports.
+                    </p>
+                </div>
+                <a href="/vistorias" class="btn-action" style="font-size: 0.8rem; padding: 6px 12px; text-decoration: none;">
+                    View All &rarr;
+                </a>
+            </div>
+
+            <div id="recentInspectionsContainer">
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                    Loading recent inspections...
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Right Column: Alerts & Operational Status -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- CARD: Important Notices & Alerts -->
+        <div class="stat-card" style="padding: 1.5rem;">
+            <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
+                <span>🚨</span> Action Required & Notices
+            </h3>
+            <div id="alertasContainer">
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                    Checking system notices...
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD: Quick System Shortcuts -->
+        <div class="stat-card" style="padding: 1.5rem;">
+            <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
+                <span>⚡</span> Quick Management
+            </h3>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <a href="/motos" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); transition: all 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">🛵</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Fleet Management</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Register, edit models or plates</div>
+                        </div>
+                    </div>
+                    <span style="color: var(--accent);">&rarr;</span>
+                </a>
+
+                <a href="/clientes" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); transition: all 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">👥</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Customer Directory</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Customers: <span id="quickTotalClientes">0</span></div>
+                        </div>
+                    </div>
+                    <span style="color: var(--accent);">&rarr;</span>
+                </a>
+
+                <a href="/financeiro" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); transition: all 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">💳</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Financial Statements</div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Payments, charges, and receipts</div>
+                        </div>
+                    </div>
+                    <span style="color: var(--accent);">&rarr;</span>
+                </a>
+
+                <a href="/relatorios/vencidos" target="_blank" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); text-decoration: none; color: #f87171; transition: all 0.2s ease;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 1.2rem;">🖨️</span>
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">Print Overdue Arrears Report</div>
+                            <div style="font-size: 0.75rem; color: rgba(248,113,113,0.8);">Download or print arrears PDF</div>
+                        </div>
+                    </div>
+                    <span>&rarr;</span>
+                </a>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', async () => {
+    const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarDashboard();
+    });
+
+    async function carregarDashboard() {
         try {
             const res = await fetch('/api/dashboard');
             const data = await res.json();
             
-            document.getElementById('total_motos').textContent = data.total_motos;
-            document.getElementById('motos_disponiveis').textContent = data.motos_disponiveis;
-            document.getElementById('contratos_ativos').textContent = data.contratos_ativos;
+            // 1. Stat cards
+            document.getElementById('total_motos').textContent = data.total_motos || 0;
+            document.getElementById('motos_disponiveis').textContent = data.motos_disponiveis || 0;
+            document.getElementById('motos_alugadas').textContent = data.motos_alugadas || 0;
+            document.getElementById('motos_manutencao').textContent = data.motos_manutencao || 0;
+            document.getElementById('contratos_ativos').textContent = data.contratos_ativos || 0;
             
-            const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
-            document.getElementById('receita_pendente').textContent = formatoMoeda.format(data.receita_pendente);
-            document.getElementById('receita_semanal').textContent = formatoMoeda.format(data.receita_semanal);
+            document.getElementById('receita_semanal').textContent = formatoMoeda.format(data.receita_semanal || 0);
+            document.getElementById('receita_pendente').textContent = formatoMoeda.format(data.receita_pendente || 0);
             
-            document.getElementById('quarentenas_count').textContent = data.quarentenas_count;
-            document.getElementById('quarentenas_valor').textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor)}`;
-            
-            // Load alerts
-            const resAlertas = await fetch('/api/alertas');
-            const alertas = await resAlertas.json();
-            
-            const alertasContainer = document.getElementById('alertasContainer');
-            if (alertas && alertas.length > 0) {
-                let html = '<h2>Important Notices</h2><div style="display: flex; flex-direction: column; gap: 10px; margin-top: 1rem;">';
-                alertas.forEach(a => {
-                    html += `
-                    <div style="background: rgba(220, 53, 69, 0.1); border-left: 4px solid var(--error); padding: 1rem; border-radius: 8px;">
-                        <h4 style="margin: 0 0 5px 0; color: var(--error);">Deposit Hold Due!</h4>
-                        <p style="margin: 0; color: var(--text-primary);">${a.mensagem || a.message}</p>
-                        <a href="/contratos/${a.contrato_id}" style="color: var(--accent); text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 10px; display: inline-block;">View Contract &rarr;</a>
-                    </div>`;
-                });
-                html += '</div>';
-                alertasContainer.innerHTML = html;
+            document.getElementById('quarentenas_count').textContent = data.quarentenas_count || 0;
+            document.getElementById('quarentenas_valor').textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor || 0)}`;
+
+            document.getElementById('quickTotalClientes').textContent = data.total_clientes || 0;
+
+            // Highlight maintenance card if > 0
+            const cardManut = document.getElementById('cardManutencao');
+            if (data.motos_manutencao > 0) {
+                cardManut.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                cardManut.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.12)';
+                document.getElementById('motos_manutencao_desc').textContent = `${data.motos_manutencao} bike(s) need attention`;
+            } else {
+                cardManut.style.borderColor = 'var(--border-color)';
+                cardManut.style.boxShadow = 'none';
+                document.getElementById('motos_manutencao_desc').textContent = 'All fleet bikes operational';
             }
-            
+
+            // 2. Fleet Allocation Bar
+            const total = data.total_motos || 0;
+            const alugadas = data.motos_alugadas || 0;
+            const disponiveis = data.motos_disponiveis || 0;
+            const manutencao = data.motos_manutencao || 0;
+
+            document.getElementById('legendRented').textContent = alugadas;
+            document.getElementById('legendAvailable').textContent = disponiveis;
+            document.getElementById('legendMaintenance').textContent = manutencao;
+
+            if (total > 0) {
+                const pRented = ((alugadas / total) * 100).toFixed(0);
+                const pAvail = ((disponiveis / total) * 100).toFixed(0);
+                const pManut = ((manutencao / total) * 100).toFixed(0);
+
+                document.getElementById('barRented').style.width = `${pRented}%`;
+                document.getElementById('barAvailable').style.width = `${pAvail}%`;
+                document.getElementById('barMaintenance').style.width = `${pManut}%`;
+
+                document.getElementById('fleetPercentSummary').textContent = `${pRented}% Rented • ${pAvail}% Available • ${pManut}% Maintenance`;
+            } else {
+                document.getElementById('fleetPercentSummary').textContent = 'No motorbikes in fleet';
+            }
+
+            // 3. Render Bikes in Maintenance
+            renderMaintenanceList(data.motos_manutencao_lista || []);
+
+            // 4. Render Recent Inspections
+            renderRecentInspections(data.recent_inspections || []);
+
+            // 5. Load Notices & Alerts
+            await carregarAlertas(data);
+
         } catch(e) {
             console.error('Error loading dashboard', e);
         }
-    });
+    }
+
+    function renderMaintenanceList(lista) {
+        const container = document.getElementById('maintenanceListContainer');
+        if (!lista || lista.length === 0) {
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; padding: 1.25rem; border-radius: 12px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25);">
+                    <span style="font-size: 1.5rem;">🎉</span>
+                    <div>
+                        <strong style="color: var(--success); font-size: 0.95rem; display: block;">No motorbikes in maintenance!</strong>
+                        <span style="color: var(--text-secondary); font-size: 0.85rem;">All registered fleet units are either actively rented or ready for new customers.</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
+        lista.forEach(m => {
+            const driverInfo = m.cliente_nome 
+                ? `<span style="color: var(--text-secondary); font-size: 0.8rem;">Last Driver: <strong style="color: var(--text-primary);">${m.cliente_nome}</strong></span>`
+                : `<span style="color: var(--text-secondary); font-size: 0.8rem;">Ready for inspection</span>`;
+
+            html += `
+                <div class="maintenance-item">
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                        <span class="badge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-weight: 700; font-family: monospace; font-size: 0.95rem; padding: 4px 10px; border-radius: 6px;">
+                            ${m.placa}
+                        </span>
+                        <div style="min-width: 0;">
+                            <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${m.modelo} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.85rem;">(${m.cor})</span>
+                            </div>
+                            ${driverInfo}
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+                        <button onclick="setBikeAvailable('${m.placa}')" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--success); border: none; border-radius: 6px;" title="Set motorbike status back to Available">
+                            ✅ Set Available
+                        </button>
+                        <a href="/motos" class="btn-action" style="padding: 6px 10px; font-size: 0.8rem; text-decoration: none;" title="View in fleet management">
+                            Manage
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    async function setBikeAvailable(placa) {
+        if (!confirm(`Are you sure you want to release motorbike ${placa} from Maintenance and set it to AVAILABLE?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/motos/${placa}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'Available' })
+            });
+
+            if (res.ok) {
+                // Reload dashboard
+                await carregarDashboard();
+            } else {
+                const err = await res.json();
+                alert(err.error || 'Failed to update motorbike status');
+            }
+        } catch (e) {
+            console.error('Error setting bike available:', e);
+            alert('Connection error');
+        }
+    }
+
+    function renderRecentInspections(inspections) {
+        const container = document.getElementById('recentInspectionsContainer');
+        if (!inspections || inspections.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9rem; margin: 0;">No inspection records found.</p>';
+            return;
+        }
+
+        let html = `
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary);">
+                            <th style="padding: 8px 10px;">Date</th>
+                            <th style="padding: 8px 10px;">Type</th>
+                            <th style="padding: 8px 10px;">Plate</th>
+                            <th style="padding: 8px 10px;">Client</th>
+                            <th style="padding: 8px 10px; text-align: center;">Photos</th>
+                            <th style="padding: 8px 10px; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        inspections.forEach(i => {
+            let typeBadge = '';
+            if (i.tipo === 'Check-out' || i.tipo === 'Saída') {
+                typeBadge = '<span class="badge badge-warning" style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-size: 0.75rem;">Check-out</span>';
+            } else if (i.tipo === 'Check-in' || i.tipo === 'Entrada') {
+                typeBadge = '<span class="badge badge-success" style="background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-size: 0.75rem;">Check-in</span>';
+            } else {
+                typeBadge = '<span class="badge badge-danger" style="background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); font-size: 0.75rem;">Incident</span>';
+            }
+
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 10px; color: var(--text-secondary); white-space: nowrap;">${i.data}</td>
+                    <td style="padding: 10px;">${typeBadge}</td>
+                    <td style="padding: 10px;"><strong style="font-family: monospace; color: var(--text-primary);">${i.placa}</strong></td>
+                    <td style="padding: 10px; color: var(--text-primary);">${i.cliente}</td>
+                    <td style="padding: 10px; text-align: center;">
+                        <span style="color: var(--text-secondary); font-size: 0.8rem;">📷 ${i.foto_count}</span>
+                    </td>
+                    <td style="padding: 10px; text-align: right;">
+                        <a href="/vistorias?contrato_id=${i.contrato_id}" class="btn-action" style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none;">
+                            View
+                        </a>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+
+    async function carregarAlertas(dashData) {
+        const container = document.getElementById('alertasContainer');
+        try {
+            const res = await fetch('/api/alertas');
+            const alertas = await res.json();
+            
+            let html = '';
+
+            // 1. Check for deposit return due alerts
+            if (alertas && alertas.length > 0) {
+                alertas.forEach(a => {
+                    html += `
+                    <div style="background: rgba(220, 53, 69, 0.1); border-left: 4px solid var(--error); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <h4 style="margin: 0 0 5px 0; color: var(--error); font-size: 0.95rem;">Deposit Return Due!</h4>
+                            <span class="badge badge-danger" style="font-size: 0.75rem;">${a.dias} days held</span>
+                        </div>
+                        <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">${a.mensagem || a.message}</p>
+                        <a href="/contratos/${a.contrato_id}" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
+                            Open Contract #${a.contrato_id} &rarr;
+                        </a>
+                    </div>`;
+                });
+            }
+
+            // 2. Check for overdue payments
+            if (dashData && dashData.total_vencidos > 0) {
+                html += `
+                <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: #f87171; font-size: 0.95rem;">Overdue Payments Detected</h4>
+                        <span class="badge badge-danger" style="font-size: 0.75rem;">${dashData.total_vencidos} overdue</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        Total of <strong>${formatoMoeda.format(dashData.receita_vencida)}</strong> in overdue arrears requiring collection.
+                    </p>
+                    <a href="/relatorios/vencidos" target="_blank" style="color: #f87171; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
+                        Print Overdue Report &rarr;
+                    </a>
+                </div>`;
+            }
+
+            // 3. If no alerts
+            if (!html) {
+                html = `
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 1rem; border-radius: 8px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2);">
+                        <span style="font-size: 1.25rem;">✅</span>
+                        <div>
+                            <strong style="color: var(--success); font-size: 0.9rem; display: block;">All systems normal</strong>
+                            <span style="color: var(--text-secondary); font-size: 0.8rem;">No overdue quarantine deposits or urgent customer notices.</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = html;
+        } catch (e) {
+            console.error('Error loading alerts:', e);
+            container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem;">Could not load notices.</p>';
+        }
+    }
 </script>
 {% endblock %}

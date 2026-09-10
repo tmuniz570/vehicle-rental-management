@@ -460,6 +460,101 @@ body {
     color: var(--text-primary);
 }
 
+.stat-desc {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+/* Dashboard Split Grid */
+.dashboard-split-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(0, 1.05fr);
+    gap: 1.5rem;
+    width: 100%;
+    margin-bottom: 2rem;
+}
+
+.dashboard-split-grid > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 1100px) {
+    .dashboard-split-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Fleet Allocation Bar */
+.fleet-bar-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.75rem;
+    backdrop-filter: blur(16px);
+}
+
+.fleet-bar-track {
+    display: flex;
+    height: 12px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    margin: 0.75rem 0;
+}
+
+.fleet-bar-segment {
+    height: 100%;
+    transition: width 0.4s ease;
+}
+
+.fleet-bar-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.fleet-bar-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.fleet-bar-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Maintenance List */
+.maintenance-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.maintenance-item:hover {
+    background: rgba(245, 158, 11, 0.06);
+    border-color: rgba(245, 158, 11, 0.35);
+}
+
+.maintenance-item:last-child {
+    margin-bottom: 0;
+}
+
+
 /* Tabelas Premium */
 .table-container {
     background: var(--card-bg);

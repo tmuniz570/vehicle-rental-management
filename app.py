@@ -785,16 +785,44 @@ def excluir_transacao(id):
 def get_dashboard():
     total_motos = Motorcycle.query.count()
     motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
+    motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
+    motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
+    
+    # Detalhes das motos em manutenção
+    motos_manutencao_lista = []
+    manutencao_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).all()
+    for m in manutencao_objs:
+        last_c = Contract.query.filter_by(placa=m.placa).order_by(Contract.id.desc()).first()
+        cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
+        contrato_id = last_c.id if last_c else None
+        motos_manutencao_lista.append({
+            'placa': m.placa,
+            'modelo': m.modelo,
+            'cor': m.cor or 'N/A',
+            'status': m.status,
+            'contrato_id': contrato_id,
+            'cliente_nome': cliente_nome
+        })
+        
     contratos_ativos_lista = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
     contratos_ativos = len(contratos_ativos_lista)
     receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_lista)
+    
+    total_clientes = Client.query.count()
     
     pendentes = FinancialTransaction.query.filter(
         FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
         FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
     ).all()
-    
     receita_pendente = sum(float(t.valor) for t in pendentes)
+    
+    agora = datetime.utcnow()
+    vencidas = FinancialTransaction.query.filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento < agora
+    ).all()
+    receita_vencida = sum(float(t.valor) for t in vencidas)
+    total_vencidos = len(vencidas)
     
     contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
     quarentenas_count = len(contratos_quarentena)
@@ -803,15 +831,54 @@ def get_dashboard():
         for t in cq.transacoes:
             if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito'] and t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
                 quarentenas_valor += float(t.valor)
+                
+    # Últimas vistorias
+    recent_inspections = []
+    inspecoes = Inspection.query.order_by(Inspection.id.desc()).limit(5).all()
+    for i in inspecoes:
+        placa = i.contrato.placa if i.contrato else '-'
+        cliente = i.contrato.cliente.nome if i.contrato and i.contrato.cliente else '-'
+        foto_count = len([f for f in (i.url_fotos or '').split(',') if f.strip()])
+        recent_inspections.append({
+            'id': i.id,
+            'contrato_id': i.id_contrato,
+            'placa': placa,
+            'cliente': cliente,
+            'tipo': i.tipo,
+            'data': i.data.strftime('%d/%m/%Y %H:%M') if i.data else '-',
+            'foto_count': foto_count,
+            'observacoes': i.observacoes or ''
+        })
+        
+    # Últimos contratos
+    recent_contracts = []
+    contratos = Contract.query.order_by(Contract.id.desc()).limit(4).all()
+    for c in contratos:
+        recent_contracts.append({
+            'id': c.id,
+            'cliente': c.cliente.nome if c.cliente else 'N/A',
+            'placa': c.placa,
+            'status': c.status,
+            'valor_semanal': float(c.valor_aluguel_semanal),
+            'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
+        })
     
     return jsonify({
         'total_motos': total_motos,
         'motos_disponiveis': motos_disponiveis,
+        'motos_alugadas': motos_alugadas,
+        'motos_manutencao': motos_manutencao,
+        'motos_manutencao_lista': motos_manutencao_lista,
         'contratos_ativos': contratos_ativos,
+        'total_clientes': total_clientes,
         'receita_pendente': receita_pendente,
         'receita_semanal': receita_semanal,
+        'receita_vencida': receita_vencida,
+        'total_vencidos': total_vencidos,
         'quarentenas_count': quarentenas_count,
-        'quarentenas_valor': quarentenas_valor
+        'quarentenas_valor': quarentenas_valor,
+        'recent_inspections': recent_inspections,
+        'recent_contracts': recent_contracts
     })
 
 @app.route('/api/alertas', methods=['GET'])
