@@ -20,9 +20,9 @@
     <div class="app-layout">
         <!-- Mobile Header (Hidden on Desktop) -->
         <header class="mobile-header">
-            <div class="mobile-brand">
+            <a href="/" class="mobile-brand" style="display: flex; align-items: center; text-decoration: none;" title="Go to Dashboard">
                 <img src="/static/images/logo.png" alt="FF Motors" style="height: 38px; width: auto; object-fit: contain;">
-            </div>
+            </a>
             <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle navigation menu">
                 <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
@@ -33,7 +33,9 @@
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
-                <img src="/static/images/logo.png" alt="FF Motors" style="width: 100%; max-width: 180px; height: auto; object-fit: contain;">
+                <a href="/" style="display: flex; justify-content: center; width: 100%; text-decoration: none;" title="Go to Dashboard">
+                    <img src="/static/images/logo.png" alt="FF Motors" style="width: 100%; max-width: 180px; height: auto; object-fit: contain; cursor: pointer;">
+                </a>
             </div>
             
             <nav class="sidebar-nav">
