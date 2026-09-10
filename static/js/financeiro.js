@@ -123,13 +123,13 @@ async function carregarFinanceiro() {
                         Contract #${t.id_contrato} &rarr;
                     </a>
                 </td>
-                <td style="font-weight:500;">${t.cliente || '-'}</td>
+                <td style="font-weight:500; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${t.cliente || ''}">${t.cliente || '-'}</td>
                 <td><span class="badge-plate">${t.placa || '-'}</span></td>
-                <td>${tipoBadge}</td>
-                <td style="font-weight:700; font-size:1rem; color:var(--text-primary);">${valorFmt}</td>
-                <td>${celulaVencimento}</td>
-                <td>${celulaPagamento}</td>
-                <td>${statusBadge}</td>
+                <td class="nowrap">${tipoBadge}</td>
+                <td class="nowrap" style="font-weight:700; font-size:1rem; color:var(--text-primary);">${valorFmt}</td>
+                <td class="nowrap">${celulaVencimento}</td>
+                <td class="nowrap">${celulaPagamento}</td>
+                <td class="nowrap">${statusBadge}</td>
                 <td style="text-align: right; white-space: nowrap;">${actBtn}</td>
             `;
             tbody.appendChild(tr);

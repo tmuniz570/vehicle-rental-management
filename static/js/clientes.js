@@ -27,10 +27,10 @@ async function carregarClientes() {
             const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${c.nome}" data-tel="${c.telefone}" data-email="${c.email}" data-endereco="${c.endereco || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             tr.innerHTML = `
-                <td>${c.nome}</td>
-                <td>${c.telefone}</td>
+                <td><strong>${c.nome}</strong></td>
+                <td class="nowrap">${c.telefone}</td>
                 <td>${c.email}</td>
-                <td>${c.endereco || '-'}</td>
+                <td class="cell-wrap">${c.endereco || '-'}</td>
                 <td>${docsHtml || '-'}</td>
                 <td>${btnEdit}</td>
             `;

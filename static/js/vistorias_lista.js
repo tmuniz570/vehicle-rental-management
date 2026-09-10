@@ -75,7 +75,7 @@ async function carregarVistorias() {
                     </a>
                 </td>
                 <td><span class="badge-plate">${v.placa || '-'}</span></td>
-                <td style="font-weight: 500;">${v.cliente || '-'}</td>
+                <td style="font-weight: 500; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${v.cliente || ''}">${v.cliente || '-'}</td>
                 <td>${tipoBadge}</td>
                 <td>${obsSnippet}</td>
                 <td style="text-align: right; white-space: nowrap;">
