@@ -1,3 +1,38 @@
+function formatWhatsAppNumber(phone) {
+    if (!phone) return '';
+    const raw = String(phone).trim();
+    
+    // 1. If it already starts with '+', keep country code (strip non-digits)
+    if (raw.startsWith('+')) {
+        return raw.replace(/\D/g, '');
+    }
+    
+    // 2. If it starts with '00' (international prefix)
+    if (raw.startsWith('00')) {
+        return raw.replace(/\D/g, '').substring(2);
+    }
+    
+    const digits = raw.replace(/\D/g, '');
+    
+    // 3. If UK number with leading 0 (e.g. 07360469902 -> 447360469902)
+    if (digits.startsWith('0')) {
+        return '44' + digits.substring(1);
+    }
+    
+    // 4. If UK mobile without leading 0 (e.g. 7360469902 with 10 digits starting with 7 -> 447360469902)
+    if (digits.startsWith('7') && digits.length === 10) {
+        return '44' + digits;
+    }
+    
+    // 5. If already has 44 prefix (e.g. 447360469902)
+    if (digits.startsWith('44') && digits.length >= 11) {
+        return digits;
+    }
+    
+    // 6. Otherwise (e.g. already has other country code like 5582999946121)
+    return digits;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
     const diasSemana = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -20,9 +55,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (linksCliente) {
             linksCliente.innerHTML = '';
             if (data.telefone) {
-                const telClean = data.telefone.replace(/\D/g, '');
+                const waNumber = formatWhatsAppNumber(data.telefone);
                 const waLink = document.createElement('a');
-                waLink.href = `https://wa.me/${telClean}`;
+                waLink.href = `https://wa.me/${waNumber}`;
                 waLink.target = '_blank';
                 waLink.className = 'btn-action';
                 waLink.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.8rem; padding: 4px 10px; text-decoration: none;';
@@ -33,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // 2. Vehicle Card
         document.getElementById('info_placa').textContent = data.placa || '-';
-        document.getElementById('info_modelo_cor').textContent = `${data.modelo || '-'} &bull; ${data.cor || '-'}`;
+        document.getElementById('info_modelo_cor').textContent = `${data.modelo || '-'} • ${data.cor || '-'}`;
         
         if (data.data_retirada) {
             document.getElementById('info_data_retirada').textContent = 'Collection: ' + new Date(data.data_retirada).toLocaleDateString('en-GB');

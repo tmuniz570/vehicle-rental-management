@@ -1,3 +1,15 @@
+function formatWhatsAppNumber(phone) {
+    if (!phone) return '';
+    const raw = String(phone).trim();
+    if (raw.startsWith('+')) return raw.replace(/\D/g, '');
+    if (raw.startsWith('00')) return raw.replace(/\D/g, '').substring(2);
+    const digits = raw.replace(/\D/g, '');
+    if (digits.startsWith('0')) return '44' + digits.substring(1);
+    if (digits.startsWith('7') && digits.length === 10) return '44' + digits;
+    if (digits.startsWith('44') && digits.length >= 11) return digits;
+    return digits;
+}
+
 let paginaAtual = 1;
 let termoBusca = '';
 
@@ -26,9 +38,14 @@ async function carregarClientes() {
             
             const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${c.nome}" data-tel="${c.telefone}" data-email="${c.email}" data-endereco="${c.endereco || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
+            const waNum = formatWhatsAppNumber(c.telefone);
+            const telHtml = waNum 
+                ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Chat with ${c.nome} on WhatsApp">💬 ${c.telefone}</a>`
+                : (c.telefone || '-');
+            
             tr.innerHTML = `
                 <td><strong>${c.nome}</strong></td>
-                <td class="nowrap">${c.telefone}</td>
+                <td class="nowrap">${telHtml}</td>
                 <td>${c.email}</td>
                 <td class="cell-wrap">${c.endereco || '-'}</td>
                 <td>${docsHtml || '-'}</td>
