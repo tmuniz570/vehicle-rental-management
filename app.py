@@ -591,8 +591,11 @@ def listar_vistorias():
     search = request.args.get('search', '', type=str)
     tipo = request.args.get('tipo', '', type=str)
     data_filtro = request.args.get('data', '', type=str)
+    contrato_id = request.args.get('contrato_id', type=int)
     
     query = Inspection.query.join(Contract, Inspection.id_contrato == Contract.id).join(Client, Contract.id_cliente == Client.id)
+    if contrato_id:
+        query = query.filter(Inspection.id_contrato == contrato_id)
     if search:
         search_term = f"%{search}%"
         query = query.filter(db.or_(
