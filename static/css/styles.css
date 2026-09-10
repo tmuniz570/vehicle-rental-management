@@ -847,3 +847,44 @@ tr:hover td {
     backdrop-filter: blur(4px);
 }
 
+.photo-badge-idx {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+    z-index: 3;
+}
+
+.photo-remove-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(220, 38, 38, 0.9);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.15s ease, background 0.15s ease;
+    z-index: 3;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.photo-remove-btn:hover {
+    background: #ef4444;
+    transform: scale(1.1);
+}
+
+

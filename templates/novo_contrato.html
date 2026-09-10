@@ -63,8 +63,28 @@
         </div>
         
         <div class="form-group">
-            <label for="fotos">Motorbike Check-out Photos (Multiple allowed)</label>
-            <input type="file" id="fotos" name="fotos" accept="image/*" multiple required style="padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <label style="margin: 0; font-weight: 600;">Motorbike Check-out Photos *</label>
+                <span id="photoCountBadge" class="badge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-size: 0.75rem;">0 photos added</span>
+            </div>
+            
+            <div class="photo-uploader-actions" style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                <button type="button" id="btnTakePhoto" class="btn-primary" style="flex: 1; min-width: 150px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0.75rem 1rem; font-size: 0.9rem;">
+                    <span>📸</span> Take Photo (Camera)
+                </button>
+                <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+
+                <button type="button" id="btnPickGallery" class="btn-secondary" style="flex: 1; min-width: 150px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0.75rem 1rem; font-size: 0.9rem;">
+                    <span>🖼️</span> Photo Library
+                </button>
+                <input type="file" id="galleryInput" accept="image/*" multiple style="display: none;">
+            </div>
+            
+            <small style="color: var(--text-secondary); display: block; margin-top: 0.4rem;">
+                Tap <strong>Take Photo</strong> repeatedly to snap multiple angles (front, rear, sides, odometer).
+            </small>
+
+            <div id="previewContainer" class="photo-grid" style="display:none; margin-top: 0.75rem;"></div>
         </div>
 
         <div class="form-group">

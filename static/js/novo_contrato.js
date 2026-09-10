@@ -37,11 +37,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         showFeedback('Failed to load data. Please refresh the page.', 'error');
     }
 
+    // Multi-photo accumulator for iPhone Camera & Gallery
+    let selectedPhotos = [];
+    const btnTakePhoto = document.getElementById('btnTakePhoto');
+    const cameraInput = document.getElementById('cameraInput');
+    const btnPickGallery = document.getElementById('btnPickGallery');
+    const galleryInput = document.getElementById('galleryInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const photoCountBadge = document.getElementById('photoCountBadge');
+
+    if (btnTakePhoto && cameraInput) {
+        btnTakePhoto.addEventListener('click', () => cameraInput.click());
+        cameraInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => selectedPhotos.push(file));
+                cameraInput.value = '';
+                renderPhotoPreviews();
+            }
+        });
+    }
+
+    if (btnPickGallery && galleryInput) {
+        btnPickGallery.addEventListener('click', () => galleryInput.click());
+        galleryInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => selectedPhotos.push(file));
+                galleryInput.value = '';
+                renderPhotoPreviews();
+            }
+        });
+    }
+
+    function renderPhotoPreviews() {
+        if (!previewContainer) return;
+        previewContainer.innerHTML = '';
+        
+        if (photoCountBadge) {
+            photoCountBadge.textContent = `${selectedPhotos.length} photo${selectedPhotos.length === 1 ? '' : 's'} added`;
+            if (selectedPhotos.length > 0) {
+                photoCountBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                photoCountBadge.style.color = '#4ade80';
+                photoCountBadge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+            } else {
+                photoCountBadge.style.background = 'rgba(255, 102, 0, 0.15)';
+                photoCountBadge.style.color = 'var(--accent)';
+                photoCountBadge.style.borderColor = 'rgba(255, 102, 0, 0.3)';
+            }
+        }
+
+        if (selectedPhotos.length > 0) {
+            previewContainer.style.display = 'grid';
+            selectedPhotos.forEach((file, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const div = document.createElement('div');
+                    div.className = 'photo-item';
+                    div.style.aspectRatio = '1 / 1';
+                    div.innerHTML = `
+                        <span class="photo-badge-idx">#${index + 1}</span>
+                        <button type="button" class="photo-remove-btn" title="Remove photo" onclick="removeNovoContratoPhoto(${index})">&times;</button>
+                        <img src="${e.target.result}" alt="Photo ${index + 1}">
+                    `;
+                    previewContainer.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        } else {
+            previewContainer.style.display = 'none';
+        }
+    }
+
+    window.removeNovoContratoPhoto = function(index) {
+        selectedPhotos.splice(index, 1);
+        renderPhotoPreviews();
+    };
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         feedbackMsg.classList.add('hidden');
         feedbackMsg.className = 'feedback-message hidden';
+
+        if (selectedPhotos.length === 0) {
+            showFeedback('Please take or select at least one check-out photo of the motorbike.', 'error');
+            return;
+        }
         
         submitBtn.disabled = true;
         btnText.classList.add('hidden');
@@ -57,9 +137,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Check-out inspection
         formData.append('observacoes', document.getElementById('observacoes').value);
         
-        const fotosInput = document.getElementById('fotos');
-        for (let i = 0; i < fotosInput.files.length; i++) {
-            const file = fotosInput.files[i];
+        for (let i = 0; i < selectedPhotos.length; i++) {
+            const file = selectedPhotos[i];
             if (file.type.startsWith('image/')) {
                 try {
                     const compressedFile = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });

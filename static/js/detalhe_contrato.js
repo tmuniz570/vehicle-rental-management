@@ -152,6 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 btnFinalizar.addEventListener('click', () => {
                     document.getElementById('ocorrenciaModalTitle').textContent = 'Complete Contract (Check-in Inspection)';
                     document.getElementById('oc_tipo').value = 'Check-in';
+                    if (typeof resetOcPhotos === 'function') resetOcPhotos();
                     abrirModal('ocorrenciaModal');
                 });
             } else {
@@ -518,43 +519,105 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
         
-        // New Incident Button
-        document.getElementById('btnNovaOcorr')?.addEventListener('click', () => {
-            document.getElementById('ocorrenciaModalTitle').textContent = 'New Inspection (Incident)';
-            document.getElementById('oc_tipo').value = 'Incident';
-            abrirModal('ocorrenciaModal');
-        });
-        
-        // Incident Photo Preview
-        const ocFotosInput = document.getElementById('oc_fotos');
+        // Incident Photo Accumulator for iPhone Camera & Gallery
+        let ocSelectedPhotos = [];
+        const btnOcTakePhoto = document.getElementById('btnOcTakePhoto');
+        const ocCameraInput = document.getElementById('ocCameraInput');
+        const btnOcPickGallery = document.getElementById('btnOcPickGallery');
+        const ocGalleryInput = document.getElementById('ocGalleryInput');
         const ocPreview = document.getElementById('oc_preview');
-        if (ocFotosInput && ocPreview) {
-            ocFotosInput.addEventListener('change', () => {
-                ocPreview.innerHTML = '';
-                if (ocFotosInput.files.length > 0) {
-                    ocPreview.style.display = 'grid';
-                    Array.from(ocFotosInput.files).forEach((file, index) => {
-                        if (file.type.startsWith('image/')) {
-                            const reader = new FileReader();
-                            reader.onload = (e) => {
-                                const div = document.createElement('div');
-                                div.className = 'photo-item';
-                                div.style.aspectRatio = '1 / 1';
-                                div.innerHTML = `<img src="${e.target.result}" alt="Preview ${index + 1}">`;
-                                ocPreview.appendChild(div);
-                            };
-                            reader.readAsDataURL(file);
-                        }
-                    });
-                } else {
-                    ocPreview.style.display = 'none';
+        const ocPhotoCountBadge = document.getElementById('ocPhotoCountBadge');
+
+        function resetOcPhotos() {
+            ocSelectedPhotos = [];
+            if (ocCameraInput) ocCameraInput.value = '';
+            if (ocGalleryInput) ocGalleryInput.value = '';
+            renderOcPreviews();
+        }
+
+        if (btnOcTakePhoto && ocCameraInput) {
+            btnOcTakePhoto.addEventListener('click', () => ocCameraInput.click());
+            ocCameraInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    Array.from(e.target.files).forEach(file => ocSelectedPhotos.push(file));
+                    ocCameraInput.value = '';
+                    renderOcPreviews();
                 }
             });
         }
 
+        if (btnOcPickGallery && ocGalleryInput) {
+            btnOcPickGallery.addEventListener('click', () => ocGalleryInput.click());
+            ocGalleryInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    Array.from(e.target.files).forEach(file => ocSelectedPhotos.push(file));
+                    ocGalleryInput.value = '';
+                    renderOcPreviews();
+                }
+            });
+        }
+
+        function renderOcPreviews() {
+            if (!ocPreview) return;
+            ocPreview.innerHTML = '';
+
+            if (ocPhotoCountBadge) {
+                ocPhotoCountBadge.textContent = `${ocSelectedPhotos.length} photo${ocSelectedPhotos.length === 1 ? '' : 's'} added`;
+                if (ocSelectedPhotos.length > 0) {
+                    ocPhotoCountBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                    ocPhotoCountBadge.style.color = '#4ade80';
+                    ocPhotoCountBadge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                } else {
+                    ocPhotoCountBadge.style.background = 'rgba(255, 102, 0, 0.15)';
+                    ocPhotoCountBadge.style.color = 'var(--accent)';
+                    ocPhotoCountBadge.style.borderColor = 'rgba(255, 102, 0, 0.3)';
+                }
+            }
+
+            if (ocSelectedPhotos.length > 0) {
+                ocPreview.style.display = 'grid';
+                ocSelectedPhotos.forEach((file, index) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const div = document.createElement('div');
+                        div.className = 'photo-item';
+                        div.style.aspectRatio = '1 / 1';
+                        div.innerHTML = `
+                            <span class="photo-badge-idx">#${index + 1}</span>
+                            <button type="button" class="photo-remove-btn" title="Remove photo" onclick="removeOcPhoto(${index})">&times;</button>
+                            <img src="${e.target.result}" alt="Preview ${index + 1}">
+                        `;
+                        ocPreview.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                ocPreview.style.display = 'none';
+            }
+        }
+
+        window.removeOcPhoto = function(index) {
+            ocSelectedPhotos.splice(index, 1);
+            renderOcPreviews();
+        };
+
+        // New Incident Button
+        document.getElementById('btnNovaOcorr')?.addEventListener('click', () => {
+            document.getElementById('ocorrenciaModalTitle').textContent = 'New Inspection (Incident)';
+            document.getElementById('oc_tipo').value = 'Incident';
+            resetOcPhotos();
+            abrirModal('ocorrenciaModal');
+        });
+
         // Submit Incident Form
         document.getElementById('ocorrenciaForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
+
+            if (ocSelectedPhotos.length === 0) {
+                alert('Please take or select at least one vehicle photo.');
+                return;
+            }
+
             const btn = document.getElementById('btnSalvarOcorr');
             btn.disabled = true;
             btn.textContent = 'Processing photos...';
@@ -564,9 +627,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             formData.append('tipo', document.getElementById('oc_tipo').value);
             formData.append('observacoes', document.getElementById('oc_obs').value);
             
-            const fileInput = document.getElementById('oc_fotos');
-            for (let i = 0; i < fileInput.files.length; i++) {
-                const file = fileInput.files[i];
+            for (let i = 0; i < ocSelectedPhotos.length; i++) {
+                const file = ocSelectedPhotos[i];
                 if (file.type.startsWith('image/')) {
                     try {
                         const compressedFile = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
