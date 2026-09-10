@@ -22,7 +22,6 @@
 html, body {
     width: 100%;
     min-height: 100vh;
-    overflow-x: hidden;
 }
 
 body {
@@ -327,9 +326,9 @@ body {
     flex: 1;
     min-width: 0;
     max-width: 100%;
-    padding: 2.5rem 3rem;
+    padding: 2rem 2rem;
     overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
 /* Secondary Action Button & Utilities */
@@ -382,11 +381,17 @@ body {
 /* Responsive Split Grid */
 .contract-details-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 1.8fr) minmax(300px, 1.2fr);
     gap: 1.5rem;
+    width: 100%;
 }
 
-@media (max-width: 960px) {
+.contract-details-grid > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 1200px) {
     .contract-details-grid {
         grid-template-columns: 1fr;
     }
@@ -409,9 +414,15 @@ body {
 /* Dashboard Grid */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
     gap: 1.5rem;
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
+    width: 100%;
+}
+
+.dashboard-grid > * {
+    min-width: 0;
+    max-width: 100%;
 }
 
 .stat-card {
