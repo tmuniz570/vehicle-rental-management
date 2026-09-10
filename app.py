@@ -17,6 +17,59 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'ff
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static', 'uploads')
 
+# Garante tipos MIME corretos no Windows para que imagens e documentos abram em nova aba e não façam download
+import mimetypes
+mimetypes.add_type('image/webp', '.webp')
+mimetypes.add_type('image/avif', '.avif')
+mimetypes.add_type('application/pdf', '.pdf')
+mimetypes.add_type('image/jpeg', '.jpg')
+mimetypes.add_type('image/jpeg', '.jpeg')
+mimetypes.add_type('image/png', '.png')
+mimetypes.add_type('image/svg+xml', '.svg')
+
+@app.route('/static/uploads/<path:filename>')
+def custom_static_uploads(filename):
+    uploads_dir = app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads'))
+    ext = os.path.splitext(filename)[1].lower()
+    mimetype = 'application/octet-stream'
+    if ext == '.webp':
+        mimetype = 'image/webp'
+    elif ext == '.pdf':
+        mimetype = 'application/pdf'
+    elif ext in ['.jpg', '.jpeg']:
+        mimetype = 'image/jpeg'
+    elif ext == '.png':
+        mimetype = 'image/png'
+    elif ext == '.svg':
+        mimetype = 'image/svg+xml'
+    else:
+        guessed = mimetypes.guess_type(filename)[0]
+        if guessed:
+            mimetype = guessed
+            
+    response = send_from_directory(uploads_dir, filename, mimetype=mimetype, as_attachment=False)
+    response.headers['Content-Disposition'] = f'inline; filename="{filename}"'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+@app.after_request
+def add_inline_document_headers(response):
+    if request.path.startswith('/static/uploads/'):
+        ext = os.path.splitext(request.path)[1].lower()
+        if ext == '.webp':
+            response.headers['Content-Type'] = 'image/webp'
+        elif ext == '.pdf':
+            response.headers['Content-Type'] = 'application/pdf'
+        elif ext in ['.jpg', '.jpeg']:
+            response.headers['Content-Type'] = 'image/jpeg'
+        elif ext == '.png':
+            response.headers['Content-Type'] = 'image/png'
+        elif ext == '.svg':
+            response.headers['Content-Type'] = 'image/svg+xml'
+        response.headers['Content-Disposition'] = 'inline'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+    return response
+
 # Inicializa o banco
 init_db(app)
 
