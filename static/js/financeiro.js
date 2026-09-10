@@ -92,9 +92,12 @@ async function carregarFinanceiro() {
             // Payment Cell
             let celulaPagamento = '<span style="color:var(--text-secondary); opacity:0.6;">-</span>';
             if (isPaid) {
+                const isDepositDeduction = t.forma_pagamento === 'Deposit';
+                const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
+                const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
                 celulaPagamento = `<div>
                     <span style="font-weight:500;">${pagamento}</span>
-                    <small style="display:block; color:var(--text-secondary); font-size:0.75rem;">${t.forma_pagamento || ''}</small>
+                    <small style="display:block; ${colorStyle} font-size:0.75rem;">${formaLabel}</small>
                 </div>`;
             }
 

@@ -244,7 +244,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 let celulaPagamento = `<span style="color:var(--text-secondary); opacity:0.5;">-</span>`;
                 if (isPaid) {
-                    celulaPagamento = `<span>${dataPag} <small style="color:var(--text-secondary); display:block; font-size:0.75rem;">${t.forma_pagamento || ''}</small></span>`;
+                    const isDepositDeduction = t.forma_pagamento === 'Deposit';
+                    const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
+                    const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
+                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${formaLabel}</small></span>`;
                 }
 
                 let celulaVencimento = `<span>${dataVenc}</span>`;
