@@ -17,17 +17,17 @@
 </div>
 
 <!-- Context Banner when filtered by Contract -->
-<div id="contractContextBanner" style="display: none; background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(30, 41, 59, 0.7) 100%); border: 1px solid rgba(59, 130, 246, 0.35); border-radius: 16px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+<div id="contractContextBanner" style="display: none; background: linear-gradient(135deg, rgba(255, 102, 0, 0.12) 0%, rgba(26, 29, 38, 0.75) 100%); border: 1px solid rgba(255, 102, 0, 0.3); border-radius: 16px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
     <div style="display: flex; align-items: center; gap: 0.85rem;">
-        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59, 130, 246, 0.25); border: 1px solid rgba(59, 130, 246, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+        <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(255, 102, 0, 0.2); border: 1px solid rgba(255, 102, 0, 0.4); display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
             🏍️
         </div>
         <div>
             <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                <span style="font-weight: 700; font-size: 1.1rem; color: #93c5fd;">Contract #<span id="bannerContractId"></span></span>
+                <span style="font-weight: 700; font-size: 1.1rem; color: #ff9955;">Contract #<span id="bannerContractId"></span></span>
                 <span id="bannerPlateBadge" class="badge-plate" style="font-size: 0.8rem;">-</span>
                 <span id="bannerCustomerName" style="color: var(--text-primary); font-weight: 600; font-size: 1rem;"></span>
-                <span id="bannerStatusBadge" class="badge badge-info" style="font-size: 0.7rem;">-</span>
+                <span id="bannerStatusBadge" class="badge badge-warning" style="font-size: 0.7rem;">-</span>
             </div>
             <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0.25rem 0 0 0;">
                 Showing inspections for this contract only.
@@ -35,7 +35,7 @@
         </div>
     </div>
     <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-        <a id="btnBackToContract" href="#" class="btn-primary" style="padding: 0.65rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(59, 130, 246, 0.25); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4);">
+        <a id="btnBackToContract" href="#" class="btn-primary" style="padding: 0.65rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(255, 102, 0, 0.25); color: #ff9955; border: 1px solid rgba(255, 102, 0, 0.4); box-shadow: none;">
             &larr; Back to Contract #<span id="btnBackContractId"></span>
         </a>
         <button id="btnExitContractFilter" type="button" style="padding: 0.65rem 1rem; font-size: 0.85rem; background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); border: 1px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s;">
@@ -63,9 +63,9 @@
         <label for="filterDate" style="color: var(--text-secondary); font-size: 0.85rem;">Date:</label>
         <input type="date" id="filterDate" style="padding: 0.4rem; border: none; background: transparent; color: var(--text-primary); outline: none; cursor: pointer;">
     </div>
-    <span id="contratoBadge" style="display: none; align-items: center; gap: 0.5rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.6rem 0.9rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
+    <span id="contratoBadge" style="display: none; align-items: center; gap: 0.5rem; background: rgba(255, 102, 0, 0.15); color: #ff9955; border: 1px solid rgba(255, 102, 0, 0.3); padding: 0.6rem 0.9rem; border-radius: 12px; font-size: 0.85rem; font-weight: 500;">
         <span>Filtered by: <strong>Contract #<span id="contratoBadgeId"></span></strong></span>
-        <button id="btnRemoveContratoFiltro" type="button" style="background: none; border: none; color: #60a5fa; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.2rem; font-weight: bold;" title="Remove contract filter">&times;</button>
+        <button id="btnRemoveContratoFiltro" type="button" style="background: none; border: none; color: #ff9955; cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 0 0.2rem; font-weight: bold;" title="Remove contract filter">&times;</button>
     </span>
     <button id="btnClearFilters" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem 1rem; border-radius: 12px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
         Clear Filters

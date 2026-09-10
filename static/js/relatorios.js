@@ -72,12 +72,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         data.frota.Rented !== undefined ? data.frota.Rented : data.frota.Alugada,
                         data.frota.Maintenance !== undefined ? data.frota.Maintenance : data.frota.Manutenção
                     ],
-                    backgroundColor: [
-                        'rgba(16, 185, 129, 0.8)', // Green
-                        'rgba(59, 130, 246, 0.8)', // Blue
-                        'rgba(239, 68, 68, 0.8)'   // Red
+                        'rgba(16, 185, 129, 0.85)', // Green - Available
+                        'rgba(255, 102, 0, 0.85)',  // FF Motors Orange - Rented
+                        'rgba(239, 68, 68, 0.85)'   // Red - Maintenance
                     ],
-                    borderColor: 'rgba(15, 23, 42, 1)',
+                    borderColor: 'rgba(12, 14, 20, 1)',
                     borderWidth: 2,
                     hoverOffset: 4
                 }]
