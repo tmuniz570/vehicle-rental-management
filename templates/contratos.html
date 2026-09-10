@@ -1,0 +1,48 @@
+{% extends 'layout.html' %}
+
+{% block title %}Contracts{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Rental Contracts</h1>
+    <a href="/contratos/novo" class="btn-primary" style="width: auto; display: inline-flex;">+ New Contract</a>
+</div>
+
+<div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+    <input type="text" id="searchInput" placeholder="Search by ID, reg plate, customer, status..." style="flex: 1; min-width: 200px; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; color: var(--text-secondary); background: var(--card-bg); padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+        <input type="checkbox" id="filterAtivos" checked style="width: 1.2rem; height: 1.2rem; accent-color: var(--accent);">
+        Active Only
+    </label>
+</div>
+
+<div class="table-container">
+    <table id="contratosTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Reg Plate</th>
+                <th>Collection</th>
+                <th>Due Day</th>
+                <th>Weekly Rent</th>
+                <th>Return Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="9" style="text-align:center;">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 10px;">
+    <button id="btnPrevPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">&laquo; Previous</button>
+    <span id="paginationInfo" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+    <button id="btnNextPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">Next &raquo;</button>
+</div>{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/contratos.js?v=2"></script>
+{% endblock %}

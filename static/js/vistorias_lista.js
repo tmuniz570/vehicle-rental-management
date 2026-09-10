@@ -1,0 +1,258 @@
+let paginaAtual = 1;
+let termoBusca = '';
+let tipoFiltro = '';
+let dataFiltro = '';
+let vistoriasCache = [];
+
+async function carregarVistorias() {
+    const tbody = document.querySelector('#vistoriasTable tbody');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const btnClear = document.getElementById('btnClearFilters');
+    
+    // Show/hide clear filters button
+    if (btnClear) {
+        btnClear.style.display = (termoBusca || tipoFiltro || dataFiltro) ? 'block' : 'none';
+    }
+
+    try {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-secondary);">Loading inspections...</td></tr>';
+        
+        const params = new URLSearchParams({
+            page: paginaAtual,
+            limit: 15,
+            search: termoBusca,
+            tipo: tipoFiltro,
+            data: dataFiltro
+        });
+
+        const res = await fetch(`/api/vistorias?${params.toString()}`);
+        const data = await res.json();
+        const vistorias = data.itens || [];
+        vistoriasCache = vistorias;
+        
+        if (vistorias.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2.5rem; color:var(--text-secondary); font-size: 0.95rem;">No inspections found with the selected filters.</td></tr>';
+            if (paginationInfo) paginationInfo.textContent = '';
+            const btnPrev = document.getElementById('btnPrevPage');
+            const btnNext = document.getElementById('btnNextPage');
+            if (btnPrev) btnPrev.disabled = true;
+            if (btnNext) btnNext.disabled = true;
+            return;
+        }
+        
+        tbody.innerHTML = '';
+        vistorias.forEach((v, index) => {
+            const tr = document.createElement('tr');
+            const dataVistoria = new Date(v.data_vistoria).toLocaleString('en-GB');
+            
+            let tipoBadge = '';
+            const tLower = (v.tipo || '').toLowerCase();
+            if (tLower === 'check-out' || tLower === 'saída') {
+                tipoBadge = '<span class="badge badge-info">Check-out (Collection)</span>';
+            } else if (tLower === 'check-in' || tLower === 'entrada') {
+                tipoBadge = '<span class="badge badge-warning">Check-in (Return)</span>';
+            } else if (tLower === 'incident' || tLower === 'ocorrência') {
+                tipoBadge = '<span class="badge badge-danger">Incident</span>';
+            } else {
+                tipoBadge = `<span class="badge">${v.tipo}</span>`;
+            }
+            
+            // Photos count
+            const fotosArray = v.foto_url ? v.foto_url.split(',').map(f => f.trim()).filter(Boolean) : [];
+            const fotosCount = fotosArray.length;
+            const btnVerText = fotosCount > 0 ? `📷 Photos (${fotosCount})` : `View Details`;
+
+            // Observações snippet
+            const obsSnippet = v.observacoes 
+                ? `<span title="${v.observacoes.replace(/"/g, '&quot;')}" style="display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary);">${v.observacoes}</span>`
+                : '<span style="color:var(--text-secondary); opacity:0.5;">-</span>';
+
+            tr.innerHTML = `
+                <td style="font-weight: 500; font-size: 0.9rem; white-space: nowrap;">${dataVistoria}</td>
+                <td>
+                    <a href="/contratos/${v.id_contrato}" class="link-contrato" title="Open Contract #${v.id_contrato}">
+                        Contract #${v.id_contrato} &rarr;
+                    </a>
+                </td>
+                <td><span class="badge-plate">${v.placa || '-'}</span></td>
+                <td style="font-weight: 500;">${v.cliente || '-'}</td>
+                <td>${tipoBadge}</td>
+                <td>${obsSnippet}</td>
+                <td style="text-align: right; white-space: nowrap;">
+                    <button class="btn-action btn-ver-detalhes" data-index="${index}">
+                        ${btnVerText}
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Pagination
+        if (paginationInfo) {
+            paginationInfo.textContent = `Page ${data.pagina_atual} of ${data.paginas || 1} (${data.total} records)`;
+        }
+        const btnPrev = document.getElementById('btnPrevPage');
+        const btnNext = document.getElementById('btnNextPage');
+        if (btnPrev) btnPrev.disabled = data.pagina_atual <= 1;
+        if (btnNext) btnNext.disabled = data.pagina_atual >= (data.paginas || 1);
+        
+        // Listeners for View Details / Photos
+        document.querySelectorAll('.btn-ver-detalhes').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(btn.getAttribute('data-index'), 10);
+                abrirModalVistoria(vistoriasCache[idx]);
+            });
+        });
+        
+    } catch (e) {
+        console.error("Error loading inspections:", e);
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--error);">Failed to load inspections from server.</td></tr>';
+    }
+}
+
+function abrirModalVistoria(v) {
+    if (!v) return;
+    const modal = document.getElementById('viewVistoriaModal');
+    if (!modal) return;
+
+    const dataVistoria = new Date(v.data_vistoria).toLocaleString('en-GB');
+    
+    // Title & Badge
+    document.getElementById('modalTitle').textContent = `Inspection #${v.id}`;
+    const badgeEl = document.getElementById('modalTipoBadge');
+    badgeEl.textContent = v.tipo;
+    const tLower = (v.tipo || '').toLowerCase();
+    badgeEl.className = 'badge ' + (
+        tLower === 'check-out' || tLower === 'saída' ? 'badge-info' :
+        tLower === 'check-in' || tLower === 'entrada' ? 'badge-warning' :
+        tLower === 'incident' || tLower === 'ocorrência' ? 'badge-danger' : ''
+    );
+
+    // Fields
+    document.getElementById('modalData').textContent = dataVistoria;
+    document.getElementById('modalContratoLink').innerHTML = `
+        <a href="/contratos/${v.id_contrato}" class="link-contrato" style="font-size:0.9rem;">
+            Contract #${v.id_contrato} &rarr;
+        </a>
+    `;
+    document.getElementById('modalPlaca').textContent = v.placa || '-';
+    document.getElementById('modalCliente').textContent = v.cliente || '-';
+    document.getElementById('modalObs').textContent = v.observacoes ? v.observacoes : 'No notes recorded.';
+
+    // Gallery
+    const fotosContainer = document.getElementById('modalGaleria');
+    fotosContainer.innerHTML = '';
+    
+    const fotosArray = v.foto_url ? v.foto_url.split(',').map(f => f.trim()).filter(Boolean) : [];
+    document.getElementById('modalFotoCount').textContent = fotosArray.length;
+
+    if (fotosArray.length > 0) {
+        fotosArray.forEach((url, i) => {
+            const item = document.createElement('a');
+            item.href = url;
+            item.target = '_blank';
+            item.className = 'photo-item';
+            item.title = `Photo ${i + 1} - Click to open in full resolution`;
+            item.innerHTML = `
+                <img src="${url}" alt="Inspection Photo ${i + 1}" loading="lazy">
+                <span class="photo-zoom-icon">&#x1F50D; Enlarge</span>
+            `;
+            fotosContainer.appendChild(item);
+        });
+    } else {
+        fotosContainer.innerHTML = '<p style="color:var(--text-secondary); font-size:0.9rem; grid-column: 1 / -1; padding:1rem 0;">No photos attached to this inspection.</p>';
+    }
+
+    modal.classList.add('active');
+}
+
+function fecharModal() {
+    const modal = document.getElementById('viewVistoriaModal');
+    if (modal) modal.classList.remove('active');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    carregarVistorias();
+    
+    // Pagination
+    const btnPrev = document.getElementById('btnPrevPage');
+    const btnNext = document.getElementById('btnNextPage');
+    if (btnPrev) {
+        btnPrev.addEventListener('click', () => {
+            if (paginaAtual > 1) {
+                paginaAtual--;
+                carregarVistorias();
+            }
+        });
+    }
+    if (btnNext) {
+        btnNext.addEventListener('click', () => {
+            paginaAtual++;
+            carregarVistorias();
+        });
+    }
+
+    // Search with debounce
+    const searchInput = document.getElementById('searchInput');
+    let timeoutId;
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                termoBusca = e.target.value.trim();
+                paginaAtual = 1;
+                carregarVistorias();
+            }, 300);
+        });
+    }
+
+    // Filter by type
+    const filterTipo = document.getElementById('filterTipo');
+    if (filterTipo) {
+        filterTipo.addEventListener('change', (e) => {
+            tipoFiltro = e.target.value;
+            paginaAtual = 1;
+            carregarVistorias();
+        });
+    }
+
+    // Filter by date
+    const filterDate = document.getElementById('filterDate');
+    if (filterDate) {
+        filterDate.addEventListener('change', (e) => {
+            dataFiltro = e.target.value;
+            paginaAtual = 1;
+            carregarVistorias();
+        });
+    }
+
+    // Clear Filters Button
+    const btnClear = document.getElementById('btnClearFilters');
+    if (btnClear) {
+        btnClear.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (filterTipo) filterTipo.value = '';
+            if (filterDate) filterDate.value = '';
+            termoBusca = '';
+            tipoFiltro = '';
+            dataFiltro = '';
+            paginaAtual = 1;
+            carregarVistorias();
+        });
+    }
+
+    // Close Modal
+    const modal = document.getElementById('viewVistoriaModal');
+    const closeBtn = document.getElementById('closeViewModal');
+    if (closeBtn) closeBtn.addEventListener('click', fecharModal);
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) fecharModal();
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') fecharModal();
+    });
+});
+
+

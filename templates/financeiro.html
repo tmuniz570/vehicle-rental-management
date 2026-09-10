@@ -1,0 +1,189 @@
+{% extends 'layout.html' %}
+
+{% block title %}Financial Management{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1>Financial Management</h1>
+        <p style="color: var(--text-secondary); margin-top: 0.25rem;">Management of charges, rental payments, deposits, and fines.</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <a href="/relatorios/vencidos" class="btn-primary" style="width: auto; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; padding: 0.75rem 1.25rem; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171;">
+            ⚠️ Overdue Payments Report
+        </a>
+    </div>
+</div>
+
+<div style="margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+    <div style="flex: 2; min-width: 240px; position: relative;">
+        <input type="text" id="searchInput" placeholder="Search by contract, customer, reg plate, type or ID..." style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none;">
+        <svg style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none;" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+    </div>
+
+    <div style="flex: 1; min-width: 170px;">
+        <select id="filterStatus" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
+            <option value="pendentes">Pending Only</option>
+            <option value="">All Statuses</option>
+            <option value="Paid">Paid Only</option>
+            <option value="Cancelled">Cancelled</option>
+        </select>
+    </div>
+
+    <div style="flex: 1; min-width: 170px;">
+        <select id="filterTipo" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
+            <option value="">All Types</option>
+            <option value="Rent">Rent</option>
+            <option value="Deposit">Deposit</option>
+            <option value="Fine">Fine</option>
+            <option value="Damage">Damage</option>
+            <option value="Deposit_Refund">Deposit Refund</option>
+        </select>
+    </div>
+
+    <button id="btnClearFilters" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem 1rem; border-radius: 12px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+        Clear Filters
+    </button>
+</div>
+
+<div class="table-container">
+    <table id="financeiroTable">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Contract</th>
+                <th>Customer</th>
+                <th>Motorbike</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Due Date</th>
+                <th>Payment Date</th>
+                <th>Status</th>
+                <th style="text-align: right;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td colspan="10" style="text-align:center; padding: 2.5rem; color: var(--text-secondary);">Loading transactions...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; flex-wrap: wrap; gap: 10px;">
+    <button id="btnPrevPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 110px;">&laquo; Previous</button>
+    <span id="paginationInfo" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+    <button id="btnNextPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 110px;">Next &raquo;</button>
+</div>
+
+<!-- Modal Confirm Payment -->
+<div id="pagamentoModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 450px;">
+        <div class="modal-header">
+            <h3>Mark Payment</h3>
+            <button id="closePagamentoModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="pagamentoForm">
+                <input type="hidden" id="pag_cobranca_id">
+                
+                <div style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
+                        <span style="color:var(--text-secondary); font-size:0.85rem;">Transaction:</span>
+                        <strong id="pag_desc_id" style="color:var(--text-primary);">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
+                        <span style="color:var(--text-secondary); font-size:0.85rem;">Description:</span>
+                        <span id="pag_desc_tipo" style="color:var(--text-primary); font-weight:500;">-</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:var(--text-secondary); font-size:0.85rem;">Amount Due:</span>
+                        <strong id="pag_desc_valor" style="font-size:1.35rem; color:var(--success);">-</strong>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="pag_forma" style="font-size:0.9rem; font-weight:600; color:var(--text-primary); margin-bottom:0.5rem; display:block;">Payment Method *</label>
+                    <select id="pag_forma" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                        <option value="Cash">Cash</option>
+                        <option value="Card">Card</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <button type="submit" id="btnConfirmarPag" class="btn-primary" style="background: var(--success); width: 100%; padding: 0.875rem;">
+                    Confirm Payment
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Recibo -->
+<div id="reciboModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px; background: #ffffff; color: #0f172a; border-radius: 16px;">
+        <div style="padding: 2rem 2rem 1rem 2rem; position: relative;">
+            <button id="closeReciboModal" class="modal-close" style="color: #64748b; position: absolute; top: 1rem; right: 1rem;">&times;</button>
+            
+            <div id="reciboPrintArea">
+                <div style="text-align: center; border-bottom: 2px dashed #cbd5e1; padding-bottom: 1.25rem; margin-bottom: 1.25rem;">
+                    <h2 style="margin: 0; color: #1e293b; font-size: 1.5rem;">FF Motors</h2>
+                    <p style="margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem;">Payment Receipt &bull; Birmingham UK</p>
+                    <span style="display:inline-block; margin-top:0.5rem; background:#dcfce7; color:#15803d; font-weight:700; font-size:0.75rem; padding:0.25rem 0.75rem; border-radius:999px;">PAYMENT CONFIRMED</span>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap: 0.5rem; font-size: 0.9rem;">
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Transaction No:</span>
+                        <strong id="rec_id" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Contract:</span>
+                        <strong id="rec_contrato_id" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Customer:</span>
+                        <strong id="rec_cliente" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Vehicle (Reg Plate):</span>
+                        <strong id="rec_placa" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Type:</span>
+                        <strong id="rec_tipo" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Payment Date:</span>
+                        <strong id="rec_data" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Payment Method:</span>
+                        <strong id="rec_forma" style="color:#0f172a;">-</strong>
+                    </div>
+                    
+                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 2px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:1rem; font-weight:600; color:#1e293b;">Amount Paid:</span>
+                        <strong id="rec_valor" style="font-size:1.5rem; color:#0f172a;">-</strong>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 1.5rem; color: #94a3b8; font-size: 0.8rem;">
+                    Thank you for choosing FF Motors Birmingham!
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
+                <button id="btnPrintRecibo" class="btn-primary" style="flex:1; background:#2563eb; color:white; padding:0.75rem;">🖨️ Print Receipt</button>
+                <a id="btnLinkRecibo" href="#" target="_blank" class="btn-primary" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; width:auto; text-decoration:none; padding:0.75rem 1rem;">Open Page</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/financeiro.js?v=3"></script>
+{% endblock %}
+

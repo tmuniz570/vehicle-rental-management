@@ -1,0 +1,66 @@
+{% extends 'layout.html' %}
+
+{% block title %}Record Inspection{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1>Record Inspection</h1>
+        <p style="color: var(--text-secondary); margin-top: 0.25rem;">Attach condition photos and notes upon motorbike collection, return or incident.</p>
+    </div>
+    <a href="/vistorias" class="btn-primary" style="background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-secondary); width: auto; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;">
+        &larr; Back to Inspections
+    </a>
+</div>
+
+<div class="glass-card" style="max-width: 650px; margin: 0 auto;">
+    <form id="vistoriaForm" class="modern-form">
+        <input type="hidden" id="id_contrato" name="id_contrato">
+        
+        <div class="form-row">
+            <div class="form-group half" id="contratoSelectGroup">
+                <label for="contrato_select">Rental Contract *</label>
+                <select id="contrato_select" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                    <option value="">Loading contracts...</option>
+                </select>
+                <div id="contratoInfoFixed" style="display:none; padding: 0.875rem 1rem; background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 12px; color: var(--text-primary); font-weight: 600;"></div>
+            </div>
+
+            <div class="form-group half">
+                <label for="tipo">Inspection Type *</label>
+                <select id="tipo" name="tipo" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                    <option value="Check-out">Check-out (Collection / Start of Rental)</option>
+                    <option value="Check-in">Check-in (Return / End of Rental)</option>
+                    <option value="Incident">Incident (Damage / Accident / Repair)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="fotos">Motorbike Photos (Multiple allowed) *</label>
+            <input type="file" id="fotos" name="fotos" accept="image/*" multiple required style="padding: 0.75rem; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; width: 100%;">
+            <small style="color: var(--text-secondary); margin-top: 0.25rem;">Photos are automatically compressed before uploading.</small>
+            <div id="previewContainer" class="photo-grid" style="display:none; margin-top: 0.75rem;"></div>
+        </div>
+
+        <div class="form-group">
+            <label for="observacoes">Notes on Condition / Existing Scratches / Tyres</label>
+            <textarea id="observacoes" name="observacoes" rows="4" placeholder="e.g. Scratches on right fairing, mirrors in good condition, front tyre 4mm thread..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;"></textarea>
+        </div>
+
+        <div id="feedbackMessage" class="feedback-message hidden"></div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <span class="btn-text">Save Inspection</span>
+                <div class="loader hidden"></div>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/vistoria.js?v=2"></script>
+{% endblock %}
+

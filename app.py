@@ -1,0 +1,974 @@
+import os
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, send_from_directory
+from database import (
+    db, init_db, Contract, FinancialTransaction, TransactionType, 
+    TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType
+)
+import werkzeug.utils
+from apscheduler.schedulers.background import BackgroundScheduler
+import pytz
+
+app = Flask(__name__)
+
+# Configuração do banco de dados SQLite
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'ffmotors.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static', 'uploads')
+
+# Inicializa o banco
+init_db(app)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/clientes/novo')
+def pagina_cadastro_cliente():
+    return render_template('cadastro_cliente.html')
+
+@app.route('/clientes')
+def pagina_clientes():
+    return render_template('clientes.html')
+
+@app.route('/motos')
+def pagina_motos():
+    return render_template('motos.html')
+
+@app.route('/motos/nova')
+def pagina_cadastro_moto():
+    return render_template('cadastro_moto.html')
+
+@app.route('/contratos')
+def pagina_contratos():
+    return render_template('contratos.html')
+
+@app.route('/contratos/novo')
+def pagina_novo_contrato():
+    return render_template('novo_contrato.html')
+
+@app.route('/vistorias/nova')
+def pagina_nova_vistoria():
+    return render_template('vistoria.html')
+
+@app.route('/financeiro')
+def pagina_financeiro():
+    return render_template('financeiro.html')
+
+@app.route('/vistorias')
+def pagina_vistorias_lista():
+    return render_template('vistorias_lista.html')
+
+@app.route('/relatorios')
+def pagina_relatorios():
+    return render_template('relatorios.html')
+
+@app.route('/relatorios/vencidos')
+def relatorio_vencidos():
+    transacoes = FinancialTransaction.query.filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pendente']),
+        FinancialTransaction.data_vencimento < datetime.utcnow()
+    ).order_by(FinancialTransaction.data_vencimento.asc()).all()
+    
+    dados = []
+    total = 0
+    for t in transacoes:
+        c = Contract.query.get(t.id_contrato)
+        cliente = Client.query.get(c.id_cliente) if c else None
+        
+        dados.append({
+            'contrato_id': c.id if c else '-',
+            'cliente_nome': cliente.nome if cliente else '-',
+            'placa': c.placa if c else '-',
+            'tipo': t.tipo,
+            'valor': t.valor,
+            'vencimento': t.data_vencimento.strftime('%d/%m/%Y') if t.data_vencimento else '-'
+        })
+        total += float(t.valor)
+        
+    tz = pytz.timezone('Europe/London')
+    agora = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+    return render_template('relatorio_vencidos.html', dados=dados, total=total, agora=agora)
+
+@app.route('/contratos/<int:id>')
+def pagina_detalhes_contrato(id):
+    return render_template('detalhe_contrato.html', contrato_id=id)
+
+# --- CRUD ROUTES ---
+
+@app.route('/api/clientes', methods=['POST'])
+def criar_cliente():
+    nome = request.form.get('nome')
+    telefone = request.form.get('telefone')
+    email = request.form.get('email')
+    endereco = request.form.get('endereco')
+    
+    if not nome or not telefone or not email:
+        return jsonify({'error': 'Missing required fields (full name, phone and email are required)', 'erro': 'Dados incompletos'}), 400
+    
+    # Check if email is already registered
+    if Client.query.filter_by(email=email).first():
+        return jsonify({'error': 'Email already registered', 'erro': 'Email já cadastrado'}), 400
+        
+    url_hab = None
+    url_comp_end = None
+    
+    if 'habilitacao' in request.files:
+        f = request.files['habilitacao']
+        if f.filename:
+            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
+            caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_arq)
+            f.save(caminho)
+            url_hab = f"/static/uploads/{nome_arq}"
+            
+    if 'comprovante_endereco' in request.files:
+        f = request.files['comprovante_endereco']
+        if f.filename:
+            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_comp_end_{f.filename}")
+            caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_arq)
+            f.save(caminho)
+            url_comp_end = f"/static/uploads/{nome_arq}"
+            
+    novo_cliente = Client(
+        nome=nome,
+        telefone=telefone,
+        email=email,
+        endereco=endereco,
+        url_habilitacao=url_hab,
+        url_comprovante_endereco=url_comp_end
+    )
+    db.session.add(novo_cliente)
+    db.session.commit()
+    
+    return jsonify({'message': 'Customer created successfully', 'mensagem': 'Cliente criado com sucesso', 'id': novo_cliente.id}), 201
+
+@app.route('/api/motos', methods=['POST'])
+def criar_moto():
+    dados = request.get_json()
+    if not dados or not all(k in dados for k in ('placa', 'modelo', 'cor')):
+        return jsonify({'error': 'Missing required fields (registration plate, model and colour are required)', 'erro': 'Dados incompletos'}), 400
+        
+    if Motorcycle.query.filter_by(placa=dados['placa']).first():
+        return jsonify({'error': 'Registration plate already registered', 'erro': 'Placa já cadastrada'}), 400
+        
+    nova_moto = Motorcycle(
+        placa=dados['placa'],
+        modelo=dados['modelo'],
+        cor=dados['cor'],
+        status=dados.get('status', MotoStatus.AVAILABLE.value)
+    )
+    db.session.add(nova_moto)
+    db.session.commit()
+    
+    return jsonify({'message': 'Motorbike registered successfully', 'mensagem': 'Moto cadastrada com sucesso', 'placa': nova_moto.placa}), 201
+
+@app.route('/api/clientes', methods=['GET'])
+def listar_clientes():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '', type=str)
+    
+    query = Client.query
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            Client.nome.ilike(search_term),
+            Client.telefone.ilike(search_term),
+            Client.email.ilike(search_term)
+        ))
+    
+    paginated = query.order_by(Client.id.desc()).paginate(page=page, per_page=limit, error_out=False)
+    
+    itens = [{
+        'id': c.id, 'nome': c.nome, 'telefone': c.telefone, 'email': c.email, 'endereco': c.endereco,
+        'url_habilitacao': c.url_habilitacao, 'url_comprovante_endereco': c.url_comprovante_endereco
+    } for c in paginated.items]
+    
+    return jsonify({
+        'itens': itens,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page
+    })
+
+@app.route('/api/clientes/<int:id>', methods=['PUT'])
+def atualizar_cliente(id):
+    cliente = Client.query.get(id)
+    if not cliente:
+        return jsonify({'error': 'Customer not found', 'erro': 'Cliente não encontrado'}), 404
+        
+    if request.is_json:
+        dados = request.get_json()
+        if 'nome' in dados: cliente.nome = dados['nome']
+        if 'telefone' in dados: cliente.telefone = dados['telefone']
+        if 'email' in dados:
+            outro = Client.query.filter(Client.email == dados['email'], Client.id != id).first()
+            if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
+            cliente.email = dados['email']
+        if 'endereco' in dados: cliente.endereco = dados['endereco']
+    else:
+        if 'nome' in request.form: cliente.nome = request.form['nome']
+        if 'telefone' in request.form: cliente.telefone = request.form['telefone']
+        if 'endereco' in request.form: cliente.endereco = request.form['endereco']
+        if 'email' in request.form:
+            outro = Client.query.filter(Client.email == request.form['email'], Client.id != id).first()
+            if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
+            cliente.email = request.form['email']
+            
+        if 'habilitacao' in request.files:
+            f = request.files['habilitacao']
+            if f.filename:
+                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
+                caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
+                f.save(caminho)
+                cliente.url_habilitacao = f"/static/uploads/{nome_arq}"
+                
+        if 'comprovante_endereco' in request.files:
+            f = request.files['comprovante_endereco']
+            if f.filename:
+                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_comp_end_{f.filename}")
+                caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
+                f.save(caminho)
+                cliente.url_comprovante_endereco = f"/static/uploads/{nome_arq}"
+    
+    db.session.commit()
+    return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'})
+
+@app.route('/api/motos', methods=['GET'])
+def listar_motos():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '', type=str)
+    
+    query = Motorcycle.query
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            Motorcycle.placa.ilike(search_term),
+            Motorcycle.modelo.ilike(search_term),
+            Motorcycle.status.ilike(search_term)
+        ))
+        
+    paginated = query.order_by(Motorcycle.placa).paginate(page=page, per_page=limit, error_out=False)
+    
+    itens = [{
+        'placa': m.placa, 'modelo': m.modelo, 'cor': m.cor, 'status': m.status
+    } for m in paginated.items]
+    
+    return jsonify({
+        'itens': itens,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page
+    })
+
+@app.route('/api/motos/<placa>', methods=['PUT'])
+def atualizar_moto(placa):
+    moto = Motorcycle.query.get(placa)
+    if not moto:
+        return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
+        
+    dados = request.get_json()
+    if 'modelo' in dados: moto.modelo = dados['modelo']
+    if 'cor' in dados: moto.cor = dados['cor']
+    if 'status' in dados: moto.status = dados['status']
+    
+    db.session.commit()
+    return jsonify({'message': 'Motorbike updated successfully', 'mensagem': 'Moto atualizada com sucesso'})
+
+@app.route('/api/contratos', methods=['POST'])
+def criar_contrato():
+    id_cliente = request.form.get('id_cliente')
+    placa = request.form.get('placa')
+    dia_pagamento_semanal = int(request.form.get('dia_pagamento_semanal'))
+    valor_aluguel_semanal = float(request.form.get('valor_aluguel_semanal', 250.0))
+    valor_deposito = float(request.form.get('valor_deposito'))
+    observacoes = request.form.get('observacoes')
+    
+    if 'fotos' not in request.files:
+        return jsonify({'error': 'Initial check-out inspection photos are required', 'erro': 'A vistoria de saída (foto) é obrigatória'}), 400
+        
+    fotos = request.files.getlist('fotos')
+    if not fotos or fotos[0].filename == '':
+        return jsonify({'error': 'No photos selected for inspection', 'erro': 'Nenhuma foto selecionada'}), 400
+        
+    if 'seguro' not in request.files:
+        return jsonify({'error': 'Insurance certificate document is required to open a contract', 'erro': 'O arquivo do Seguro é obrigatório para abrir um contrato'}), 400
+        
+    moto = Motorcycle.query.get(placa)
+    if not moto or moto.status not in [MotoStatus.AVAILABLE.value, 'Disponível']:
+        return jsonify({'error': 'Motorbike is not available for rental', 'erro': 'Moto não está disponível'}), 400
+        
+    # Save inspection photos
+    urls_fotos = []
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    for i, foto in enumerate(fotos):
+        if foto.filename:
+            filename = werkzeug.utils.secure_filename(foto.filename)
+            nome_arquivo = f"{timestamp}_{i}_{filename}"
+            caminho_salvar = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arquivo)
+            foto.save(caminho_salvar)
+            urls_fotos.append(f"/static/uploads/{nome_arquivo}")
+            
+    url_foto_str = ",".join(urls_fotos)
+    
+    # Save insurance document
+    url_seguro = None
+    arq_seguro = request.files['seguro']
+    if arq_seguro.filename:
+        filename_seguro = werkzeug.utils.secure_filename(arq_seguro.filename)
+        nome_seguro = f"{timestamp}_seguro_{filename_seguro}"
+        caminho_seguro = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_seguro)
+        arq_seguro.save(caminho_seguro)
+        url_seguro = f"/static/uploads/{nome_seguro}"
+
+    # Create Contract
+    novo_contrato = Contract(
+        id_cliente=id_cliente,
+        placa=placa,
+        dia_pagamento_semanal=dia_pagamento_semanal,
+        valor_aluguel_semanal=valor_aluguel_semanal,
+        url_seguro=url_seguro,
+        status=ContractStatus.ACTIVE.value
+    )
+    db.session.add(novo_contrato)
+    
+    # Update motorbike status to Rented
+    moto.status = MotoStatus.RENTED.value
+    
+    db.session.flush() # Retrieve generated contract ID
+    
+    hoje = datetime.utcnow()
+    
+    # Security deposit transaction
+    deposito = FinancialTransaction(
+        id_contrato=novo_contrato.id,
+        tipo=TransactionType.DEPOSIT.value,
+        data_vencimento=hoje,
+        valor=valor_deposito,
+        status=TransactionStatus.PENDING.value
+    )
+    db.session.add(deposito)
+    
+    # Week 1 rent (due today upon collection)
+    aluguel_semana_1 = FinancialTransaction(
+        id_contrato=novo_contrato.id,
+        tipo=TransactionType.RENT.value,
+        data_vencimento=hoje,
+        valor=valor_aluguel_semanal,
+        status=TransactionStatus.PENDING.value
+    )
+    db.session.add(aluguel_semana_1)
+    
+    # Week 2 rent (due on next recurring payment day)
+    days_ahead = dia_pagamento_semanal - hoje.weekday()
+    if days_ahead <= 0:
+        days_ahead += 7
+    proximo_vencimento = hoje + timedelta(days=days_ahead)
+    
+    aluguel_semana_2 = FinancialTransaction(
+        id_contrato=novo_contrato.id,
+        tipo=TransactionType.RENT.value,
+        data_vencimento=proximo_vencimento,
+        valor=valor_aluguel_semanal,
+        status=TransactionStatus.PENDING.value
+    )
+    db.session.add(aluguel_semana_2)
+    
+    # Create Check-out Inspection
+    nova_vistoria = Inspection(
+        id_contrato=novo_contrato.id,
+        tipo=InspectionType.CHECK_OUT.value,
+        observacoes=observacoes,
+        url_fotos=url_foto_str
+    )
+    db.session.add(nova_vistoria)
+    
+    db.session.commit()
+    
+    return jsonify({'message': 'Contract and initial inspection created successfully', 'mensagem': 'Contrato e vistoria criados com sucesso', 'id': novo_contrato.id}), 201
+
+@app.route('/api/contratos/<int:id>/seguro', methods=['PUT'])
+def atualizar_seguro_contrato(id):
+    contrato = Contract.query.get(id)
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+        
+    if 'seguro' in request.files:
+        f = request.files['seguro']
+        if f.filename:
+            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_seguro_upd_{f.filename}")
+            caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
+            f.save(caminho)
+            contrato.url_seguro = f"/static/uploads/{nome_arq}"
+            db.session.commit()
+            return jsonify({'message': 'Insurance document updated successfully', 'mensagem': 'Seguro atualizado'})
+            
+    return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
+
+@app.route('/api/contratos', methods=['GET'])
+def listar_contratos():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '', type=str)
+    
+    query = Contract.query.join(Client, Contract.id_cliente == Client.id)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            Contract.id.cast(db.String).ilike(search_term),
+            Contract.placa.ilike(search_term),
+            Contract.status.ilike(search_term),
+            Client.nome.ilike(search_term)
+        ))
+        
+    ativos = request.args.get('ativos') == 'true'
+    if ativos:
+        query = query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Ativo']))
+        
+    paginated = query.order_by(Contract.id.desc()).paginate(page=page, per_page=limit, error_out=False)
+    
+    itens = [{
+        'id': c.id, 'id_cliente': c.id_cliente, 'cliente_nome': c.cliente.nome, 'placa': c.placa,
+        'data_retirada': c.data_retirada.isoformat() + 'Z' if c.data_retirada else None,
+        'dia_pagamento_semanal': c.dia_pagamento_semanal,
+        'valor_aluguel_semanal': c.valor_aluguel_semanal,
+        'data_devolucao': c.data_devolucao.isoformat() + 'Z' if c.data_devolucao else None,
+        'status': c.status,
+        'url_seguro': c.url_seguro
+    } for c in paginated.items]
+    
+    return jsonify({
+        'itens': itens,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page
+    })
+
+@app.route('/api/contratos/<int:id>', methods=['GET'])
+def detalhe_contrato(id):
+    c = Contract.query.get(id)
+    if not c:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+        
+    cliente = Client.query.get(c.id_cliente)
+    moto = Motorcycle.query.get(c.placa)
+    
+    transacoes = FinancialTransaction.query.filter_by(id_contrato=id).all()
+    vistorias = Inspection.query.filter_by(id_contrato=id).all()
+    
+    return jsonify({
+        'id': c.id,
+        'cliente': cliente.nome if cliente else f'ID {c.id_cliente}',
+        'telefone': cliente.telefone if cliente else '-',
+        'email': cliente.email if cliente else '-',
+        'placa': c.placa,
+        'modelo': moto.modelo if moto else '-',
+        'cor': moto.cor if moto else '-',
+        'data_retirada': c.data_retirada.isoformat() + 'Z' if c.data_retirada else None,
+        'data_devolucao': c.data_devolucao.isoformat() + 'Z' if c.data_devolucao else None,
+        'dia_pagamento_semanal': c.dia_pagamento_semanal,
+        'valor_aluguel_semanal': float(c.valor_aluguel_semanal) if c.valor_aluguel_semanal else 0.0,
+        'status': c.status,
+        'url_seguro': c.url_seguro,
+        'url_comprovante_deposito': c.url_comprovante_deposito,
+        'transacoes': [{
+            'id': t.id,
+            'tipo': t.tipo,
+            'valor': float(t.valor),
+            'status': t.status,
+            'forma_pagamento': t.forma_pagamento,
+            'data_vencimento': t.data_vencimento.isoformat() + 'Z' if t.data_vencimento else None,
+            'data_pagamento': t.data_pagamento.isoformat() + 'Z' if t.data_pagamento else None
+        } for t in transacoes],
+        'vistorias': [{
+            'id': v.id,
+            'tipo': v.tipo,
+            'data_vistoria': v.data.isoformat() + 'Z' if v.data else None,
+            'foto_url': v.url_fotos,
+            'observacoes': v.observacoes
+        } for v in vistorias]
+    })
+
+@app.route('/api/contratos/<int:id>/cobrancas', methods=['POST'])
+def criar_cobranca(id):
+    c = Contract.query.get(id)
+    if not c:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+        
+    tipo = request.json.get('tipo')
+    valor = request.json.get('valor')
+    data_vencimento_str = request.json.get('data_vencimento')
+    
+    if not tipo or not valor or not data_vencimento_str:
+        return jsonify({'error': 'Missing required fields (type, amount and due date are required)', 'erro': 'Dados incompletos'}), 400
+        
+    try:
+        data_vencimento = datetime.strptime(data_vencimento_str, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({'error': 'Invalid due date format', 'erro': 'Data de vencimento inválida'}), 400
+        
+    nova_cobranca = FinancialTransaction(
+        id_contrato=c.id,
+        tipo=tipo,
+        data_vencimento=data_vencimento,
+        valor=float(valor),
+        status=TransactionStatus.PENDING.value
+    )
+    db.session.add(nova_cobranca)
+    db.session.commit()
+    
+    return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
+
+@app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT'])
+def pagar_cobranca(id):
+    t = FinancialTransaction.query.get(id)
+    if not t:
+        return jsonify({'error': 'Charge not found', 'erro': 'Cobrança não encontrada'}), 404
+        
+    forma_pagamento = request.json.get('forma_pagamento')
+    if not forma_pagamento:
+        return jsonify({'error': 'Payment method is required', 'erro': 'Forma de pagamento é obrigatória'}), 400
+        
+    t.status = TransactionStatus.PAID.value
+    t.data_pagamento = datetime.utcnow()
+    t.forma_pagamento = forma_pagamento
+    
+    db.session.commit()
+    return jsonify({'message': 'Payment marked successfully', 'mensagem': 'Baixa realizada com sucesso', 'forma_pagamento': t.forma_pagamento}), 200
+
+@app.route('/api/vistorias', methods=['POST'])
+def criar_vistoria():
+    id_contrato = request.form.get('id_contrato')
+    tipo = request.form.get('tipo')
+    observacoes = request.form.get('observacoes')
+    
+    if 'fotos' not in request.files:
+        return jsonify({'error': 'No photos uploaded', 'erro': 'Nenhuma foto enviada'}), 400
+        
+    fotos = request.files.getlist('fotos')
+    if not fotos or fotos[0].filename == '':
+        return jsonify({'error': 'No photos selected', 'erro': 'Nenhuma foto selecionada'}), 400
+        
+    urls_fotos = []
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    for i, foto in enumerate(fotos):
+        if foto.filename:
+            filename = werkzeug.utils.secure_filename(foto.filename)
+            nome_arquivo = f"{timestamp}_{i}_{filename}"
+            caminho_salvar = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arquivo)
+            foto.save(caminho_salvar)
+            urls_fotos.append(f"/static/uploads/{nome_arquivo}")
+            
+    url_foto_str = ",".join(urls_fotos)
+    
+    nova_vistoria = Inspection(
+        id_contrato=id_contrato,
+        tipo=tipo,
+        observacoes=observacoes,
+        url_fotos=url_foto_str
+    )
+    db.session.add(nova_vistoria)
+    
+    if tipo in [InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']:
+        contrato = Contract.query.get(id_contrato)
+        if contrato:
+            contrato.status = ContractStatus.DEPOSIT_HOLD.value
+            contrato.data_devolucao = datetime.utcnow()
+            moto = Motorcycle.query.get(contrato.placa)
+            if moto:
+                moto.status = MotoStatus.MAINTENANCE.value
+                
+    db.session.commit()
+    
+    return jsonify({'message': 'Inspection recorded successfully', 'mensagem': 'Vistoria registrada com sucesso', 'id': nova_vistoria.id, 'url': url_foto_str}), 201
+
+@app.route('/api/vistorias', methods=['GET'])
+def listar_vistorias():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '', type=str)
+    tipo = request.args.get('tipo', '', type=str)
+    data_filtro = request.args.get('data', '', type=str)
+    
+    query = Inspection.query.join(Contract, Inspection.id_contrato == Contract.id).join(Client, Contract.id_cliente == Client.id)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            Inspection.id_contrato.cast(db.String).ilike(search_term),
+            Inspection.tipo.ilike(search_term),
+            Contract.placa.ilike(search_term),
+            Client.nome.ilike(search_term),
+            Inspection.observacoes.ilike(search_term)
+        ))
+        
+    if tipo:
+        query = query.filter(Inspection.tipo == tipo)
+        
+    if data_filtro:
+        try:
+            dt_inicio = datetime.strptime(data_filtro, "%Y-%m-%d")
+            dt_fim = dt_inicio + timedelta(days=1)
+            query = query.filter(Inspection.data >= dt_inicio, Inspection.data < dt_fim)
+        except ValueError:
+            pass
+        
+    paginated = query.order_by(Inspection.data.desc()).paginate(page=page, per_page=limit, error_out=False)
+    
+    itens = [{
+        'id': v.id,
+        'id_contrato': v.id_contrato,
+        'data_vistoria': v.data.isoformat() + 'Z',
+        'tipo': v.tipo,
+        'foto_url': v.url_fotos,
+        'observacoes': v.observacoes,
+        'placa': v.contrato.placa if v.contrato else '',
+        'cliente': v.contrato.cliente.nome if v.contrato and v.contrato.cliente else ''
+    } for v in paginated.items]
+    
+    return jsonify({
+        'itens': itens,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page
+    })
+
+# --- DASHBOARD & JOBS ---
+
+@app.route('/api/financeiro', methods=['GET'])
+def listar_financeiro():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '', type=str)
+    status_filtro = request.args.get('status', '', type=str)
+    tipo_filtro = request.args.get('tipo', '', type=str)
+    pendentes = request.args.get('pendentes') == 'true'
+    
+    query = FinancialTransaction.query.outerjoin(Contract, FinancialTransaction.id_contrato == Contract.id).outerjoin(Client, Contract.id_cliente == Client.id)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            FinancialTransaction.id.cast(db.String).ilike(search_term),
+            FinancialTransaction.id_contrato.cast(db.String).ilike(search_term),
+            FinancialTransaction.tipo.ilike(search_term),
+            FinancialTransaction.status.ilike(search_term),
+            Contract.placa.ilike(search_term),
+            Client.nome.ilike(search_term)
+        ))
+        
+    if status_filtro:
+        query = query.filter(FinancialTransaction.status == status_filtro)
+    elif pendentes:
+        query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
+        
+    if tipo_filtro:
+        query = query.filter(FinancialTransaction.tipo == tipo_filtro)
+        
+    paginated = query.order_by(FinancialTransaction.data_vencimento.asc()).paginate(page=page, per_page=limit, error_out=False)
+    
+    itens = [{
+        'id': t.id,
+        'id_contrato': t.id_contrato,
+        'tipo': t.tipo,
+        'data_vencimento': t.data_vencimento.isoformat() + 'Z' if t.data_vencimento else None,
+        'data_pagamento': t.data_pagamento.isoformat() + 'Z' if t.data_pagamento else None,
+        'valor': float(t.valor),
+        'status': t.status,
+        'forma_pagamento': t.forma_pagamento or '',
+        'placa': t.contrato.placa if t.contrato else '',
+        'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else ''
+    } for t in paginated.items]
+    
+    return jsonify({
+        'itens': itens,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page
+    })
+
+@app.route('/api/financeiro/pagar/<int:id>', methods=['POST', 'PUT'])
+def pagar_transacao(id):
+    t = FinancialTransaction.query.get(id)
+    if not t:
+        return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
+        
+    forma = 'Cash'
+    if request.is_json and request.json:
+        forma = request.json.get('forma_pagamento', 'Cash')
+    elif request.form and 'forma_pagamento' in request.form:
+        forma = request.form.get('forma_pagamento', 'Cash')
+        
+    t.status = TransactionStatus.PAID.value
+    t.data_pagamento = datetime.utcnow()
+    t.forma_pagamento = forma
+    db.session.commit()
+    return jsonify({'message': 'Transaction marked as paid successfully', 'mensagem': 'Transação paga com sucesso', 'forma_pagamento': t.forma_pagamento}), 200
+
+@app.route('/recibo/<int:id>')
+def pagina_recibo(id):
+    t = FinancialTransaction.query.get_or_404(id)
+    contrato = Contract.query.get(t.id_contrato) if t.id_contrato else None
+    cliente = Client.query.get(contrato.id_cliente) if (contrato and contrato.id_cliente) else None
+    return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente)
+
+@app.route('/api/financeiro/<int:id>', methods=['DELETE'])
+def excluir_transacao(id):
+    t = FinancialTransaction.query.get(id)
+    if not t:
+        return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
+        
+    if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+        return jsonify({'error': 'Cannot delete an already paid transaction', 'erro': 'Não é possível excluir uma transação já paga'}), 400
+        
+    db.session.delete(t)
+    db.session.commit()
+    return jsonify({'message': 'Transaction deleted successfully', 'mensagem': 'Transação excluída com sucesso'}), 200
+
+@app.route('/api/dashboard', methods=['GET'])
+def get_dashboard():
+    total_motos = Motorcycle.query.count()
+    motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
+    contratos_ativos_lista = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+    contratos_ativos = len(contratos_ativos_lista)
+    receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_lista)
+    
+    pendentes = FinancialTransaction.query.filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
+    ).all()
+    
+    receita_pendente = sum(float(t.valor) for t in pendentes)
+    
+    contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
+    quarentenas_count = len(contratos_quarentena)
+    quarentenas_valor = 0
+    for cq in contratos_quarentena:
+        for t in cq.transacoes:
+            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito'] and t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                quarentenas_valor += float(t.valor)
+    
+    return jsonify({
+        'total_motos': total_motos,
+        'motos_disponiveis': motos_disponiveis,
+        'contratos_ativos': contratos_ativos,
+        'receita_pendente': receita_pendente,
+        'receita_semanal': receita_semanal,
+        'quarentenas_count': quarentenas_count,
+        'quarentenas_valor': quarentenas_valor
+    })
+
+@app.route('/api/alertas', methods=['GET'])
+def listar_alertas():
+    alertas = []
+    
+    # Deposit hold alerts (14 or 15+ days)
+    contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
+    hoje = datetime.utcnow()
+    
+    for c in contratos_quarentena:
+        if c.data_devolucao:
+            dias_passados = (hoje - c.data_devolucao).days
+            if dias_passados >= 14:
+                cliente = Client.query.get(c.id_cliente)
+                nome = cliente.nome if cliente else f"ID {c.id_cliente}"
+                alertas.append({
+                    'tipo': 'deposit_hold_due',
+                    'contrato_id': c.id,
+                    'cliente_nome': nome,
+                    'dias': dias_passados,
+                    'mensagem': f"Contract #{c.id} ({nome}) has been on deposit hold for {dias_passados} days. Deposit return due today or tomorrow!"
+                })
+                
+    return jsonify(alertas)
+
+@app.route('/api/contratos/<int:id>/finalizar-quarentena', methods=['POST'])
+def finalizar_quarentena(id):
+    contrato = Contract.query.get(id)
+    if not contrato or contrato.status not in [ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']:
+        return jsonify({'error': 'Contract not found or not in deposit hold', 'erro': 'Contrato não encontrado ou não está em quarentena'}), 404
+        
+    url_comprovante = None
+    if 'comprovante' in request.files:
+        f = request.files['comprovante']
+        if f.filename:
+            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
+            caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
+            f.save(caminho)
+            url_comprovante = f"/static/uploads/{nome_arq}"
+            
+    contrato.url_comprovante_deposito = url_comprovante
+    contrato.status = ContractStatus.COMPLETED.value
+    
+    # Mark deposit refund transactions as paid
+    for t in contrato.transacoes:
+        if t.tipo in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'] and t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
+            t.status = TransactionStatus.PAID.value
+            t.data_pagamento = datetime.utcnow()
+            
+    db.session.commit()
+    return jsonify({'message': 'Deposit hold finalized successfully', 'mensagem': 'Quarentena finalizada com sucesso'})
+
+@app.route('/api/relatorios/resumo', methods=['GET'])
+def get_relatorios_resumo():
+    transacoes = FinancialTransaction.query.all()
+    faturamento = {'Paid': 0, 'Pending': 0, 'Pago': 0, 'Pendente': 0}
+    for t in transacoes:
+        if t.tipo in [TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa']:
+            if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                faturamento['Paid'] += float(t.valor)
+                faturamento['Pago'] += float(t.valor)
+            elif t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
+                faturamento['Pending'] += float(t.valor)
+                faturamento['Pendente'] += float(t.valor)
+                
+    motos = Motorcycle.query.all()
+    frota = {'Available': 0, 'Rented': 0, 'Maintenance': 0, 'Disponível': 0, 'Alugada': 0, 'Manutenção': 0}
+    for m in motos:
+        st = m.status
+        if st in ['Available', 'Disponível']:
+            frota['Available'] += 1
+            frota['Disponível'] += 1
+        elif st in ['Rented', 'Alugada']:
+            frota['Rented'] += 1
+            frota['Alugada'] += 1
+        elif st in ['Maintenance', 'Manutenção', 'Manutencao']:
+            frota['Maintenance'] += 1
+            frota['Manutenção'] += 1
+            
+    return jsonify({
+        'faturamento': faturamento,
+        'frota': frota
+    })
+
+# --- BUSINESS LOGIC (Background Jobs & Schedulers) ---
+
+def _gerar_cobrancas_semanais_logic():
+    # London / UK timezone
+    tz = pytz.timezone('Europe/London')
+    hoje = datetime.now(tz)
+    dia_semana_atual = hoje.weekday() # 0 = Monday, 6 = Sunday
+    
+    hoje_utc = datetime.utcnow()
+    
+    contratos_ativos = Contract.query.filter(
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+        Contract.dia_pagamento_semanal == dia_semana_atual
+    ).all()
+    
+    transacoes_geradas = 0
+    proximo_vencimento = hoje_utc + timedelta(days=7)
+    inicio_dia_prox = proximo_vencimento.replace(hour=0, minute=0, second=0, microsecond=0)
+    fim_dia_prox = inicio_dia_prox + timedelta(days=1)
+    
+    for contrato in contratos_ativos:
+        cobranca_existente = FinancialTransaction.query.filter(
+            FinancialTransaction.id_contrato == contrato.id,
+            FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']),
+            FinancialTransaction.data_vencimento >= inicio_dia_prox,
+            FinancialTransaction.data_vencimento < fim_dia_prox
+        ).first()
+        
+        if not cobranca_existente:
+            nova_cobranca = FinancialTransaction(
+                id_contrato=contrato.id,
+                tipo=TransactionType.RENT.value,
+                data_vencimento=proximo_vencimento,
+                valor=contrato.valor_aluguel_semanal,
+                status=TransactionStatus.PENDING.value
+            )
+            db.session.add(nova_cobranca)
+            transacoes_geradas += 1
+            
+    if transacoes_geradas > 0:
+        db.session.commit()
+        
+    return transacoes_geradas
+
+@app.route('/api/jobs/gerar-cobrancas-semanais', methods=['POST'])
+def gerar_cobrancas_semanais():
+    transacoes = _gerar_cobrancas_semanais_logic()
+    return jsonify({
+        "message": "Weekly rent charges processed successfully",
+        "charges_generated": transacoes,
+        "transacoes_geradas": transacoes
+    }), 200
+
+def _processar_quarentenas_logic():
+    """
+    Checks contracts in deposit hold that have exceeded 15 days
+    and calculates refundable deposit balance.
+    """
+    hoje = datetime.utcnow()
+    limite_quarentena = hoje - timedelta(days=15)
+    
+    contratos_quarentena = Contract.query.filter(
+        Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']),
+        Contract.data_devolucao <= limite_quarentena
+    ).all()
+    
+    processados = 0
+    
+    for contrato in contratos_quarentena:
+        transacoes = FinancialTransaction.query.filter_by(id_contrato=contrato.id).all()
+        
+        deposito = 0
+        multas_e_danos_pendentes = 0
+        
+        for t in transacoes:
+            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito'] and t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                deposito += float(t.valor)
+            elif t.tipo in [TransactionType.FINE.value, TransactionType.DAMAGE.value, 'Fine', 'Damage', 'Multa', 'Dano'] and t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
+                multas_e_danos_pendentes += float(t.valor)
+        
+        saldo_a_devolver = deposito - multas_e_danos_pendentes
+        
+        if saldo_a_devolver > 0:
+            devolucao = FinancialTransaction(
+                id_contrato=contrato.id,
+                tipo=TransactionType.DEPOSIT_REFUND.value,
+                data_vencimento=hoje,
+                valor=saldo_a_devolver,
+                status=TransactionStatus.PENDING.value
+            )
+            db.session.add(devolucao)
+            
+        contrato.status = ContractStatus.COMPLETED.value
+        
+        moto = Motorcycle.query.get(contrato.placa)
+        if moto and moto.status in [MotoStatus.RENTED.value, 'Rented', 'Alugada']:
+            moto.status = MotoStatus.AVAILABLE.value
+            
+        processados += 1
+        
+    if processados > 0:
+        db.session.commit()
+        
+    return processados
+
+@app.route('/api/jobs/processar-quarentenas', methods=['POST'])
+def processar_quarentenas():
+    processados = _processar_quarentenas_logic()
+    return jsonify({
+        "message": "Deposit holds processed successfully",
+        "contracts_completed": processados,
+        "contratos_finalizados": processados
+    }), 200
+
+def run_daily_jobs():
+    with app.app_context():
+        print("[Cron] Starting daily background jobs (Birmingham UK timezone)...")
+        t_cobrancas = _gerar_cobrancas_semanais_logic()
+        t_quarentenas = _processar_quarentenas_logic()
+        print(f"[Cron] Finished. {t_cobrancas} rent charges generated, {t_quarentenas} deposit holds processed.")
+
+if __name__ == '__main__':
+    uploads_dir = os.path.join(basedir, 'static', 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+    
+    # Start APScheduler with Europe/London timezone
+    scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
+    scheduler.add_job(func=run_daily_jobs, trigger="cron", hour=1, minute=0)
+    scheduler.start()
+    
+    app.run(debug=True, host='0.0.0.0', use_reloader=False)

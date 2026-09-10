@@ -1,0 +1,388 @@
+{% extends 'layout.html' %}
+
+{% block title %}Contract Details #{{ contrato_id }}{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+        <h1>Contract #<span id="header_id">{{ contrato_id }}</span></h1>
+        <p style="color: var(--text-secondary); margin-top: 0.25rem;">Rental agreement management, financial transactions statement and inspections.</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center;">
+        <button id="btnFinalizarContrato" class="btn-primary" style="background: #ef4444; width: auto; display: none; padding: 0.75rem 1.25rem; align-items: center; gap: 0.5rem;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Complete Contract / Return Bike
+        </button>
+        <a href="/contratos" class="btn-primary" style="background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-secondary); width: auto; display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; padding: 0.75rem 1.25rem;">
+            &larr; Back
+        </a>
+    </div>
+</div>
+
+<!-- 3 Summary Cards at Top -->
+<div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Customer Card -->
+    <div class="stat-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem;">
+                <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Customer</span>
+                <span style="font-size: 1.2rem;">👤</span>
+            </div>
+            <div id="info_cliente" style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">-</div>
+            <div id="info_tel" style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 0.25rem;">-</div>
+            <div id="info_email" style="color: var(--text-secondary); font-size: 0.9rem; word-break: break-all;">-</div>
+        </div>
+        <div id="info_cliente_links" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; gap: 0.5rem;">
+            <!-- Dynamic links via JS -->
+        </div>
+    </div>
+
+    <!-- Vehicle Card -->
+    <div class="stat-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem;">
+                <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Vehicle</span>
+                <span style="font-size: 1.2rem;">🏍️</span>
+            </div>
+            <div style="margin-bottom: 0.5rem;">
+                <span id="info_placa" class="badge-plate" style="font-size: 1.35rem; padding: 0.3rem 0.75rem;">-</span>
+            </div>
+            <div id="info_modelo_cor" style="color: var(--text-primary); font-weight: 500; font-size: 1rem; margin-bottom: 0.25rem;">-</div>
+            <div id="info_data_retirada" style="color: var(--text-secondary); font-size: 0.85rem;">Collection Date: -</div>
+        </div>
+        
+        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+            <div id="info_seguro" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+            <input type="file" id="update_seguro_file" accept="image/*,.pdf" style="display:none;">
+        </div>
+    </div>
+
+    <!-- Contract & Terms Card -->
+    <div class="stat-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem;">
+                <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Contract & Status</span>
+                <span id="info_status">-</span>
+            </div>
+            <div style="margin-bottom: 0.5rem;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; display: block;">Weekly Rent</span>
+                <strong id="info_aluguel" style="font-size: 1.35rem; color: var(--accent);">-</strong>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                Due Day: <strong id="info_dia_venc" style="color: var(--text-primary);">-</strong>
+            </div>
+        </div>
+
+        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
+            <button id="btnDevolverDeposito" class="btn-primary" style="display:none; font-size: 0.85rem; padding: 0.6rem 1rem; width: 100%; background: var(--success);">
+                Refund Deposit & Finalize
+            </button>
+            <div id="info_comprovante"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Lower Grid: Financial Statement (2/3) + Inspections (1/3) -->
+<div class="dashboard-grid" style="grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+    <!-- Financial Statement -->
+    <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column;">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <div>
+                <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Financial Statement</h3>
+                <span id="resumoExtrato" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+            </div>
+            <button id="btnLancCob" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; width: auto; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Add Charge
+            </button>
+        </div>
+
+        <div class="table-container" style="box-shadow: none; border: 1px solid var(--border-color); flex-grow: 1;">
+            <table id="extratoTable">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Due Date</th>
+                        <th>Payment Date</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="extratoTableBody">
+                    <tr>
+                        <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Loading statement...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Inspections -->
+    <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column;">
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Inspections</h3>
+            <button id="btnNovaOcorr" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; width: auto; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Incident
+            </button>
+        </div>
+
+        <div id="vistoriasList" style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem;">
+            <p style="color: var(--text-secondary); text-align: center; padding: 2rem 0;">Loading...</p>
+        </div>
+
+        <div style="margin-top: 1rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+            <a href="/vistorias" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 500;">
+                View Full Inspection History &rarr;
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- View Inspection Modal -->
+<div id="viewVistoriaModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 id="modalVistoriaTitle">Inspection Details</h3>
+            <button id="closeViewModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
+                    <span style="color:var(--text-secondary); font-size:0.85rem;">Type:</span>
+                    <span id="modalVistoriaTipo"></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
+                    <span style="color:var(--text-secondary); font-size:0.85rem;">Date & Time:</span>
+                    <strong id="modalVistoriaData" style="color:var(--text-primary); font-size:0.9rem;">-</strong>
+                </div>
+                <div>
+                    <span style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:0.25rem;">Observations:</span>
+                    <p id="vistoria_obs" style="color:var(--text-primary); font-size:0.95rem; margin:0; line-height:1.4; white-space:pre-line;">-</p>
+                </div>
+            </div>
+
+            <div>
+                <span style="font-size:0.85rem; color:var(--text-secondary); font-weight:600; text-transform:uppercase; display:block; margin-bottom:0.5rem;">Recorded Photos:</span>
+                <div id="vistoria_galeria" class="photo-grid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Charge Modal -->
+<div id="cobrancaModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 420px;">
+        <div class="modal-header">
+            <h3>Add Charge</h3>
+            <button id="closeCobrancaModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="cobrancaForm" class="modern-form">
+                <div class="form-group">
+                    <label for="cob_tipo">Charge Type</label>
+                    <select id="cob_tipo" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                        <option value="Fine">Fine / Penalty</option>
+                        <option value="Damage">Damage / Repair</option>
+                        <option value="Rent">Extra Rent</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="cob_valor">Amount (£)</label>
+                    <input type="number" inputmode="decimal" id="cob_valor" step="0.01" required placeholder="e.g. 50.00" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label for="cob_data">Due Date</label>
+                    <input type="date" id="cob_data" required style="width: 100%;">
+                </div>
+                <button type="submit" id="btnSalvarCob" class="btn-primary" style="width: 100%; margin-top: 0.5rem;">Create Charge</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- New Incident / Return Inspection Modal -->
+<div id="ocorrenciaModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 id="ocorrenciaModalTitle">New Inspection (Incident)</h3>
+            <button id="closeOcorrenciaModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="ocorrenciaForm" class="modern-form" enctype="multipart/form-data">
+                <input type="hidden" id="oc_tipo" value="Incident">
+                
+                <div class="form-group">
+                    <label for="oc_fotos">Vehicle Photos (Mandatory)</label>
+                    <input type="file" id="oc_fotos" accept="image/*" multiple required style="padding: 0.75rem; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; width: 100%;">
+                    <small style="color: var(--text-secondary); margin-top: 0.25rem;">Images will be compressed automatically.</small>
+                    <div id="oc_preview" class="photo-grid" style="display:none; margin-top:0.5rem;"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="oc_obs">Damage Observations / Notes</label>
+                    <textarea id="oc_obs" rows="3" required placeholder="Describe damages, reason for incident or return condition..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;"></textarea>
+                </div>
+                
+                <button type="submit" id="btnSalvarOcorr" class="btn-primary" style="width: 100%; margin-top: 0.5rem;">Save Inspection</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Mark as Paid Modal -->
+<div id="pagamentoModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 420px;">
+        <div class="modal-header">
+            <h3>Confirm Payment</h3>
+            <button id="closePagamentoModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="pagamentoForm">
+                <input type="hidden" id="pag_cobranca_id">
+                
+                <div style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
+                        <span style="color:var(--text-secondary); font-size:0.85rem;">Type:</span>
+                        <strong id="pag_desc_tipo" style="color:var(--text-primary);">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:var(--text-secondary); font-size:0.85rem;">Amount:</span>
+                        <strong id="pag_desc_valor" style="font-size:1.35rem; color:var(--success);">-</strong>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <label for="pag_forma" style="font-weight:600; font-size:0.9rem; margin-bottom:0.5rem; display:block;">Payment Method</label>
+                    <select id="pag_forma" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                        <option value="Cash">Cash</option>
+                        <option value="Card">Card</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <button type="submit" id="btnSubmitPag" class="btn-primary" style="width: 100%; background: var(--success); padding: 0.875rem;">
+                    Confirm Payment
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Receipt Modal -->
+<div id="reciboModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px; background: #ffffff; color: #0f172a; border-radius: 16px;">
+        <div style="padding: 2rem 2rem 1rem 2rem; position: relative;">
+            <button id="closeReciboModal" class="modal-close" style="color: #64748b; position: absolute; top: 1rem; right: 1rem;">&times;</button>
+            
+            <div id="reciboContent">
+                <div style="text-align: center; border-bottom: 2px dashed #cbd5e1; padding-bottom: 1.25rem; margin-bottom: 1.25rem;">
+                    <h2 style="margin: 0; color: #1e293b; font-size: 1.5rem;">FF Motors</h2>
+                    <p style="margin: 0.25rem 0 0; color: #64748b; font-size: 0.9rem;">Payment Receipt &bull; Birmingham UK</p>
+                    <span style="display:inline-block; margin-top:0.5rem; background:#dcfce7; color:#15803d; font-weight:700; font-size:0.75rem; padding:0.25rem 0.75rem; border-radius:999px;">PAYMENT CONFIRMED</span>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap: 0.5rem; font-size: 0.9rem;">
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Transaction No:</span>
+                        <strong id="rec_id" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Contract:</span>
+                        <strong id="rec_contrato_id" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Customer:</span>
+                        <strong id="rec_cliente" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Vehicle (Reg Plate):</span>
+                        <strong id="rec_placa" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Description:</span>
+                        <strong id="rec_tipo" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Payment Date:</span>
+                        <strong id="rec_data" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
+                        <span style="color:#64748b;">Payment Method:</span>
+                        <strong id="rec_forma" style="color:#0f172a;">-</strong>
+                    </div>
+
+                    <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 2px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:1rem; font-weight:600; color:#1e293b;">Amount Paid:</span>
+                        <strong id="rec_valor" style="font-size:1.5rem; color:#0f172a;">-</strong>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 1.5rem; color: #94a3b8; font-size: 0.8rem;">
+                    Thank you for choosing FF Motors Birmingham!
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem;">
+                <button onclick="window.print()" class="btn-primary" style="flex:1; background:#2563eb; color:white; padding:0.75rem;">🖨️ Print Receipt</button>
+                <a id="rec_link_page" href="#" target="_blank" class="btn-primary" style="background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; width:auto; text-decoration:none; padding:0.75rem 1rem;">Open Page</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Release Deposit Hold Modal -->
+<div id="devolverDepositoModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px;">
+        <div class="modal-header">
+            <h3>Release Deposit Hold</h3>
+            <button id="closeDevolverDepositoModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.9rem; line-height: 1.4;">
+                Upon confirmation, this contract will be completed. You can attach proof of the bank transfer for the deposit refund.
+            </p>
+            <form id="formDevolverDeposito" class="modern-form">
+                <div class="form-group">
+                    <label for="comprovante_deposito">Refund Receipt (Optional)</label>
+                    <input type="file" id="comprovante_deposito" accept="image/*,.pdf" style="padding: 0.75rem; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; width: 100%;">
+                </div>
+                <button type="submit" id="btnConfirmarDevolucao" class="btn-primary" style="width:100%; margin-top:0.75rem; background: var(--success);">
+                    Confirm Deposit Refund
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #reciboContent,
+        #reciboContent * {
+            visibility: visible;
+        }
+        #reciboContent {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none;
+            box-shadow: none;
+            padding: 0;
+            margin: 0;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const CONTRATO_ID = {{ contrato_id }};
+</script>
+<script src="/static/js/detalhe_contrato.js?v=3"></script>
+{% endblock %}

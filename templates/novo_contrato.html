@@ -1,0 +1,88 @@
+{% extends 'layout.html' %}
+
+{% block title %}New Contract{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>New Rental Contract</h1>
+</div>
+
+<div class="glass-card">
+    <div class="card-header">
+        <p>Start a new rental agreement by selecting the customer and motorbike.</p>
+    </div>
+    
+    <form id="contratoForm" class="modern-form" enctype="multipart/form-data">
+        <div class="form-row">
+            <div class="form-group half">
+                <label for="id_cliente">Customer</label>
+                <select id="id_cliente" name="id_cliente" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
+                    <option value="">Loading customers...</option>
+                </select>
+            </div>
+            
+            <div class="form-group half">
+                <label for="placa">Available Motorbike</label>
+                <select id="placa" name="placa" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
+                    <option value="">Loading motorbikes...</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group half">
+                <label for="dia_pagamento_semanal">Weekly Payment Due Day</label>
+                <select id="dia_pagamento_semanal" name="dia_pagamento_semanal" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
+                    <option value="0">Monday</option>
+                    <option value="1">Tuesday</option>
+                    <option value="2">Wednesday</option>
+                    <option value="3">Thursday</option>
+                    <option value="4">Friday</option>
+                    <option value="5">Saturday</option>
+                    <option value="6">Sunday</option>
+                </select>
+            </div>
+            
+            <div class="form-group half">
+                <label for="valor_aluguel_semanal">Weekly Rent (£)</label>
+                <input type="number" inputmode="decimal" id="valor_aluguel_semanal" name="valor_aluguel_semanal" placeholder="e.g. 250.00" step="0.01" required>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label for="valor_deposito">Security Deposit (£)</label>
+            <input type="number" inputmode="decimal" id="valor_deposito" name="valor_deposito" placeholder="e.g. 500.00" step="0.01" required>
+        </div>
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0;">
+        <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Documentation & Initial Check-out Inspection</h3>
+        
+        <div class="form-group">
+            <label for="seguro">Motorbike Insurance Certificate (Photo/PDF) - Mandatory</label>
+            <input type="file" id="seguro" name="seguro" accept="image/*,.pdf" required style="padding-top: 10px;">
+        </div>
+        
+        <div class="form-group">
+            <label for="fotos">Motorbike Check-out Photos (Multiple allowed)</label>
+            <input type="file" id="fotos" name="fotos" accept="image/*" multiple required style="padding-top: 10px;">
+        </div>
+
+        <div class="form-group">
+            <label for="observacoes">Notes on Condition / Existing Scratches / Tyres</label>
+            <textarea id="observacoes" name="observacoes" rows="3" placeholder="Describe general motorbike condition or pre-existing scratches..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;"></textarea>
+        </div>
+
+        <div id="feedbackMessage" class="feedback-message hidden"></div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <span class="btn-text">Create Contract</span>
+                <div class="loader hidden"></div>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/novo_contrato.js"></script>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends 'layout.html' %}
+
+{% block title %}Register Customer{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>New Customer</h1>
+</div>
+
+<div class="glass-card">
+    <div class="card-header">
+        <p>Fill in details and upload documentation to register a customer.</p>
+    </div>
+    
+    <form id="clientForm" class="modern-form">
+        <div class="form-group">
+            <label for="nome">Full Name</label>
+            <input type="text" id="nome" name="nome" placeholder="e.g. John Smith" required>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group half">
+                <label for="telefone">Phone / WhatsApp</label>
+                <input type="tel" id="telefone" name="telefone" placeholder="+44 7911 123456" required>
+            </div>
+            
+            <div class="form-group half">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="john.smith@example.co.uk" required>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="endereco">Full Address & Postcode</label>
+            <input type="text" id="endereco" name="endereco" placeholder="e.g. 123 High St, Birmingham B4 7ET, UK" required>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group half">
+                <label for="habilitacao">Driving Licence (Photo/PDF)</label>
+                <input type="file" id="habilitacao" name="habilitacao" accept="image/*,.pdf" style="padding-top: 10px;">
+            </div>
+            <div class="form-group half">
+                <label for="comprovante_endereco">Proof of Address (Photo/PDF)</label>
+                <input type="file" id="comprovante_endereco" name="comprovante_endereco" accept="image/*,.pdf" style="padding-top: 10px;">
+            </div>
+        </div>
+
+        <div id="feedbackMessage" class="feedback-message hidden"></div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary" id="submitBtn">
+                <span class="btn-text">Register Customer</span>
+                <div class="loader hidden"></div>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/cadastro_cliente.js"></script>
+{% endblock %}

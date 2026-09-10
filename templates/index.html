@@ -1,0 +1,81 @@
+{% extends 'layout.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Overview</h1>
+</div>
+
+<div class="dashboard-grid">
+    <div class="stat-card">
+        <div class="stat-title">Total Motorbikes</div>
+        <div class="stat-value" id="total_motos">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Available Motorbikes</div>
+        <div class="stat-value" id="motos_disponiveis">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Active Contracts</div>
+        <div class="stat-value" id="contratos_ativos">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Expected Weekly Revenue</div>
+        <div class="stat-value" style="color: var(--accent);" id="receita_semanal">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Pending Receivables</div>
+        <div class="stat-value" style="color: var(--success);" id="receita_pendente">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Deposit Holds</div>
+        <div class="stat-value" style="color: var(--warning);" id="quarentenas_count">-</div>
+        <div class="stat-title" id="quarentenas_valor" style="margin-top: 5px;">-</div>
+    </div>
+</div>
+
+<div id="alertasContainer" style="margin-top: 2rem;"></div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const res = await fetch('/api/dashboard');
+            const data = await res.json();
+            
+            document.getElementById('total_motos').textContent = data.total_motos;
+            document.getElementById('motos_disponiveis').textContent = data.motos_disponiveis;
+            document.getElementById('contratos_ativos').textContent = data.contratos_ativos;
+            
+            const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+            document.getElementById('receita_pendente').textContent = formatoMoeda.format(data.receita_pendente);
+            document.getElementById('receita_semanal').textContent = formatoMoeda.format(data.receita_semanal);
+            
+            document.getElementById('quarentenas_count').textContent = data.quarentenas_count;
+            document.getElementById('quarentenas_valor').textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor)}`;
+            
+            // Load alerts
+            const resAlertas = await fetch('/api/alertas');
+            const alertas = await resAlertas.json();
+            
+            const alertasContainer = document.getElementById('alertasContainer');
+            if (alertas && alertas.length > 0) {
+                let html = '<h2>Important Notices</h2><div style="display: flex; flex-direction: column; gap: 10px; margin-top: 1rem;">';
+                alertas.forEach(a => {
+                    html += `
+                    <div style="background: rgba(220, 53, 69, 0.1); border-left: 4px solid var(--error); padding: 1rem; border-radius: 8px;">
+                        <h4 style="margin: 0 0 5px 0; color: var(--error);">Deposit Hold Due!</h4>
+                        <p style="margin: 0; color: var(--text-primary);">${a.mensagem || a.message}</p>
+                        <a href="/contratos/${a.contrato_id}" style="color: var(--accent); text-decoration: none; font-size: 0.9rem; font-weight: bold; margin-top: 10px; display: inline-block;">View Contract &rarr;</a>
+                    </div>`;
+                });
+                html += '</div>';
+                alertasContainer.innerHTML = html;
+            }
+            
+        } catch(e) {
+            console.error('Error loading dashboard', e);
+        }
+    });
+</script>
+{% endblock %}

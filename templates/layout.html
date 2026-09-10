@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon.png">
+    <title>{% block title %}Dashboard{% endblock %} | FF Motors Birmingham</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Mobile Header (Hidden on Desktop) -->
+        <header class="mobile-header">
+            <div class="mobile-brand">
+                <span>FF Motors</span>
+            </div>
+            <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Toggle navigation menu">
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="url(#grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                            <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M5 22h14"></path>
+                    <path d="M5 2h14"></path>
+                    <path d="M17 22v-5"></path>
+                    <path d="M7 22v-5"></path>
+                    <path d="M12 17v-5"></path>
+                    <path d="M12 7V2"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <span>FF Motors</span>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <a href="/" class="{% if request.path == '/' %}active{% endif %}">
+                    Dashboard
+                </a>
+                <a href="/motos" class="{% if 'moto' in request.path %}active{% endif %}">
+                    Fleet
+                </a>
+                <a href="/clientes" class="{% if 'cliente' in request.path %}active{% endif %}">
+                    Customers
+                </a>
+                <a href="/contratos" class="{% if 'contrato' in request.path %}active{% endif %}">
+                    Contracts
+                </a>
+                <a href="/vistorias" class="{% if 'vistoria' in request.path %}active{% endif %}">
+                    Inspections
+                </a>
+                <a href="/financeiro" class="{% if 'financeiro' in request.path %}active{% endif %}">
+                    Financial
+                </a>
+                <a href="/relatorios" class="{% if 'relatorio' in request.path %}active{% endif %}">
+                    Reports
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    
+    {% block scripts %}{% endblock %}
+    <script>
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('open');
+            });
+        }
+    </script>
+</body>
+</html>
