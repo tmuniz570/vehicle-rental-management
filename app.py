@@ -62,7 +62,7 @@ def pagina_vistorias_lista():
 
 @app.route('/relatorios')
 def pagina_relatorios():
-    return render_template('relatorios.html')
+    return redirect('/financeiro')
 
 @app.route('/relatorios/vencidos')
 def relatorio_vencidos():
