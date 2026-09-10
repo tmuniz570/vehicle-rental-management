@@ -182,19 +182,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         formData.append('tipo', document.getElementById('tipo').value);
         formData.append('observacoes', document.getElementById('observacoes').value.trim());
         
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const options = {
-            fileType: 'image/webp',
-            maxSizeMB: 0.4,
-            maxWidthOrHeight: 1920,
-            useWebWorker: true
+            maxSizeMB: 0.35,
+            maxWidthOrHeight: 1600,
+            useWebWorker: !isIOS,
+            fileType: isIOS ? 'image/jpeg' : 'image/webp',
+            initialQuality: 0.75
         };
+        const extReplacement = isIOS ? '.jpg' : '.webp';
         
         for (let i = 0; i < selectedPhotos.length; i++) {
             const file = selectedPhotos[i];
             if (file.type.startsWith('image/')) {
                 try {
                     const compressedFile = await imageCompression(file, options);
-                    formData.append('fotos', compressedFile, file.name.replace(/\.[^/.]+$/, ".webp"));
+                    formData.append('fotos', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     formData.append('fotos', file);
                 }

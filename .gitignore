@@ -8,3 +8,5 @@ __pycache__/
 .idea/
 backups/
 .temp*
+static/uploads/*
+!static/uploads/.gitkeep

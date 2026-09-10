@@ -73,6 +73,57 @@ def add_inline_document_headers(response):
 # Inicializa o banco
 init_db(app)
 
+def salvar_arquivo_otimizado(file_storage, nome_arquivo):
+    """
+    Salva arquivo enviado. Se for imagem, auto-rotaciona via EXIF (corrige fotos de iPhone),
+    redimensiona para no máximo 1600px e comprime em WebP com qualidade 80 (~30-90 KB).
+    Se for PDF ou outro documento, salva diretamente.
+    Retorna o nome do arquivo final salvo.
+    """
+    uploads_dir = app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads'))
+    os.makedirs(uploads_dir, exist_ok=True)
+    
+    ext = os.path.splitext(nome_arquivo)[1].lower()
+    caminho_final = os.path.join(uploads_dir, nome_arquivo)
+    
+    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic']:
+        file_storage.save(caminho_final)
+        return nome_arquivo
+        
+    try:
+        from PIL import Image, ImageOps
+        img = Image.open(file_storage.stream)
+        try:
+            img = ImageOps.exif_transpose(img)
+        except Exception:
+            pass
+            
+        if img.mode in ('RGBA', 'P'):
+            bg = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'RGBA':
+                bg.paste(img, mask=img.split()[3])
+            else:
+                bg.paste(img)
+            img = bg
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+            
+        max_dim = 1600
+        if img.width > max_dim or img.height > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+            
+        nome_webp = os.path.splitext(nome_arquivo)[0] + '.webp'
+        caminho_webp = os.path.join(uploads_dir, nome_webp)
+        img.save(caminho_webp, 'WEBP', quality=80, method=6)
+        return nome_webp
+    except Exception:
+        try:
+            file_storage.seek(0)
+        except Exception:
+            pass
+        file_storage.save(caminho_final)
+        return nome_arquivo
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -171,17 +222,15 @@ def criar_cliente():
         f = request.files['habilitacao']
         if f.filename:
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
-            caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_arq)
-            f.save(caminho)
-            url_hab = f"/static/uploads/{nome_arq}"
+            nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+            url_hab = f"/static/uploads/{nome_salvo}"
             
     if 'comprovante_endereco' in request.files:
         f = request.files['comprovante_endereco']
         if f.filename:
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_comp_end_{f.filename}")
-            caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_arq)
-            f.save(caminho)
-            url_comp_end = f"/static/uploads/{nome_arq}"
+            nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+            url_comp_end = f"/static/uploads/{nome_salvo}"
             
     novo_cliente = Client(
         nome=nome,
@@ -273,17 +322,15 @@ def atualizar_cliente(id):
             f = request.files['habilitacao']
             if f.filename:
                 nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
-                caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
-                f.save(caminho)
-                cliente.url_habilitacao = f"/static/uploads/{nome_arq}"
+                nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+                cliente.url_habilitacao = f"/static/uploads/{nome_salvo}"
                 
         if 'comprovante_endereco' in request.files:
             f = request.files['comprovante_endereco']
             if f.filename:
                 nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_comp_end_{f.filename}")
-                caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
-                f.save(caminho)
-                cliente.url_comprovante_endereco = f"/static/uploads/{nome_arq}"
+                nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+                cliente.url_comprovante_endereco = f"/static/uploads/{nome_salvo}"
     
     db.session.commit()
     return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'})
@@ -360,9 +407,8 @@ def criar_contrato():
         if foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
             nome_arquivo = f"{timestamp}_{i}_{filename}"
-            caminho_salvar = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arquivo)
-            foto.save(caminho_salvar)
-            urls_fotos.append(f"/static/uploads/{nome_arquivo}")
+            nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
+            urls_fotos.append(f"/static/uploads/{nome_salvo}")
             
     url_foto_str = ",".join(urls_fotos)
     
@@ -372,9 +418,8 @@ def criar_contrato():
     if arq_seguro.filename:
         filename_seguro = werkzeug.utils.secure_filename(arq_seguro.filename)
         nome_seguro = f"{timestamp}_seguro_{filename_seguro}"
-        caminho_seguro = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_seguro)
-        arq_seguro.save(caminho_seguro)
-        url_seguro = f"/static/uploads/{nome_seguro}"
+        nome_salvo = salvar_arquivo_otimizado(arq_seguro, nome_seguro)
+        url_seguro = f"/static/uploads/{nome_salvo}"
 
     # Create Contract
     novo_contrato = Contract(
@@ -452,9 +497,8 @@ def atualizar_seguro_contrato(id):
         f = request.files['seguro']
         if f.filename:
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_seguro_upd_{f.filename}")
-            caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
-            f.save(caminho)
-            contrato.url_seguro = f"/static/uploads/{nome_arq}"
+            nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+            contrato.url_seguro = f"/static/uploads/{nome_salvo}"
             db.session.commit()
             return jsonify({'message': 'Insurance document updated successfully', 'mensagem': 'Seguro atualizado'})
             
@@ -632,9 +676,8 @@ def criar_vistoria():
         if foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
             nome_arquivo = f"{timestamp}_{i}_{filename}"
-            caminho_salvar = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arquivo)
-            foto.save(caminho_salvar)
-            urls_fotos.append(f"/static/uploads/{nome_arquivo}")
+            nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
+            urls_fotos.append(f"/static/uploads/{nome_salvo}")
             
     url_foto_str = ",".join(urls_fotos)
     
@@ -944,9 +987,8 @@ def finalizar_quarentena(id):
         f = request.files['comprovante']
         if f.filename:
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
-            caminho = os.path.join(app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads')), nome_arq)
-            f.save(caminho)
-            url_comprovante = f"/static/uploads/{nome_arq}"
+            nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+            url_comprovante = f"/static/uploads/{nome_salvo}"
             
     contrato.url_comprovante_deposito = url_comprovante
     contrato.status = ContractStatus.COMPLETED.value

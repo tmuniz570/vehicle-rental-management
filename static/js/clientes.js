@@ -117,12 +117,22 @@ document.addEventListener('DOMContentLoaded', () => {
         data.append('email', document.getElementById('edit_email').value);
         data.append('endereco', document.getElementById('edit_endereco').value);
         
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const compOptions = {
+            maxSizeMB: 0.35,
+            maxWidthOrHeight: 1600,
+            useWebWorker: !isIOS,
+            fileType: isIOS ? 'image/jpeg' : 'image/webp',
+            initialQuality: 0.75
+        };
+        const extReplacement = isIOS ? '.jpg' : '.webp';
+        
         const hFile = document.getElementById('edit_habilitacao').files[0];
         if(hFile) {
             if (hFile.type.startsWith('image/')) {
                 try {
-                    const compressedFile = await imageCompression(hFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
-                    data.append('habilitacao', compressedFile, hFile.name.replace(/\.[^/.]+$/, ".webp"));
+                    const compressedFile = await imageCompression(hFile, compOptions);
+                    data.append('habilitacao', compressedFile, hFile.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     data.append('habilitacao', hFile);
                 }
@@ -135,8 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if(ceFile) {
             if (ceFile.type.startsWith('image/')) {
                 try {
-                    const compressedFile = await imageCompression(ceFile, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
-                    data.append('comprovante_endereco', compressedFile, ceFile.name.replace(/\.[^/.]+$/, ".webp"));
+                    const compressedFile = await imageCompression(ceFile, compOptions);
+                    data.append('comprovante_endereco', compressedFile, ceFile.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     data.append('comprovante_endereco', ceFile);
                 }

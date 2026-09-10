@@ -137,12 +137,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Check-out inspection
         formData.append('observacoes', document.getElementById('observacoes').value);
         
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const compOptions = {
+            maxSizeMB: 0.35,
+            maxWidthOrHeight: 1600,
+            useWebWorker: !isIOS,
+            fileType: isIOS ? 'image/jpeg' : 'image/webp',
+            initialQuality: 0.75
+        };
+        const extReplacement = isIOS ? '.jpg' : '.webp';
+        
         for (let i = 0; i < selectedPhotos.length; i++) {
             const file = selectedPhotos[i];
             if (file.type.startsWith('image/')) {
                 try {
-                    const compressedFile = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
-                    formData.append('fotos', compressedFile, file.name.replace(/\.[^/.]+$/, ".webp"));
+                    const compressedFile = await imageCompression(file, compOptions);
+                    formData.append('fotos', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     formData.append('fotos', file);
                 }
@@ -156,8 +166,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const file = seguroInput.files[0];
             if (file.type.startsWith('image/')) {
                 try {
-                    const compressedFile = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
-                    formData.append('seguro', compressedFile, file.name.replace(/\.[^/.]+$/, ".webp"));
+                    const compressedFile = await imageCompression(file, compOptions);
+                    formData.append('seguro', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     formData.append('seguro', file);
                 }

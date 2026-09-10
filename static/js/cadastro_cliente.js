@@ -24,13 +24,23 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('email', document.getElementById('email').value.trim());
         formData.append('endereco', document.getElementById('endereco').value.trim());
         
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const compOptions = {
+            maxSizeMB: 0.35,
+            maxWidthOrHeight: 1600,
+            useWebWorker: !isIOS,
+            fileType: isIOS ? 'image/jpeg' : 'image/webp',
+            initialQuality: 0.75
+        };
+        const extReplacement = isIOS ? '.jpg' : '.webp';
+        
         const habInput = document.getElementById('habilitacao');
         if (habInput.files.length > 0) {
             const file = habInput.files[0];
             if (file.type.startsWith('image/')) {
                 try {
-                    const compressedFile = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
-                    formData.append('habilitacao', compressedFile, file.name.replace(/\.[^/.]+$/, ".webp"));
+                    const compressedFile = await imageCompression(file, compOptions);
+                    formData.append('habilitacao', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     formData.append('habilitacao', file);
                 }
@@ -44,8 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const file = compEndInput.files[0];
             if (file.type.startsWith('image/')) {
                 try {
-                    const compressedFile = await imageCompression(file, { maxSizeMB: 0.3, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp' });
-                    formData.append('comprovante_endereco', compressedFile, file.name.replace(/\.[^/.]+$/, ".webp"));
+                    const compressedFile = await imageCompression(file, compOptions);
+                    formData.append('comprovante_endereco', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
                 } catch (err) {
                     formData.append('comprovante_endereco', file);
                 }
