@@ -162,6 +162,10 @@ async function carregarFinanceiro() {
                 abrirModalRecibo(transacoesCache[idx]);
             });
         });
+
+        if (typeof enableTableSorting === 'function') {
+            enableTableSorting('financeiroTable');
+        }
         
     } catch(e) {
         console.error("Error loading financial transactions:", e);
@@ -218,6 +222,22 @@ function fecharModalRecibo() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramStatus = urlParams.get('status');
+    const filterStatusEl = document.getElementById('filterStatus');
+    if (paramStatus && filterStatusEl) {
+        if (paramStatus.toLowerCase() === 'overdue' || paramStatus.toLowerCase() === 'vencidos') {
+            statusFiltro = 'overdue';
+            filterStatusEl.value = 'overdue';
+        } else if (paramStatus.toLowerCase() === 'paid') {
+            statusFiltro = 'Paid';
+            filterStatusEl.value = 'Paid';
+        } else if (paramStatus.toLowerCase() === 'all') {
+            statusFiltro = '';
+            filterStatusEl.value = '';
+        }
+    }
+
     carregarFinanceiro();
     
     // Pagination
@@ -341,10 +361,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function imprimirReciboDireto(url) {
+        if (!url || url === '#' || url.endsWith('#')) {
+            window.print();
+            return;
+        }
+
+        let iframe = document.getElementById('reciboPrintFrame');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'reciboPrintFrame';
+            iframe.style.position = 'fixed';
+            iframe.style.top = '-9999px';
+            iframe.style.left = '-9999px';
+            iframe.style.width = '10px';
+            iframe.style.height = '10px';
+            iframe.style.border = 'none';
+            iframe.style.opacity = '0';
+            iframe.style.pointerEvents = 'none';
+            document.body.appendChild(iframe);
+        }
+
+        iframe.onload = function() {
+            setTimeout(() => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (err) {
+                    console.warn('Iframe direct print failed, opening fallback window:', err);
+                    window.open(`${url}?autoprint=1`, '_blank');
+                }
+            }, 250);
+        };
+
+        iframe.src = url;
+    }
+
     const btnPrint = document.getElementById('btnPrintRecibo');
     if (btnPrint) {
         btnPrint.addEventListener('click', () => {
-            window.print();
+            const btnLink = document.getElementById('btnLinkRecibo');
+            if (btnLink && btnLink.href && btnLink.href !== '#' && !btnLink.href.endsWith('#')) {
+                imprimirReciboDireto(btnLink.href);
+            } else {
+                window.print();
+            }
         });
     }
 

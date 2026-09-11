@@ -52,6 +52,10 @@ def custom_static_uploads(filename):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
 
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(os.path.join(basedir, 'static'), 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
 @app.after_request
 def add_inline_document_headers(response):
     if request.path.startswith('/static/uploads/'):
@@ -520,9 +524,23 @@ def listar_contratos():
             Client.nome.ilike(search_term)
         ))
         
-    ativos = request.args.get('ativos') == 'true'
-    if ativos:
-        query = query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Ativo']))
+    status_filter = request.args.get('status', '', type=str)
+    if status_filter:
+        if status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
+            query = query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']))
+        elif status_filter.lower() in ['active', 'ativo']:
+            query = query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+        elif status_filter.lower() in ['completed', 'finalizado']:
+            query = query.filter(Contract.status.in_([ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']))
+        else:
+            query = query.filter(Contract.status == status_filter)
+    else:
+        nao_finalizados = request.args.get('nao_finalizados') == 'true' or request.args.get('ativos') == 'true'
+        if nao_finalizados:
+            query = query.filter(Contract.status.in_([
+                ContractStatus.ACTIVE.value, 'Active', 'Ativo',
+                ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'
+            ]))
         
     paginated = query.order_by(Contract.id.desc()).paginate(page=page, per_page=limit, error_out=False)
     
@@ -571,7 +589,12 @@ def detalhe_contrato(id):
                     'valor': float(t.valor),
                     'data_pagamento': t.data_pagamento.strftime('%d/%m/%Y') if t.data_pagamento else None
                 })
-    saldo_deposito = max(0.0, deposito_pago - deducoes_deposito)
+    is_completed = c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']
+    valor_restituido = max(0.0, deposito_pago - deducoes_deposito) if is_completed else 0.0
+    saldo_deposito = 0.0 if is_completed else max(0.0, deposito_pago - deducoes_deposito)
+    
+    # Filter out any deposit refund transactions from customer statement
+    transacoes_cliente = [t for t in transacoes if t.tipo.lower() not in ['deposit_refund', 'devolucao_deposito', 'deposit refund']]
     
     return jsonify({
         'id': c.id,
@@ -586,11 +609,13 @@ def detalhe_contrato(id):
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
         'valor_aluguel_semanal': float(c.valor_aluguel_semanal) if c.valor_aluguel_semanal else 0.0,
         'status': c.status,
+        'is_completed': is_completed,
         'url_seguro': c.url_seguro,
         'url_comprovante_deposito': c.url_comprovante_deposito,
         'deposito_pago': deposito_pago,
         'deducoes_deposito': deducoes_deposito,
         'saldo_deposito': saldo_deposito,
+        'valor_restituido': valor_restituido,
         'deducoes_lista': deducoes_lista,
         'transacoes': [{
             'id': t.id,
@@ -600,7 +625,7 @@ def detalhe_contrato(id):
             'forma_pagamento': t.forma_pagamento,
             'data_vencimento': t.data_vencimento.isoformat() + 'Z' if t.data_vencimento else None,
             'data_pagamento': t.data_pagamento.isoformat() + 'Z' if t.data_pagamento else None
-        } for t in transacoes],
+        } for t in transacoes_cliente],
         'vistorias': [{
             'id': v.id,
             'tipo': v.tipo,
@@ -779,7 +804,14 @@ def listar_financeiro():
         ))
         
     if status_filtro:
-        query = query.filter(FinancialTransaction.status == status_filtro)
+        if status_filtro.lower() in ['overdue', 'vencidos', 'vencido']:
+            agora = datetime.utcnow()
+            query = query.filter(
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+                FinancialTransaction.data_vencimento < agora
+            )
+        else:
+            query = query.filter(FinancialTransaction.status == status_filtro)
     elif pendentes:
         query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
         
@@ -992,39 +1024,6 @@ def finalizar_quarentena(id):
             
     contrato.url_comprovante_deposito = url_comprovante
     contrato.status = ContractStatus.COMPLETED.value
-    
-    # Calculate net deposit refund
-    deposito_pago = 0.0
-    deducoes = 0.0
-    for t in contrato.transacoes:
-        if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
-            if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
-                deposito_pago += float(t.valor)
-            elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
-                deducoes += float(t.valor)
-    saldo_restituivel = max(0.0, deposito_pago - deducoes)
-    
-    # Mark existing refund or create a paid Deposit_Refund transaction if saldo > 0
-    refund_encontrado = False
-    for t in contrato.transacoes:
-        if t.tipo in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']:
-            t.status = TransactionStatus.PAID.value
-            t.data_pagamento = datetime.utcnow()
-            t.valor = saldo_restituivel
-            refund_encontrado = True
-            
-    if not refund_encontrado and saldo_restituivel > 0:
-        devolucao_tx = FinancialTransaction(
-            id_contrato=contrato.id,
-            tipo=TransactionType.DEPOSIT_REFUND.value,
-            valor=saldo_restituivel,
-            data_vencimento=datetime.utcnow(),
-            data_pagamento=datetime.utcnow(),
-            status=TransactionStatus.PAID.value,
-            forma_pagamento='Bank Transfer'
-        )
-        db.session.add(devolucao_tx)
-            
     db.session.commit()
     return jsonify({'message': 'Deposit hold finalized successfully', 'mensagem': 'Quarentena finalizada com sucesso'})
 
@@ -1144,18 +1143,6 @@ def _processar_quarentenas_logic():
             elif t.tipo in [TransactionType.FINE.value, TransactionType.DAMAGE.value, 'Fine', 'Damage', 'Multa', 'Dano'] and t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
                 multas_e_danos_pendentes += float(t.valor)
         
-        saldo_a_devolver = max(0.0, deposito - deducoes_pagas - multas_e_danos_pendentes)
-        
-        if saldo_a_devolver > 0:
-            devolucao = FinancialTransaction(
-                id_contrato=contrato.id,
-                tipo=TransactionType.DEPOSIT_REFUND.value,
-                data_vencimento=hoje,
-                valor=saldo_a_devolver,
-                status=TransactionStatus.PENDING.value
-            )
-            db.session.add(devolucao)
-            
         contrato.status = ContractStatus.COMPLETED.value
         
         moto = Motorcycle.query.get(contrato.placa)

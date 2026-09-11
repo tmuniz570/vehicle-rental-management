@@ -73,14 +73,14 @@
 
 <!-- Row 2: Financial & Arrears -->
 <div class="dashboard-grid" style="margin-bottom: 1.75rem;">
-    <!-- Active Contracts -->
-    <a href="/contratos" class="stat-card interactive" style="text-decoration: none;">
+    <!-- Total Customers -->
+    <a href="/clientes" class="stat-card interactive" style="text-decoration: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="stat-title">Active Contracts</span>
-            <span style="font-size: 1.25rem;">📑</span>
+            <span class="stat-title">Total Customers</span>
+            <span style="font-size: 1.25rem;">👥</span>
         </div>
-        <div class="stat-value" id="contratos_ativos">-</div>
-        <div class="stat-desc">Ongoing client rentals</div>
+        <div class="stat-value" id="total_clientes">-</div>
+        <div class="stat-desc">Registered clients in system</div>
     </a>
 
     <!-- Expected Weekly Revenue -->
@@ -93,18 +93,18 @@
         <div class="stat-desc">Expected rent each week</div>
     </a>
 
-    <!-- Pending Receivables -->
-    <a href="/financeiro" class="stat-card interactive" style="text-decoration: none;">
+    <!-- Overdue Receivables -->
+    <a href="/financeiro?status=overdue" class="stat-card interactive" style="text-decoration: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="stat-title">Pending Receivables</span>
-            <span style="font-size: 1.25rem;">⏳</span>
+            <span class="stat-title" style="color: #f87171;">Overdue Receivables</span>
+            <span style="font-size: 1.25rem;">⚠️</span>
         </div>
-        <div class="stat-value" style="color: #38bdf8;" id="receita_pendente">-</div>
-        <div class="stat-desc">Uncollected rent & charges</div>
+        <div class="stat-value" style="color: #f87171;" id="receita_vencida">-</div>
+        <div class="stat-desc" id="vencidos_desc" style="color: #fca5a5;">0 overdue payments</div>
     </a>
 
     <!-- Deposit Holds -->
-    <a href="/contratos" class="stat-card interactive" style="text-decoration: none;">
+    <a href="/contratos?status=Deposit_Hold" class="stat-card interactive" style="text-decoration: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title">Deposit Holds</span>
             <span style="font-size: 1.25rem;">🔒</span>
@@ -116,11 +116,11 @@
 
 <!-- Fleet Allocation Bar -->
 <div class="fleet-bar-card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
         <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
             <span>📊</span> Fleet Distribution
         </h4>
-        <span id="fleetPercentSummary" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 500;">-</span>
+        <span id="fleetPercentSummary" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; line-height: 1.4;">-</span>
     </div>
     <div class="fleet-bar-track">
         <div id="barRented" class="fleet-bar-segment" style="background: var(--accent); width: 0%;" title="Rented"></div>
@@ -149,8 +149,8 @@
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
         
         <!-- CARD: Bikes in Maintenance -->
-        <div id="maintenanceSection" class="stat-card" style="padding: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div id="maintenanceSection" class="stat-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
                 <div>
                     <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: #f59e0b;">
                         <span>🔧</span> Motorbikes in Maintenance
@@ -172,8 +172,8 @@
         </div>
 
         <!-- CARD: Recent Inspections -->
-        <div class="stat-card" style="padding: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div class="stat-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem;">
                 <div>
                     <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
                         <span>📋</span> Recent Inspections
@@ -200,7 +200,7 @@
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
         
         <!-- CARD: Important Notices & Alerts -->
-        <div class="stat-card" style="padding: 1.5rem;">
+        <div class="stat-card">
             <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
                 <span>🚨</span> Action Required & Notices
             </h3>
@@ -212,7 +212,7 @@
         </div>
 
         <!-- CARD: Quick System Shortcuts -->
-        <div class="stat-card" style="padding: 1.5rem;">
+        <div class="stat-card">
             <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
                 <span>⚡</span> Quick Management
             </h3>
@@ -286,15 +286,25 @@
             document.getElementById('motos_disponiveis').textContent = data.motos_disponiveis || 0;
             document.getElementById('motos_alugadas').textContent = data.motos_alugadas || 0;
             document.getElementById('motos_manutencao').textContent = data.motos_manutencao || 0;
-            document.getElementById('contratos_ativos').textContent = data.contratos_ativos || 0;
+            
+            const elTotalClientes = document.getElementById('total_clientes');
+            if (elTotalClientes) elTotalClientes.textContent = data.total_clientes || 0;
             
             document.getElementById('receita_semanal').textContent = formatoMoeda.format(data.receita_semanal || 0);
-            document.getElementById('receita_pendente').textContent = formatoMoeda.format(data.receita_pendente || 0);
+            
+            const elReceitaVencida = document.getElementById('receita_vencida');
+            if (elReceitaVencida) elReceitaVencida.textContent = formatoMoeda.format(data.receita_vencida || 0);
+            const elVencidosDesc = document.getElementById('vencidos_desc');
+            if (elVencidosDesc) {
+                const tv = data.total_vencidos || 0;
+                elVencidosDesc.textContent = tv === 1 ? '1 overdue payment' : `${tv} overdue payments`;
+            }
             
             document.getElementById('quarentenas_count').textContent = data.quarentenas_count || 0;
             document.getElementById('quarentenas_valor').textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor || 0)}`;
 
-            document.getElementById('quickTotalClientes').textContent = data.total_clientes || 0;
+            const elQuickClientes = document.getElementById('quickTotalClientes');
+            if (elQuickClientes) elQuickClientes.textContent = data.total_clientes || 0;
 
             // Highlight maintenance card if > 0
             const cardManut = document.getElementById('cardManutencao');
@@ -369,22 +379,24 @@
 
             html += `
                 <div class="maintenance-item">
-                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
-                        <span class="badge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-weight: 700; font-family: monospace; font-size: 0.95rem; padding: 4px 10px; border-radius: 6px;">
+                    <div class="maintenance-item-info">
+                        <span class="badge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-weight: 700; font-family: monospace; font-size: 0.95rem; padding: 4px 10px; border-radius: 6px; flex-shrink: 0;">
                             ${m.placa}
                         </span>
-                        <div style="min-width: 0;">
+                        <div style="min-width: 0; flex: 1;">
                             <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                 ${m.modelo} <span style="color: var(--text-secondary); font-weight: 400; font-size: 0.85rem;">(${m.cor})</span>
                             </div>
-                            ${driverInfo}
+                            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                                ${driverInfo}
+                            </div>
                         </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
-                        <button onclick="setBikeAvailable('${m.placa}')" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--success); border: none; border-radius: 6px;" title="Set motorbike status back to Available">
+                    <div class="maintenance-item-actions">
+                        <button onclick="setBikeAvailable('${m.placa}')" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--success); border: none; border-radius: 6px; white-space: nowrap;" title="Set motorbike status back to Available">
                             ✅ Set Available
                         </button>
-                        <a href="/motos" class="btn-action" style="padding: 6px 10px; font-size: 0.8rem; text-decoration: none;" title="View in fleet management">
+                        <a href="/motos" class="btn-action" style="padding: 6px 10px; font-size: 0.8rem; text-decoration: none; white-space: nowrap;" title="View in fleet management">
                             Manage
                         </a>
                     </div>
@@ -428,20 +440,24 @@
         }
 
         let html = `
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
-                    <thead>
-                        <tr style="border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary);">
-                            <th style="padding: 8px 10px;">Date</th>
-                            <th style="padding: 8px 10px;">Type</th>
-                            <th style="padding: 8px 10px;">Plate</th>
-                            <th style="padding: 8px 10px;">Client</th>
-                            <th style="padding: 8px 10px; text-align: center;">Photos</th>
-                            <th style="padding: 8px 10px; text-align: right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+            <!-- Desktop Table View -->
+            <div class="desktop-inspections-view">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="border-bottom: 1px solid var(--border-color); text-align: left; color: var(--text-secondary);">
+                                <th style="padding: 8px 10px;">Date</th>
+                                <th style="padding: 8px 10px;">Type</th>
+                                <th style="padding: 8px 10px;">Plate</th>
+                                <th style="padding: 8px 10px;">Client</th>
+                                <th style="padding: 8px 10px; text-align: center;">Photos</th>
+                                <th style="padding: 8px 10px; text-align: right;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
         `;
+
+        let mobileCardsHtml = '<div class="mobile-inspections-view">';
 
         inspections.forEach(i => {
             let typeBadge = '';
@@ -458,7 +474,7 @@
                     <td style="padding: 10px; color: var(--text-secondary); white-space: nowrap;">${i.data}</td>
                     <td style="padding: 10px;">${typeBadge}</td>
                     <td style="padding: 10px;"><strong style="font-family: monospace; color: var(--text-primary);">${i.placa}</strong></td>
-                    <td style="padding: 10px; color: var(--text-primary);">${i.cliente}</td>
+                    <td style="padding: 10px; color: var(--text-primary);">${i.cliente || '-'}</td>
                     <td style="padding: 10px; text-align: center;">
                         <span style="color: var(--text-secondary); font-size: 0.8rem;">📷 ${i.foto_count}</span>
                     </td>
@@ -469,10 +485,30 @@
                     </td>
                 </tr>
             `;
+
+            mobileCardsHtml += `
+                <div class="inspection-mobile-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            ${typeBadge}
+                            <strong style="font-family: monospace; color: var(--text-primary); font-size: 0.95rem;">${i.placa}</strong>
+                        </div>
+                        <span style="color: var(--text-secondary); font-size: 0.8rem;">${i.data}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                        <span style="color: var(--text-secondary); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">Client: <strong style="color: var(--text-primary);">${i.cliente || '-'}</strong></span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="color: var(--text-secondary); font-size: 0.8rem;">📷 ${i.foto_count}</span>
+                            <a href="/vistorias?contrato_id=${i.contrato_id}" class="btn-action" style="padding: 4px 10px; font-size: 0.75rem; text-decoration: none;">View &rarr;</a>
+                        </div>
+                    </div>
+                </div>
+            `;
         });
 
-        html += `</tbody></table></div>`;
-        container.innerHTML = html;
+        html += `</tbody></table></div></div>`;
+        mobileCardsHtml += `</div>`;
+        container.innerHTML = html + mobileCardsHtml;
     }
 
     async function carregarAlertas(dashData) {

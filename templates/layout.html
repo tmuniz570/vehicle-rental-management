@@ -7,12 +7,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/static/manifest.json">
-    <link rel="icon" type="image/png" href="/static/images/logo.png">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icon.png">
+    <link rel="apple-touch-icon" href="/static/icon.png">
     <title>{% block title %}Dashboard{% endblock %} | FF Motors Birmingham</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/styles.css?v=3">
+    <link rel="stylesheet" href="/static/css/styles.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
     {% block head %}{% endblock %}
 </head>
@@ -65,8 +67,51 @@
         <main class="main-content">
             {% block content %}{% endblock %}
         </main>
+
+        <!-- Bottom Navigation Bar (Mobile Only) -->
+        <nav class="bottom-nav" aria-label="Mobile Navigation">
+            <a href="/" class="bottom-nav-item {% if request.path == '/' %}active{% endif %}">
+                <svg class="bottom-nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                <span class="bottom-nav-label">Home</span>
+            </a>
+            <a href="/motos" class="bottom-nav-item {% if 'moto' in request.path %}active{% endif %}">
+                <svg class="bottom-nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="6" cy="17" r="3"/>
+                    <circle cx="18" cy="17" r="3"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 17l4-9h4l3 4.5M14 8h3.5l1.5 2M9 17l2.5-4h4.5"/>
+                </svg>
+                <span class="bottom-nav-label">Fleet</span>
+            </a>
+            <a href="/clientes" class="bottom-nav-item {% if 'cliente' in request.path %}active{% endif %}">
+                <svg class="bottom-nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span class="bottom-nav-label">Clients</span>
+            </a>
+            <a href="/contratos" class="bottom-nav-item {% if 'contrato' in request.path %}active{% endif %}">
+                <svg class="bottom-nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span class="bottom-nav-label">Contracts</span>
+            </a>
+            <a href="/vistorias" class="bottom-nav-item {% if 'vistoria' in request.path %}active{% endif %}">
+                <svg class="bottom-nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                </svg>
+                <span class="bottom-nav-label">Inspect</span>
+            </a>
+            <a href="/financeiro" class="bottom-nav-item {% if 'financeiro' in request.path %}active{% endif %}">
+                <svg class="bottom-nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="bottom-nav-label">Finance</span>
+            </a>
+        </nav>
     </div>
     
+    <script src="/static/js/app_shared.js?v=1"></script>
     {% block scripts %}{% endblock %}
     <script>
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');

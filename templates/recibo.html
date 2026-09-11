@@ -124,15 +124,22 @@
             color: #334155;
         }
         @media print {
+            @page {
+                size: auto;
+                margin: 10mm;
+            }
             body {
-                background: #ffffff;
-                padding: 0;
+                background: #ffffff !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
             .receipt-card {
-                box-shadow: none;
-                border: none;
-                padding: 1.5rem;
-                max-width: 100%;
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+                padding: 1.5rem !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
             }
             .receipt-actions {
                 display: none !important;
@@ -189,9 +196,26 @@
         </div>
 
         <div class="receipt-actions">
-            <a href="/financeiro" class="btn btn-back">&larr; Back</a>
+            <a href="/financeiro" class="btn btn-back" data-back="true">&larr; Back</a>
             <button onclick="window.print()" class="btn btn-print">🖨️ Print Receipt</button>
         </div>
     </div>
+    <script>
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-back, [data-back="true"]');
+            if (btn && document.referrer && document.referrer.startsWith(window.location.origin) && document.referrer !== window.location.href) {
+                e.preventDefault();
+                window.history.back();
+            }
+        });
+
+        if (new URLSearchParams(window.location.search).get('autoprint') === '1') {
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    window.print();
+                }, 250);
+            });
+        }
+    </script>
 </body>
 </html>

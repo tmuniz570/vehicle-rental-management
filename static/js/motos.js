@@ -61,6 +61,9 @@ async function carregarMotos() {
                 modal.style.display = 'flex';
             });
         });
+        if (typeof enableTableSorting === 'function') {
+            enableTableSorting('motosTable');
+        }
         
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';

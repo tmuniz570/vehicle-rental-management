@@ -1,12 +1,30 @@
+# Virtual Environments
 venv/
 env/
+ENV/
+.venv/
+
+# Python Cache & Bytecode
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+
+# IDEs & System files
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
+
+# Backups & Temporary files
 backups/
 .temp*
+*.log
+
+# SQLite temporary/journal files
+*.db-journal
+*.db-wal
+*.db-shm
+
+# User uploaded media (preserve .gitkeep)
 static/uploads/*
 !static/uploads/.gitkeep

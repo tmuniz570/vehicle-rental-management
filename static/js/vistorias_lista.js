@@ -183,6 +183,10 @@ async function carregarVistorias() {
                 abrirModalVistoria(vistoriasCache[idx]);
             });
         });
+
+        if (typeof enableTableSorting === 'function') {
+            enableTableSorting('vistoriasTable');
+        }
         
     } catch (e) {
         console.error("Error loading inspections:", e);

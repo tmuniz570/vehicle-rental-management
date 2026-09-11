@@ -6,9 +6,17 @@ async function carregarContratos() {
     const paginationInfo = document.getElementById('paginationInfo');
     
     try {
-        const checkAtivos = document.getElementById('filterAtivos');
-        const isAtivos = checkAtivos ? checkAtivos.checked : true;
-        const res = await fetch(`/api/contratos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}&ativos=${isAtivos}`);
+        const filterStatus = document.getElementById('filterStatus');
+        const statusVal = filterStatus ? filterStatus.value : 'open';
+        
+        let url = `/api/contratos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}`;
+        if (statusVal === 'open') {
+            url += '&nao_finalizados=true';
+        } else if (statusVal !== 'all') {
+            url += `&status=${encodeURIComponent(statusVal)}`;
+        }
+
+        const res = await fetch(url);
         const data = await res.json();
         const contratos = data.itens || [];
         
@@ -64,6 +72,10 @@ async function carregarContratos() {
         const btnNext = document.getElementById('btnNextPage');
         if(btnPrev) btnPrev.disabled = data.pagina_atual <= 1;
         if(btnNext) btnNext.disabled = data.pagina_atual >= data.paginas;
+
+        if (typeof enableTableSorting === 'function') {
+            enableTableSorting('contratosTable');
+        }
         
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--error);">Error loading contracts.</td></tr>';
@@ -71,6 +83,20 @@ async function carregarContratos() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Check URL parameters for status filter (e.g. from Dashboard Deposit Holds link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramStatus = urlParams.get('status');
+    const filterStatus = document.getElementById('filterStatus');
+    if (paramStatus && filterStatus) {
+        if (paramStatus.toLowerCase() === 'deposit_hold' || paramStatus.toLowerCase() === 'quarentena') {
+            filterStatus.value = 'Deposit_Hold';
+        } else if (paramStatus.toLowerCase() === 'active') {
+            filterStatus.value = 'Active';
+        } else if (paramStatus.toLowerCase() === 'completed') {
+            filterStatus.value = 'Completed';
+        }
+    }
+
     carregarContratos();
     
     // Pagination Buttons
@@ -93,9 +119,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const filterAtivos = document.getElementById('filterAtivos');
-    if (filterAtivos) {
-        filterAtivos.addEventListener('change', () => {
+    if (filterStatus) {
+        filterStatus.addEventListener('change', () => {
             paginaAtual = 1;
             carregarContratos();
         });

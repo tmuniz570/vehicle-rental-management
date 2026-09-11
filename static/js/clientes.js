@@ -75,6 +75,9 @@ async function carregarClientes() {
                 modal.style.display = 'flex';
             });
         });
+        if (typeof enableTableSorting === 'function') {
+            enableTableSorting('clientesTable');
+        }
         
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--error);">Error loading customers.</td></tr>';

@@ -172,7 +172,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const boxDep = document.getElementById('box_deposito_info');
         const depOriginal = data.deposito_pago || 0;
         const depDeducoes = data.deducoes_deposito || 0;
-        const depSaldo = data.saldo_deposito !== undefined ? data.saldo_deposito : Math.max(0, depOriginal - depDeducoes);
+        const isCompleted = stLower === 'completed' || stLower === 'finalizado';
+        
+        // After contract is completed/refunded, current balance is 0.00
+        const depSaldo = isCompleted ? 0 : (data.saldo_deposito !== undefined ? data.saldo_deposito : Math.max(0, depOriginal - depDeducoes));
+        const depRestituido = Math.max(0, depOriginal - depDeducoes);
 
         if (boxDep && depOriginal > 0) {
             boxDep.style.display = 'block';
@@ -185,12 +189,31 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 dedRow.style.display = 'none';
             }
+
+            const restRow = document.getElementById('dep_restituido_row');
+            if (restRow) {
+                if (isCompleted && depRestituido > 0) {
+                    restRow.style.display = 'flex';
+                    document.getElementById('dep_restituido_valor').textContent = formatoMoeda.format(depRestituido);
+                } else {
+                    restRow.style.display = 'none';
+                }
+            }
             
-            document.getElementById('dep_saldo_valor').textContent = formatoMoeda.format(depSaldo);
+            const saldoLabel = document.getElementById('dep_saldo_label');
+            if (saldoLabel) {
+                saldoLabel.textContent = isCompleted ? 'Current Deposit Balance:' : 'Refundable Balance:';
+            }
+
+            const saldoValEl = document.getElementById('dep_saldo_valor');
+            if (saldoValEl) {
+                saldoValEl.textContent = formatoMoeda.format(depSaldo);
+                saldoValEl.style.color = isCompleted ? 'var(--text-secondary)' : 'var(--success)';
+            }
             
             const badgeStatus = document.getElementById('dep_badge_status');
             if (badgeStatus) {
-                if (stLower === 'completed' || stLower === 'finalizado') {
+                if (isCompleted) {
                     badgeStatus.textContent = 'Refunded/Closed';
                     badgeStatus.style.background = 'rgba(34, 197, 94, 0.15)';
                     badgeStatus.style.color = '#4ade80';
@@ -238,12 +261,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        if (data.url_comprovante_deposito) {
-            document.getElementById('info_comprovante').innerHTML = `
-                <a href="${data.url_comprovante_deposito}" target="_blank" style="color:var(--success); text-decoration:none; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px; margin-top:4px;">
-                    📄 Deposit Refund Proof &rarr;
-                </a>
-            `;
+        const infoComp = document.getElementById('info_comprovante');
+        if (infoComp) {
+            if (data.url_comprovante_deposito) {
+                infoComp.innerHTML = `
+                    <a href="${data.url_comprovante_deposito}" target="_blank" style="color:var(--success); text-decoration:none; font-size:0.85rem; display:inline-flex; align-items:center; gap:4px; margin-top:4px;">
+                        📄 Deposit Refund Proof &rarr;
+                    </a>
+                `;
+            } else {
+                infoComp.innerHTML = '';
+            }
         }
         
         // 4. Financial Statement
@@ -266,14 +294,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const dataVenc = dataVencObj ? dataVencObj.toLocaleDateString('en-GB') : '-';
                 
                 const tStatusLower = (t.status || '').toLowerCase();
+                const tipoLower = (t.tipo || '').toLowerCase();
                 const isPaid = tStatusLower === 'paid' || tStatusLower === 'pago';
                 const isPending = tStatusLower === 'pending' || tStatusLower === 'pendente';
                 const isVencido = isPending && dataVencObj && dataVencObj < hoje;
 
                 const dataPag = t.data_pagamento ? new Date(t.data_pagamento).toLocaleDateString('en-GB') : '-';
                 
-                if (isPaid) totalPago += t.valor;
-                else if (isPending) totalPendente += t.valor;
+                if (isPaid && tipoLower !== 'deposit_refund' && tipoLower !== 'devolucao_deposito') {
+                    totalPago += t.valor;
+                } else if (isPending) {
+                    totalPendente += t.valor;
+                }
 
                 let statusBadge = '';
                 if (isPaid) statusBadge = '<span class="badge badge-success">PAID</span>';
@@ -282,7 +314,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Type Badges
                 let tipoBadge = '';
-                const tipoLower = (t.tipo || '').toLowerCase();
                 if (tipoLower === 'rent' || tipoLower === 'aluguel') tipoBadge = '<span class="badge badge-info">Rent</span>';
                 else if (tipoLower === 'deposit' || tipoLower === 'deposito') tipoBadge = '<span class="badge" style="background:rgba(168, 85, 247, 0.2); color:#c084fc;">Deposit</span>';
                 else if (tipoLower === 'fine' || tipoLower === 'multa') tipoBadge = '<span class="badge badge-danger">Fine</span>';
@@ -339,7 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (resumoExtrato) {
                 let depSummary = '';
                 if (depOriginal > 0) {
-                    depSummary = ` &bull; Deposit Balance: <strong style="color:var(--success);">${formatoMoeda.format(depSaldo)}</strong>`;
+                    depSummary = ` &bull; Deposit Balance: <strong style="color:${isCompleted ? 'var(--text-secondary)' : 'var(--success)'};">${formatoMoeda.format(depSaldo)}</strong>`;
                 }
                 resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>${depSummary}`;
             }
@@ -796,6 +827,54 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
     });
+
+    function imprimirReciboDireto(url) {
+        if (!url || url === '#' || url.endsWith('#')) {
+            window.print();
+            return;
+        }
+
+        let iframe = document.getElementById('reciboPrintFrame');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'reciboPrintFrame';
+            iframe.style.position = 'fixed';
+            iframe.style.top = '-9999px';
+            iframe.style.left = '-9999px';
+            iframe.style.width = '10px';
+            iframe.style.height = '10px';
+            iframe.style.border = 'none';
+            iframe.style.opacity = '0';
+            iframe.style.pointerEvents = 'none';
+            document.body.appendChild(iframe);
+        }
+
+        iframe.onload = function() {
+            setTimeout(() => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (err) {
+                    console.warn('Iframe direct print failed, opening fallback window:', err);
+                    window.open(`${url}?autoprint=1`, '_blank');
+                }
+            }, 250);
+        };
+
+        iframe.src = url;
+    }
+
+    const btnPrintRec = document.getElementById('btnPrintReciboContrato');
+    if (btnPrintRec) {
+        btnPrintRec.addEventListener('click', () => {
+            const recLink = document.getElementById('rec_link_page');
+            if (recLink && recLink.href && recLink.href !== '#' && !recLink.href.endsWith('#')) {
+                imprimirReciboDireto(recLink.href);
+            } else {
+                window.print();
+            }
+        });
+    }
 
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
