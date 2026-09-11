@@ -6,6 +6,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
+![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red?style=for-the-badge)
 ![Location](https://img.shields.io/badge/Location-Birmingham%2C%20UK-red?style=for-the-badge)
 
 **A modern, mobile-first Fleet Operations, Rental Agreement, and Financial Management platform tailored for motorcycle rental businesses in the UK.**
@@ -176,12 +177,20 @@ FF Motors APP/
 
 ---
 
-## 📄 License
+## 🔒 Intellectual Property & License
 
-This project is licensed under the MIT License — feel free to adapt and use it for your portfolio or fleet management projects.
+**Copyright © 2026 Thiago Muniz. All Rights Reserved.**
+
+This software, its source code, database architecture, design, and associated assets are the sole and exclusive intellectual property of **Thiago Muniz**.
+
+* **Portfolio & Showcase Only:** This repository is published strictly for demonstration and professional portfolio evaluation purposes.
+* **No Commercial Use:** You may **not** copy, modify, distribute, sell, host, fork, or use this software (in whole or in part) for commercial purposes, business operations, or production deployment without prior explicit written authorization from the author.
+* **No Derivative Works:** Creation of derivative works or reproduction of the business logic is strictly prohibited.
+
+For business inquiries or licensing requests, please contact **Thiago Muniz** directly.
 
 ---
 
 <div align="center">
-  <sub>Developed for <strong>FF Motors Birmingham, UK</strong>. Crafted with clean architecture, modern aesthetics, and performance in mind.</sub>
+  <sub>Designed and Developed by <strong>Thiago Muniz</strong>. All rights reserved.</sub>
 </div>
