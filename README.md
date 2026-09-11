@@ -179,18 +179,18 @@ FF Motors APP/
 
 ## 🔒 Intellectual Property & License
 
-**Copyright © 2026 Thiago Muniz. All Rights Reserved.**
+**Copyright © 2026 Thiago Brandão. All Rights Reserved.**
 
-This software, its source code, database architecture, design, and associated assets are the sole and exclusive intellectual property of **Thiago Muniz**.
+This software, its source code, database architecture, design, and associated assets are the sole and exclusive intellectual property of **Thiago Brandão**.
 
 * **Portfolio & Showcase Only:** This repository is published strictly for demonstration and professional portfolio evaluation purposes.
 * **No Commercial Use:** You may **not** copy, modify, distribute, sell, host, fork, or use this software (in whole or in part) for commercial purposes, business operations, or production deployment without prior explicit written authorization from the author.
 * **No Derivative Works:** Creation of derivative works or reproduction of the business logic is strictly prohibited.
 
-For business inquiries or licensing requests, please contact **Thiago Muniz** directly.
+For business inquiries or licensing requests, please contact **Thiago Brandão** at **tmuniz570@gmail.com**.
 
 ---
 
 <div align="center">
-  <sub>Designed and Developed by <strong>Thiago Muniz</strong>. All rights reserved.</sub>
+  <sub>Designed and Developed by <strong>Thiago Brandão</strong> (<a href="mailto:tmuniz570@gmail.com">tmuniz570@gmail.com</a>). All rights reserved.</sub>
 </div>
