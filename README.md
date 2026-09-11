@@ -57,7 +57,13 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Native-Style Bottom Navigation:** High-usability bottom navigation bar enabled exclusively on mobile viewports (`<= 768px`) with iOS Safe Area Insets support.
 * **Installable App:** Manifest configuration (`manifest.json`) and app icons allowing home screen installation on iOS (Safari) and Android (Chrome).
 
-### 🛡️ 8. Data Security & Backup Suite
+### 🔐 8. Authentication & Role-Based Access Control
+* **Secure Session Auth:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`).
+* **Branded Login Experience:** Modern glassmorphism dark-mode login interface with flash message feedback and "Remember Me" session persistence.
+* **Auto-Provisioned Master Admin:** Automatic initialization of the primary administrator profile upon first launch.
+
+### 🛡️ 9. Data Security, Production Server & Backup Suite
+* **Production-Ready WSGI:** Multi-threaded production server powered by `Waitress` (`wsgi.py`) ensuring concurrent connection handling on Windows and Linux.
 * **Point-in-Time Backups:** Automated script (`backup.py`) packaging database snapshots and asset files into compressed zip archives.
 * **Disaster Recovery:** Dedicated restore script (`restore.py`) and development sanitation utility (`reset_data.py`).
 
@@ -67,7 +73,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 | Layer | Technology |
 |---|---|
-| **Backend** | Python 3.10+, Flask 3.0, Flask-SQLAlchemy, SQLAlchemy 2.0 |
+| **Backend** | Python 3.10+, Flask 3.0, Flask-Login, Flask-SQLAlchemy, SQLAlchemy 2.0 |
+| **WSGI Server** | Waitress (Production multi-threaded WSGI server) |
 | **Scheduler** | APScheduler (Background task runner for automated rent billing) |
 | **Database** | SQLite 3 (ACID-compliant relational database with foreign key support) |
 | **Frontend** | Vanilla HTML5, Modern CSS (Glassmorphism design system), JavaScript ES6+ |
@@ -85,8 +92,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/ff-motors-app.git
-cd ff-motors-app
+git clone https://github.com/tmuniz570/vehicle-rental-management.git
+cd vehicle-rental-management
 ```
 
 ### 2. Create and Activate a Virtual Environment
@@ -105,20 +112,39 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Populate Demo / Seed Data (Optional)
+### 4. Configure Environment (.env)
+Copy the example environment file:
+```bash
+copy .env.example .env
+```
+*(Optionally adjust `SECRET_KEY` or `DATABASE_URL` in `.env`)*
+
+### 5. Populate Demo / Seed Data (Optional)
 To test the platform with realistic sample motorbikes, customers, and active agreements:
 ```bash
 python seed_data.py
 ```
 
-### 5. Run the Application
+### 6. Run the Application
+
+**Development Mode:**
 ```bash
 python app.py
 ```
+
+**Production Mode (Waitress Multi-Threaded WSGI):**
+```bash
+python wsgi.py
+```
+
 Open your browser and navigate to:
 ```
 http://127.0.0.1:5000
 ```
+
+### 🔑 Default Credentials (Initial Master Admin)
+* **Email:** `tmuniz570@gmail.com`
+* **Password:** `Admin123!`
 
 ---
 
@@ -130,7 +156,7 @@ To access and test the app on your mobile device outside the local Wi-Fi network
    ```powershell
    winget install Cloudflare.cloudflared
    ```
-2. Start the tunnel while `app.py` is running:
+2. Start the tunnel while the server is running:
    ```powershell
    cloudflared tunnel --url http://127.0.0.1:5000
    ```
@@ -146,12 +172,14 @@ To access and test the app on your mobile device outside the local Wi-Fi network
 ```text
 FF Motors APP/
 ├── app.py                     # Main Flask application, routes & API endpoints
-├── database.py                # Database models (Clients, Motos, Contracts, Inspections, Transactions)
+├── wsgi.py                    # Production WSGI server runner (Waitress)
+├── database.py                # Database models (User, Clients, Motos, Contracts, Inspections, Transactions)
 ├── backup.py                  # Automated database & asset backup utility
 ├── restore.py                 # Restoration utility for backup archives
 ├── reset_data.py              # Development data wipe utility
 ├── seed_data.py               # Demo data seeder for immediate testing
 ├── requirements.txt           # Production Python dependencies
+├── .env.example               # Template environment configuration
 ├── static/
 │   ├── css/
 │   │   └── styles.css         # Glassmorphism design system & responsive rules
@@ -166,6 +194,7 @@ FF Motors APP/
 │   └── manifest.json          # PWA progressive web app configuration
 └── templates/
     ├── layout.html            # Base master layout with mobile bottom navigation
+    ├── login.html             # Glassmorphism dark authentication screen
     ├── index.html             # Executive operational dashboard
     ├── contratos.html         # Contracts list & status filtering
     ├── detalhe_contrato.html  # Comprehensive agreement view & financial statement

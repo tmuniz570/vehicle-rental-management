@@ -1,19 +1,33 @@
 import os
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, send_from_directory
+from dotenv import load_dotenv
+from flask import (
+    Flask, render_template, request, jsonify, send_file, redirect, url_for, 
+    send_from_directory, flash
+)
+from flask_login import (
+    LoginManager, login_user, logout_user, login_required, current_user
+)
 from database import (
     db, init_db, Contract, FinancialTransaction, TransactionType, 
-    TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType
+    TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
+    User
 )
 import werkzeug.utils
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
 
+load_dotenv()
+
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'ffmotors-birmingham-uk-secret-key-2026-production')
 
 # Configuração do banco de dados SQLite
 basedir = os.path.abspath(os.path.dirname(__file__))
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'ffmotors.db')
+db_uri = os.environ.get('DATABASE_URL')
+if not db_uri:
+    db_uri = 'sqlite:///' + os.path.join(basedir, 'ffmotors.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static', 'uploads')
 
@@ -26,6 +40,73 @@ mimetypes.add_type('image/jpeg', '.jpg')
 mimetypes.add_type('image/jpeg', '.jpeg')
 mimetypes.add_type('image/png', '.png')
 mimetypes.add_type('image/svg+xml', '.svg')
+
+# Configuração de Autenticação (Flask-Login)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Faça login para acessar o sistema FF Motors.'
+login_manager.login_message_category = 'warning'
+
+@login_manager.user_loader
+def load_user(user_id):
+    try:
+        return User.query.get(int(user_id))
+    except Exception:
+        return None
+
+@login_manager.unauthorized_handler
+def unauthorized_callback():
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
+    return redirect(url_for('login', next=request.path))
+
+@app.before_request
+def check_authentication():
+    # Endpoints públicos permitidos sem autenticação
+    allowed_routes = ['login', 'static', 'custom_static_uploads', 'favicon']
+    if request.endpoint in allowed_routes:
+        return
+    if request.path.startswith('/static/'):
+        return
+
+    if not current_user.is_authenticated:
+        if request.path.startswith('/api/'):
+            return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
+        return redirect(url_for('login', next=request.path))
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+        
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        remember = bool(request.form.get('remember'))
+        
+        user = User.query.filter_by(email=email).first()
+        if user and user.check_password(password):
+            if not user.ativo:
+                flash('Esta conta de acesso está inativa. Contate o administrador.', 'danger')
+                return render_template('login.html', email=email)
+                
+            login_user(user, remember=remember)
+            next_page = request.args.get('next')
+            if not next_page or not next_page.startswith('/'):
+                next_page = url_for('index')
+            return redirect(next_page)
+        else:
+            flash('Credenciais inválidas. Verifique seu e-mail e senha.', 'danger')
+            return render_template('login.html', email=email)
+            
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    flash('Você saiu do sistema com segurança.', 'info')
+    return redirect(url_for('login'))
 
 @app.route('/static/uploads/<path:filename>')
 def custom_static_uploads(filename):
@@ -74,8 +155,27 @@ def add_inline_document_headers(response):
         response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
 
-# Inicializa o banco
+# Inicializa o banco de dados e cria admin padrão caso ainda não exista
 init_db(app)
+
+def seed_default_admin():
+    with app.app_context():
+        try:
+            if User.query.count() == 0:
+                admin = User(
+                    nome="Thiago Brandão",
+                    email="tmuniz570@gmail.com",
+                    role="admin",
+                    ativo=True
+                )
+                admin.set_password("Admin123!")
+                db.session.add(admin)
+                db.session.commit()
+                print("[Auth] Master Admin 'Thiago Brandão' (tmuniz570@gmail.com) criado com sucesso.")
+        except Exception as e:
+            print(f"[Auth] Erro ao verificar ou criar admin padrão: {e}")
+
+seed_default_admin()
 
 def salvar_arquivo_otimizado(file_storage, nome_arquivo):
     """
