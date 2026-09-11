@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from functools import wraps
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, jsonify, send_file, redirect, url_for, 
@@ -11,7 +12,7 @@ from flask_login import (
 from database import (
     db, init_db, Contract, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
-    User
+    User, AuditLog
 )
 import werkzeug.utils
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -60,6 +61,41 @@ def unauthorized_callback():
     if request.path.startswith('/api/'):
         return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
     return redirect(url_for('login', next=request.path))
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or getattr(current_user, 'role', '') != 'admin':
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Forbidden", "message": "Admin privileges required"}), 403
+            flash('Acesso restrito a administradores.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def registrar_log(acao, entidade, entidade_id, descricao):
+    """
+    Registra um evento na trilha de auditoria interna.
+    Identifica automaticamente o usuário logado e o IP da requisição.
+    """
+    try:
+        user_id = current_user.id if current_user.is_authenticated else None
+        user_nome = current_user.nome if current_user.is_authenticated else "System"
+        ip = request.remote_addr if request else None
+        log = AuditLog(
+            id_usuario=user_id,
+            usuario_nome=user_nome,
+            acao=acao,
+            entidade=entidade,
+            entidade_id=str(entidade_id) if entidade_id else None,
+            descricao=descricao,
+            ip_origem=ip,
+            data_hora=datetime.utcnow()
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        print(f"[AuditLog Error]: {e}")
 
 @app.before_request
 def check_authentication():
@@ -303,6 +339,189 @@ def relatorio_vencidos():
 def pagina_detalhes_contrato(id):
     return render_template('detalhe_contrato.html', contrato_id=id)
 
+@app.route('/usuarios')
+@admin_required
+def pagina_usuarios():
+    return render_template('usuarios.html')
+
+# --- USER MANAGEMENT API ROUTES ---
+
+@app.route('/api/usuarios', methods=['GET'])
+@admin_required
+def listar_usuarios():
+    usuarios = User.query.order_by(User.id.asc()).all()
+    dados = []
+    for u in usuarios:
+        dados.append({
+            'id': u.id,
+            'nome': u.nome,
+            'email': u.email,
+            'role': u.role,
+            'ativo': u.ativo,
+            'data_criacao': u.data_criacao.strftime('%Y-%m-%d %H:%M:%S') if u.data_criacao else None
+        })
+    return jsonify({
+        'usuarios': dados,
+        'current_user_id': current_user.id
+    }), 200
+
+@app.route('/api/usuarios', methods=['POST'])
+@admin_required
+def criar_usuario():
+    data = request.get_json() or {}
+    nome = data.get('nome', '').strip()
+    email = data.get('email', '').strip().lower()
+    role = data.get('role', 'staff').strip().lower()
+    password = data.get('password', '')
+    
+    if not nome or not email or not password:
+        return jsonify({'error': 'Name, email, and password are required'}), 400
+        
+    if len(password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        
+    if User.query.filter_by(email=email).first():
+        return jsonify({'error': 'An account with this email address already exists'}), 400
+        
+    if role not in ['admin', 'staff']:
+        role = 'staff'
+        
+    novo_user = User(
+        nome=nome,
+        email=email,
+        role=role,
+        ativo=True
+    )
+    novo_user.set_password(password)
+    
+    db.session.add(novo_user)
+    db.session.commit()
+    
+    registrar_log('USER_CREATE', 'User', novo_user.id, f"Novo usuário cadastrado: {novo_user.nome} ({novo_user.email}) com perfil {novo_user.role}")
+
+    return jsonify({
+        'message': 'User created successfully',
+        'usuario': {
+            'id': novo_user.id,
+            'nome': novo_user.nome,
+            'email': novo_user.email,
+            'role': novo_user.role,
+            'ativo': novo_user.ativo
+        }
+    }), 201
+
+@app.route('/api/usuarios/<int:user_id>', methods=['PUT'])
+@admin_required
+def atualizar_usuario(user_id):
+    user = User.query.get_or_404(user_id)
+    data = request.get_json() or {}
+    alteracoes = []
+    
+    # Check if modifying name
+    if 'nome' in data and data['nome'].strip():
+        if user.nome != data['nome'].strip():
+            alteracoes.append(f"nome de '{user.nome}' para '{data['nome'].strip()}'")
+            user.nome = data['nome'].strip()
+        
+    # Check if modifying role
+    if 'role' in data:
+        nova_role = data['role'].strip().lower()
+        if nova_role in ['admin', 'staff']:
+            if user.id == current_user.id and nova_role != 'admin':
+                return jsonify({'error': 'You cannot remove your own administrator privileges'}), 400
+            if user.role != nova_role:
+                alteracoes.append(f"perfil para '{nova_role}'")
+                user.role = nova_role
+            
+    # Check if modifying status (ativo)
+    if 'ativo' in data:
+        novo_status = bool(data['ativo'])
+        if user.id == current_user.id and not novo_status:
+            return jsonify({'error': 'You cannot suspend your own account'}), 400
+        if user.ativo != novo_status:
+            status_txt = "Ativado" if novo_status else "Suspenso"
+            alteracoes.append(f"status alterado para {status_txt}")
+            user.ativo = novo_status
+        
+    # Check if updating password
+    if 'password' in data and data['password']:
+        if len(data['password']) < 6:
+            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        user.set_password(data['password'])
+        alteracoes.append("senha redefinida")
+        
+    db.session.commit()
+    
+    if alteracoes:
+        registrar_log('USER_UPDATE', 'User', user.id, f"Usuário {user.nome}: {', '.join(alteracoes)}")
+
+    return jsonify({
+        'message': 'User updated successfully',
+        'usuario': {
+            'id': user.id,
+            'nome': user.nome,
+            'email': user.email,
+            'role': user.role,
+            'ativo': user.ativo
+        }
+    }), 200
+
+@app.route('/api/usuarios/<int:user_id>', methods=['DELETE'])
+@admin_required
+def deletar_usuario(user_id):
+    user = User.query.get_or_404(user_id)
+    
+    if user.id == current_user.id:
+        return jsonify({'error': 'You cannot delete your own account'}), 400
+        
+    nome_antigo = user.nome
+    email_antigo = user.email
+    db.session.delete(user)
+    db.session.commit()
+    
+    registrar_log('USER_DELETE', 'User', user_id, f"Usuário excluído: {nome_antigo} ({email_antigo})")
+    return jsonify({'message': f'User {nome_antigo} deleted successfully'}), 200
+
+@app.route('/api/auditoria', methods=['GET'])
+@admin_required
+def listar_auditoria():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    search = request.args.get('search', '', type=str)
+    acao = request.args.get('acao', '', type=str)
+    
+    query = AuditLog.query
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(db.or_(
+            AuditLog.usuario_nome.ilike(search_term),
+            AuditLog.descricao.ilike(search_term),
+            AuditLog.entidade.ilike(search_term),
+            AuditLog.entidade_id.ilike(search_term)
+        ))
+    if acao:
+        query = query.filter(AuditLog.acao == acao)
+        
+    paginated = query.order_by(AuditLog.data_hora.desc()).paginate(page=page, per_page=limit, error_out=False)
+    
+    itens = [{
+        'id': a.id,
+        'data_hora': a.data_hora.isoformat() + 'Z' if a.data_hora else None,
+        'usuario_nome': a.usuario_nome or 'System',
+        'acao': a.acao,
+        'entidade': a.entidade,
+        'entidade_id': a.entidade_id,
+        'descricao': a.descricao,
+        'ip_origem': a.ip_origem
+    } for a in paginated.items]
+    
+    return jsonify({
+        'itens': itens,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page
+    })
+
 # --- CRUD ROUTES ---
 
 @app.route('/api/clientes', methods=['POST'])
@@ -347,7 +566,10 @@ def criar_cliente():
     db.session.add(novo_cliente)
     db.session.commit()
     
-    return jsonify({'message': 'Customer created successfully', 'mensagem': 'Cliente criado com sucesso', 'id': novo_cliente.id}), 201
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('CREATE_CLIENT', 'Client', novo_cliente.id, f"Cliente {novo_cliente.nome} cadastrado por {operador_atual}")
+
+    return jsonify({'message': 'Customer registered successfully', 'mensagem': 'Cliente cadastrado com sucesso', 'id': novo_cliente.id}), 201
 
 @app.route('/api/motos', methods=['POST'])
 def criar_moto():
@@ -474,11 +696,17 @@ def atualizar_moto(placa):
         return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
         
     dados = request.get_json()
+    status_antigo = moto.status
     if 'modelo' in dados: moto.modelo = dados['modelo']
     if 'cor' in dados: moto.cor = dados['cor']
     if 'status' in dados: moto.status = dados['status']
     
     db.session.commit()
+    
+    if 'status' in dados and dados['status'] != status_antigo:
+        operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+        registrar_log('MOTO_STATUS_CHANGE', 'Motorcycle', placa, f"Status da moto {placa} alterado de '{status_antigo}' para '{dados['status']}' por {operador_atual}")
+
     return jsonify({'message': 'Motorbike updated successfully', 'mensagem': 'Moto atualizada com sucesso'})
 
 @app.route('/api/contratos', methods=['POST'])
@@ -525,6 +753,8 @@ def criar_contrato():
         nome_salvo = salvar_arquivo_otimizado(arq_seguro, nome_seguro)
         url_seguro = f"/static/uploads/{nome_salvo}"
 
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+
     # Create Contract
     novo_contrato = Contract(
         id_cliente=id_cliente,
@@ -532,7 +762,8 @@ def criar_contrato():
         dia_pagamento_semanal=dia_pagamento_semanal,
         valor_aluguel_semanal=valor_aluguel_semanal,
         url_seguro=url_seguro,
-        status=ContractStatus.ACTIVE.value
+        status=ContractStatus.ACTIVE.value,
+        criado_por_nome=operador_atual
     )
     db.session.add(novo_contrato)
     
@@ -583,11 +814,14 @@ def criar_contrato():
         id_contrato=novo_contrato.id,
         tipo=InspectionType.CHECK_OUT.value,
         observacoes=observacoes,
-        url_fotos=url_foto_str
+        url_fotos=url_foto_str,
+        realizado_por_nome=operador_atual
     )
     db.session.add(nova_vistoria)
     
     db.session.commit()
+    
+    registrar_log('CREATE_CONTRACT', 'Contract', novo_contrato.id, f"Contrato #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f})")
     
     return jsonify({'message': 'Contract and initial inspection created successfully', 'mensagem': 'Contrato e vistoria criados com sucesso', 'id': novo_contrato.id}), 201
 
@@ -712,6 +946,7 @@ def detalhe_contrato(id):
         'is_completed': is_completed,
         'url_seguro': c.url_seguro,
         'url_comprovante_deposito': c.url_comprovante_deposito,
+        'criado_por_nome': c.criado_por_nome or '',
         'deposito_pago': deposito_pago,
         'deducoes_deposito': deducoes_deposito,
         'saldo_deposito': saldo_deposito,
@@ -723,6 +958,7 @@ def detalhe_contrato(id):
             'valor': float(t.valor),
             'status': t.status,
             'forma_pagamento': t.forma_pagamento,
+            'registrado_por_nome': t.registrado_por_nome or '',
             'data_vencimento': t.data_vencimento.isoformat() + 'Z' if t.data_vencimento else None,
             'data_pagamento': t.data_pagamento.isoformat() + 'Z' if t.data_pagamento else None
         } for t in transacoes_cliente],
@@ -731,7 +967,8 @@ def detalhe_contrato(id):
             'tipo': v.tipo,
             'data_vistoria': v.data.isoformat() + 'Z' if v.data else None,
             'foto_url': v.url_fotos,
-            'observacoes': v.observacoes
+            'observacoes': v.observacoes,
+            'realizado_por_nome': v.realizado_por_nome or ''
         } for v in vistorias]
     })
 
@@ -763,6 +1000,9 @@ def criar_cobranca(id):
     db.session.add(nova_cobranca)
     db.session.commit()
     
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo}) gerada por {operador_atual} para o Contrato #{c.id}")
+
     return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
 
 @app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT'])
@@ -775,12 +1015,15 @@ def pagar_cobranca(id):
     if not forma_pagamento:
         return jsonify({'error': 'Payment method is required', 'erro': 'Forma de pagamento é obrigatória'}), 400
         
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     t.status = TransactionStatus.PAID.value
     t.data_pagamento = datetime.utcnow()
     t.forma_pagamento = forma_pagamento
+    t.registrado_por_nome = operador_atual
     
     db.session.commit()
-    return jsonify({'message': 'Payment marked successfully', 'mensagem': 'Baixa realizada com sucesso', 'forma_pagamento': t.forma_pagamento}), 200
+    registrar_log('PAYMENT_RECEIVED', 'Transaction', t.id, f"Baixa de £{float(t.valor):.2f} ({t.tipo}) confirmada via {forma_pagamento} por {operador_atual} no Contrato #{t.id_contrato}")
+    return jsonify({'message': 'Payment marked successfully', 'mensagem': 'Baixa realizada com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
 
 @app.route('/api/vistorias', methods=['POST'])
 def criar_vistoria():
@@ -806,11 +1049,13 @@ def criar_vistoria():
             
     url_foto_str = ",".join(urls_fotos)
     
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     nova_vistoria = Inspection(
         id_contrato=id_contrato,
         tipo=tipo,
         observacoes=observacoes,
-        url_fotos=url_foto_str
+        url_fotos=url_foto_str,
+        realizado_por_nome=operador_atual
     )
     db.session.add(nova_vistoria)
     
@@ -824,6 +1069,10 @@ def criar_vistoria():
                 moto.status = MotoStatus.MAINTENANCE.value
                 
     db.session.commit()
+    
+    registrar_log('CREATE_INSPECTION', 'Inspection', nova_vistoria.id, f"Vistoria de {tipo} registrada por {operador_atual} no Contrato #{id_contrato}")
+    if tipo in [InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']:
+        registrar_log('RETURN_VEHICLE', 'Contract', id_contrato, f"Moto devolvida / Check-in confirmado por {operador_atual} no Contrato #{id_contrato}")
     
     return jsonify({'message': 'Inspection recorded successfully', 'mensagem': 'Vistoria registrada com sucesso', 'id': nova_vistoria.id, 'url': url_foto_str}), 201
 
@@ -869,6 +1118,7 @@ def listar_vistorias():
         'tipo': v.tipo,
         'foto_url': v.url_fotos,
         'observacoes': v.observacoes,
+        'realizado_por_nome': v.realizado_por_nome or '',
         'placa': v.contrato.placa if v.contrato else '',
         'cliente': v.contrato.cliente.nome if v.contrato and v.contrato.cliente else ''
     } for v in paginated.items]
@@ -929,6 +1179,7 @@ def listar_financeiro():
         'valor': float(t.valor),
         'status': t.status,
         'forma_pagamento': t.forma_pagamento or '',
+        'registrado_por_nome': t.registrado_por_nome or '',
         'placa': t.contrato.placa if t.contrato else '',
         'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else ''
     } for t in paginated.items]
@@ -952,11 +1203,14 @@ def pagar_transacao(id):
     elif request.form and 'forma_pagamento' in request.form:
         forma = request.form.get('forma_pagamento', 'Cash')
         
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     t.status = TransactionStatus.PAID.value
     t.data_pagamento = datetime.utcnow()
     t.forma_pagamento = forma
+    t.registrado_por_nome = operador_atual
     db.session.commit()
-    return jsonify({'message': 'Transaction marked as paid successfully', 'mensagem': 'Transação paga com sucesso', 'forma_pagamento': t.forma_pagamento}), 200
+    registrar_log('PAYMENT_RECEIVED', 'Transaction', t.id, f"Baixa de £{float(t.valor):.2f} ({t.tipo}) confirmada via {forma} por {operador_atual} no Contrato #{t.id_contrato}")
+    return jsonify({'message': 'Transaction marked as paid successfully', 'mensagem': 'Transação paga com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
 
 @app.route('/recibo/<int:id>')
 def pagina_recibo(id):

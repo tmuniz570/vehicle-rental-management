@@ -66,6 +66,11 @@
                 <a href="/financeiro" class="{% if 'financeiro' in request.path %}active{% endif %}">
                     Financial
                 </a>
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <a href="/usuarios" class="{% if 'usuario' in request.path %}active{% endif %}">
+                    Users
+                </a>
+                {% endif %}
             </nav>
 
             <div class="sidebar-footer" style="margin-top: auto; padding-top: 1.25rem; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 0.75rem;">

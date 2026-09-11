@@ -57,10 +57,12 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Native-Style Bottom Navigation:** High-usability bottom navigation bar enabled exclusively on mobile viewports (`<= 768px`) with iOS Safe Area Insets support.
 * **Installable App:** Manifest configuration (`manifest.json`) and app icons allowing home screen installation on iOS (Safari) and Android (Chrome).
 
-### 🔐 8. Authentication & Role-Based Access Control
+### 🔐 8. Authentication, User Management & Internal Audit Trail
 * **Secure Session Auth:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`).
 * **Branded Login Experience:** Modern glassmorphism dark-mode login interface with flash message feedback and "Remember Me" session persistence.
-* **Auto-Provisioned Master Admin:** Automatic initialization of the primary administrator profile upon first launch.
+* **Staff & Operator Management:** Full administrative panel (`/usuarios`) to create, edit, suspend, and reset passwords for team operators.
+* **Internal Accountability & Audit Trail:** Automatic tracking of which staff member created contracts, marked payments as received, or conducted vehicle inspections. Live activity stream with filters for complete company oversight.
+* **Client Privacy Guarantee:** Customer-facing documents (such as printable receipts) strictly remain 100% corporate under FF Motors branding with zero exposure of internal employee records.
 
 ### 🛡️ 9. Data Security, Production Server & Backup Suite
 * **Production-Ready WSGI:** Multi-threaded production server powered by `Waitress` (`wsgi.py`) ensuring concurrent connection handling on Windows and Linux.
@@ -188,6 +190,7 @@ FF Motors APP/
 │   │   ├── detalhe_contrato.js# Contract ledger, modal accounting & inspection handling
 │   │   ├── financeiro.js      # Financial transactions filtering & payment modals
 │   │   ├── motos.js           # Fleet management logic & maintenance triggers
+│   │   ├── usuarios.js        # User accounts & audit log timeline scripts
 │   │   └── vistorias_lista.js # Inspection gallery & photo previews
 │   ├── images/                # Brand assets (logo, icons)
 │   ├── uploads/               # Stored inspection photos & client documents (.gitkeep)
@@ -195,6 +198,7 @@ FF Motors APP/
 └── templates/
     ├── layout.html            # Base master layout with mobile bottom navigation
     ├── login.html             # Glassmorphism dark authentication screen
+    ├── usuarios.html          # User management & audit log dashboard
     ├── index.html             # Executive operational dashboard
     ├── contratos.html         # Contracts list & status filtering
     ├── detalhe_contrato.html  # Comprehensive agreement view & financial statement

@@ -1,0 +1,244 @@
+{% extends 'layout.html' %}
+
+{% block title %}User Management{% endblock %}
+
+{% block content %}
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 1.75rem; font-weight: 700; color: var(--text-primary);">User Management</h1>
+        <p style="margin: 0.25rem 0 0; color: var(--text-secondary); font-size: 0.9rem;">
+            Manage operator accounts, access roles, and system credentials.
+        </p>
+    </div>
+    <button id="btnOpenNewUserModal" class="btn-primary" style="width: auto; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.25rem; font-weight: 600;">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+        </svg>
+        + Add New User
+    </button>
+</div>
+
+<!-- Tabs Navigation -->
+<div style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem;">
+    <button id="tabBtnUsers" class="btn-tab active" onclick="switchTab('users')" style="padding: 0.65rem 1.25rem; font-weight: 600; border-radius: 10px; border: none; background: var(--accent); color: white; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+        👥 Team Accounts
+    </button>
+    <button id="tabBtnAudit" class="btn-tab" onclick="switchTab('audit')" style="padding: 0.65rem 1.25rem; font-weight: 600; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.03); color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+        📜 Activity Log & Audit Trail
+    </button>
+</div>
+
+<!-- Tab 1: Users Section -->
+<div id="tabContentUsers">
+    <!-- Quick Metric Cards -->
+    <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Total Users</div>
+            <div id="statTotalUsers" style="font-size: 2rem; font-weight: 700; color: var(--text-primary); margin-top: 0.5rem;">-</div>
+        </div>
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Active Staff</div>
+            <div id="statActiveUsers" style="font-size: 2rem; font-weight: 700; color: #10b981; margin-top: 0.5rem;">-</div>
+        </div>
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Administrators</div>
+            <div id="statAdminUsers" style="font-size: 2rem; font-weight: 700; color: #a855f7; margin-top: 0.5rem;">-</div>
+        </div>
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Yard Operators</div>
+            <div id="statStaffUsers" style="font-size: 2rem; font-weight: 700; color: #3b82f6; margin-top: 0.5rem;">-</div>
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div style="margin-bottom: 1.5rem;">
+        <input type="text" id="userSearchInput" placeholder="Search user by name, email, or role..." style="width: 100%; padding: 0.875rem 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.95rem;">
+    </div>
+
+    <!-- Users Table -->
+    <div class="table-container">
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>User / Name</th>
+                    <th>Email Address</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody">
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Loading accounts...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Tab 2: Audit Trail Section -->
+<div id="tabContentAudit" style="display: none;">
+    <!-- Audit Filter Controls -->
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <div style="flex: 1; min-width: 240px;">
+            <input type="text" id="auditSearchInput" placeholder="Search by operator, action, plate, or details..." style="width: 100%; padding: 0.875rem 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.95rem;">
+        </div>
+        <div style="min-width: 180px;">
+            <select id="auditAcaoFilter" style="width: 100%; height: 100%; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.9); color: var(--text-primary); font-size: 0.95rem;">
+                <option value="">All Operational Actions</option>
+                <option value="PAYMENT_RECEIVED">Payment Received</option>
+                <option value="CREATE_CONTRACT">Contract Created</option>
+                <option value="CREATE_INSPECTION">Inspection Performed</option>
+                <option value="RETURN_VEHICLE">Vehicle Returned</option>
+                <option value="MOTO_STATUS_CHANGE">Motorbike Status Changed</option>
+                <option value="CREATE_CLIENT">Customer Registered</option>
+                <option value="USER_CREATE">User Account Created</option>
+                <option value="USER_UPDATE">User Account Updated</option>
+                <option value="USER_DELETE">User Account Deleted</option>
+            </select>
+        </div>
+        <button type="button" id="btnRefreshAudit" class="btn-secondary" style="padding: 0.75rem 1.25rem; width: auto; font-size: 0.9rem;" title="Refresh Audit Trail">
+            🔄 Refresh
+        </button>
+    </div>
+
+    <!-- Audit Log Table -->
+    <div class="table-container">
+        <table id="auditTable">
+            <thead>
+                <tr>
+                    <th>Date & Time</th>
+                    <th>Staff / Operator</th>
+                    <th>Action</th>
+                    <th>Activity Description</th>
+                    <th>Target</th>
+                    <th>IP</th>
+                </tr>
+            </thead>
+            <tbody id="auditTableBody">
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--text-secondary);">Loading activity log...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 10px;">
+        <button id="btnPrevAuditPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 90px;">&laquo; Previous</button>
+        <span id="auditPaginationInfo" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+        <button id="btnNextAuditPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 90px;">Next &raquo;</button>
+    </div>
+</div>
+
+<!-- Modal: New User -->
+<div id="modalNewUser" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
+    <div class="glass-card" style="width:100%; max-width:480px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
+        <button type="button" class="close-modal-btn" onclick="fecharModalNovoUsuario()" style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;" aria-label="Close">&times;</button>
+        
+        <h2 style="margin: 0 0 0.5rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">Add System User</h2>
+        <p style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Create login credentials for team members and operators.</p>
+        
+        <form id="formNovoUsuario">
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Full Name *</label>
+                <input type="text" id="novo_nome" required placeholder="e.g. John Smith" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Email Address *</label>
+                <input type="email" id="novo_email" required placeholder="e.g. john@ffmotors.co.uk" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">System Role *</label>
+                <select id="novo_role" required style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
+                    <option value="staff" selected>Yard Staff / Operator (Standard Access)</option>
+                    <option value="admin">Administrator (Full Access & User Management)</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">Password *</label>
+                    <button type="button" onclick="gerarSenhaAleatoria()" style="background: none; border: none; color: var(--accent); font-size: 0.75rem; cursor: pointer; padding: 0;">Generate Random</button>
+                </div>
+                <div style="position: relative;">
+                    <input type="password" id="novo_password" required minlength="6" placeholder="At least 6 characters" style="width:100%; padding:0.75rem 2.75rem 0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <button type="button" onclick="togglePasswordVisibility('novo_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer;" title="Toggle Password">
+                        👁️
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+                <button type="button" onclick="fecharModalNovoUsuario()" class="btn-secondary" style="width: auto; padding: 0.75rem 1.25rem;">Cancel</button>
+                <button type="submit" id="btnSalvarNovoUsuario" class="btn-primary" style="width: auto; padding: 0.75rem 1.5rem;">Create User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit User & Change Password -->
+<div id="modalEditUser" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
+    <div class="glass-card" style="width:100%; max-width:480px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
+        <button type="button" class="close-modal-btn" onclick="fecharModalEditUsuario()" style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;" aria-label="Close">&times;</button>
+        
+        <h2 style="margin: 0 0 0.5rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">Edit Account</h2>
+        <p id="editUserSubtitle" style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Modify permissions and credentials.</p>
+        
+        <form id="formEditUsuario">
+            <input type="hidden" id="edit_user_id">
+            
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Full Name</label>
+                <input type="text" id="edit_nome" required style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Email Address</label>
+                <input type="email" id="edit_email" readonly style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(255,255,255,0.05); color:var(--text-secondary); cursor:not-allowed;" title="Email cannot be changed directly">
+            </div>
+            
+            <div class="form-row" style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+                <div class="form-group">
+                    <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Role</label>
+                    <select id="edit_role" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
+                        <option value="staff">Staff / Operator</option>
+                        <option value="admin">Administrator</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem;">Account Status</label>
+                    <select id="edit_ativo" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
+                        <option value="true">Active</option>
+                        <option value="false">Suspended / Inactive</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="border-top: 1px solid var(--border-color); padding-top: 1.25rem; margin-top: 1rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">Reset Password</label>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">Leave blank to keep current</span>
+                </div>
+                <div style="position: relative;">
+                    <input type="password" id="edit_password" minlength="6" placeholder="Enter new password (optional)" style="width:100%; padding:0.75rem 2.75rem 0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <button type="button" onclick="togglePasswordVisibility('edit_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer;" title="Toggle Password">
+                        👁️
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button type="button" onclick="fecharModalEditUsuario()" class="btn-secondary" style="width: auto; padding: 0.75rem 1.25rem;">Cancel</button>
+                <button type="submit" id="btnSalvarEditUsuario" class="btn-primary" style="width: auto; padding: 0.75rem 1.5rem;">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/usuarios.js"></script>
+{% endblock %}

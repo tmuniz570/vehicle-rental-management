@@ -95,9 +95,11 @@ async function carregarFinanceiro() {
                 const isDepositDeduction = t.forma_pagamento === 'Deposit';
                 const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
                 const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
+                const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.7rem; color:#a855f7; margin-top:2px;">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
                 celulaPagamento = `<div>
                     <span style="font-weight:500;">${pagamento}</span>
                     <small style="display:block; ${colorStyle} font-size:0.75rem;">${formaLabel}</small>
+                    ${staffHtml}
                 </div>`;
             }
 

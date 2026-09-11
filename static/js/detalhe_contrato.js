@@ -152,6 +152,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             : '-';
         document.getElementById('info_dia_venc').textContent = diaVencTexto;
         
+        const boxCriado = document.getElementById('box_criado_por');
+        const infoCriado = document.getElementById('info_criado_por');
+        if (boxCriado && infoCriado) {
+            if (data.criado_por_nome) {
+                boxCriado.style.display = 'block';
+                infoCriado.textContent = data.criado_por_nome;
+            } else {
+                boxCriado.style.display = 'none';
+            }
+        }
+        
         // Button Complete Contract
         const btnFinalizar = document.getElementById('btnFinalizarContrato');
         if (btnFinalizar) {
@@ -346,7 +357,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const isDepositDeduction = t.forma_pagamento === 'Deposit';
                     const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
                     const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
-                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${formaLabel}</small></span>`;
+                    const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.7rem; color:#c084fc; margin-top:2px;">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
+                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${formaLabel}</small>${staffHtml}</span>`;
                 }
 
                 let celulaVencimento = `<span>${dataVenc}</span>`;
@@ -459,9 +471,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 div.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;";
                 div.innerHTML = `
                     <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                             ${tBadge}
                             <span style="font-size: 0.8rem; color: var(--text-secondary);">${dataVist}</span>
+                            ${v.realizado_por_nome ? `<span style="font-size: 0.75rem; color: #c084fc;">&bull; 👤 ${escapeHtml(v.realizado_por_nome)}</span>` : ''}
                         </div>
                         <div style="font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">
                             ${v.observacoes || '<em style="opacity:0.5;">No notes</em>'}

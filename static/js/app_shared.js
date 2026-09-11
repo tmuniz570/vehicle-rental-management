@@ -137,7 +137,17 @@ function sortTableByColumn(table, colIndex) {
 
 // Auto-initialize sortable tables on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-    ['motosTable', 'clientesTable', 'contratosTable', 'vistoriasTable', 'financeiroTable'].forEach(id => {
+    ['motosTable', 'clientesTable', 'contratosTable', 'vistoriasTable', 'financeiroTable', 'usersTable'].forEach(id => {
         enableTableSorting(id);
     });
 });
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}

@@ -114,6 +114,7 @@ class Contract(db.Model):
     status = db.Column(db.String(20), default=ContractStatus.ATIVO.value, nullable=False)
     url_seguro = db.Column(db.String(255), nullable=True)
     url_comprovante_deposito = db.Column(db.String(255), nullable=True)
+    criado_por_nome = db.Column(db.String(100), nullable=True)
     
     vistorias = db.relationship('Inspection', backref='contrato', lazy=True)
     transacoes = db.relationship('FinancialTransaction', backref='contrato', lazy=True)
@@ -127,6 +128,7 @@ class Inspection(db.Model):
     data = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     observacoes = db.Column(db.Text, nullable=True)
     url_fotos = db.Column(db.String(255), nullable=True) # Pode ser JSON array se forem várias fotos
+    realizado_por_nome = db.Column(db.String(100), nullable=True)
 
 class FinancialTransaction(db.Model):
     __tablename__ = 'financeiro_transacoes'
@@ -139,11 +141,46 @@ class FinancialTransaction(db.Model):
     valor = db.Column(db.Numeric(10, 2), nullable=False)
     status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False)
     forma_pagamento = db.Column(db.String(50), nullable=True)
+    registrado_por_nome = db.Column(db.String(100), nullable=True)
+
+class AuditLog(db.Model):
+    __tablename__ = 'logs_auditoria'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    usuario_nome = db.Column(db.String(100), nullable=True)
+    acao = db.Column(db.String(50), nullable=False, index=True)
+    entidade = db.Column(db.String(50), nullable=False)
+    entidade_id = db.Column(db.String(50), nullable=True)
+    descricao = db.Column(db.Text, nullable=False)
+    ip_origem = db.Column(db.String(50), nullable=True)
 
 def init_db(app):
     db.init_app(app)
     with app.app_context():
         db.create_all()
+        try:
+            with db.engine.connect() as conn:
+                res_c = conn.execute(db.text("PRAGMA table_info(contratos)")).fetchall()
+                cols_c = [r[1] for r in res_c]
+                if 'criado_por_nome' not in cols_c:
+                    conn.execute(db.text("ALTER TABLE contratos ADD COLUMN criado_por_nome VARCHAR(100)"))
+                    conn.commit()
+                    
+                res_i = conn.execute(db.text("PRAGMA table_info(vistorias)")).fetchall()
+                cols_i = [r[1] for r in res_i]
+                if 'realizado_por_nome' not in cols_i:
+                    conn.execute(db.text("ALTER TABLE vistorias ADD COLUMN realizado_por_nome VARCHAR(100)"))
+                    conn.commit()
+                    
+                res_t = conn.execute(db.text("PRAGMA table_info(financeiro_transacoes)")).fetchall()
+                cols_t = [r[1] for r in res_t]
+                if 'registrado_por_nome' not in cols_t:
+                    conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN registrado_por_nome VARCHAR(100)"))
+                    conn.commit()
+        except Exception as e:
+            print(f"[DB Auto-Migration] Info: {e}")
 
 # --- Garbage Collector (File Cleanup) ---
 def delete_file_if_exists(filepath):

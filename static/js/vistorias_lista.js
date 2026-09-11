@@ -147,8 +147,10 @@ async function carregarVistorias() {
                 ? `<span title="${v.observacoes.replace(/"/g, '&quot;')}" style="display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary);">${v.observacoes}</span>`
                 : '<span style="color:var(--text-secondary); opacity:0.5;">-</span>';
 
+            const staffTag = v.realizado_por_nome ? `<small style="display:block; color:#c084fc; font-size:0.75rem; margin-top:2px;">👤 ${escapeHtml(v.realizado_por_nome)}</small>` : '';
+
             tr.innerHTML = `
-                <td style="font-weight: 500; font-size: 0.9rem; white-space: nowrap;">${dataVistoria}</td>
+                <td style="font-weight: 500; font-size: 0.9rem; white-space: nowrap;">${dataVistoria}${staffTag}</td>
                 <td>
                     <a href="/contratos/${v.id_contrato}" class="link-contrato" title="Open Contract #${v.id_contrato}">
                         Contract #${v.id_contrato} &rarr;
@@ -221,6 +223,8 @@ function abrirModalVistoria(v) {
     `;
     document.getElementById('modalPlaca').textContent = v.placa || '-';
     document.getElementById('modalCliente').textContent = v.cliente || '-';
+    const elOp = document.getElementById('modalOperador');
+    if (elOp) elOp.textContent = v.realizado_por_nome || '-';
     document.getElementById('modalObs').textContent = v.observacoes ? v.observacoes : 'No notes recorded.';
 
     // Gallery
