@@ -25,6 +25,7 @@ backups/
 *.db-wal
 *.db-shm
 
-# User uploaded media (preserve .gitkeep)
+# User uploaded media (preserve .gitkeep and demo portfolio assets)
 static/uploads/*
 !static/uploads/.gitkeep
+!static/uploads/demo_*.webp
