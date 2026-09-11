@@ -10,6 +10,8 @@ from database import (
 )
 
 def create_sample_image(filepath, title, subtitle, bg_color="#111827", accent_color="#FF6600"):
+    if os.path.exists(filepath) and os.path.getsize(filepath) > 10000:
+        return filepath
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     w, h = 800, 600
     img = Image.new('RGB', (w, h), color=bg_color)
