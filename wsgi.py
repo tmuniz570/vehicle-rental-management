@@ -17,6 +17,11 @@ if os.environ.get('ENABLE_SCHEDULER', 'true').lower() in ('true', '1', 'yes'):
     except Exception as e:
         print(f"[WSGI] Aviso do agendador: {e}")
 
+# Habilita suporte a Proxy Reverso (Cloudflare, Render, AWS ALB, Nginx)
+# Garante que request.remote_addr seja o IP real do cliente na trilha de auditoria e url_for use HTTPS
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 # Expõe as referências padrão para servidores WSGI (Gunicorn, Waitress, uWSGI)
 application = app
 

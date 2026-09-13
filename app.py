@@ -35,7 +35,14 @@ else:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'ffmotors.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = os.path.join(basedir, 'static', 'uploads')
+app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER') or os.path.join(basedir, 'static', 'uploads')
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Configurações de Cookie de Sessão
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+if os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or (os.environ.get('FLASK_ENV') == 'production' and os.environ.get('HTTPS') == 'on'):
+    app.config['SESSION_COOKIE_SECURE'] = True
 
 # Garante tipos MIME corretos no Windows para que imagens e documentos abram em nova aba e não façam download
 import mimetypes
