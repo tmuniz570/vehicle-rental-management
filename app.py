@@ -1,10 +1,12 @@
 import os
+import secrets
+import hmac
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, jsonify, send_file, redirect, url_for, 
-    send_from_directory, flash
+    send_from_directory, flash, session
 )
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
@@ -23,10 +25,13 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'ffmotors-birmingham-uk-secret-key-2026-production')
 
-# Configuração do banco de dados SQLite
+# Configuração do banco de dados (PostgreSQL em produção ou SQLite local)
 basedir = os.path.abspath(os.path.dirname(__file__))
 db_uri = os.environ.get('DATABASE_URL')
-if not db_uri:
+if db_uri and not db_uri.startswith("sqlite"):
+    if db_uri.startswith("postgres://"):
+        db_uri = db_uri.replace("postgres://", "postgresql://", 1)
+else:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'ffmotors.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -96,6 +101,49 @@ def registrar_log(acao, entidade, entidade_id, descricao):
         db.session.commit()
     except Exception as e:
         print(f"[AuditLog Error]: {e}")
+
+# --- CSRF Protection & Security Headers ---
+def generate_csrf_token():
+    if '_csrf_token' not in session:
+        session['_csrf_token'] = secrets.token_hex(32)
+    return session['_csrf_token']
+
+@app.context_processor
+def inject_csrf_token():
+    return dict(csrf_token=generate_csrf_token)
+
+app.jinja_env.globals['csrf_token'] = generate_csrf_token
+
+@app.before_request
+def validate_csrf():
+    if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
+        if request.path.startswith('/static/') or request.endpoint == 'custom_static_uploads':
+            return
+            
+        expected_token = session.get('_csrf_token')
+        client_token = (
+            request.headers.get('X-CSRFToken') or
+            request.headers.get('X-CSRF-Token') or
+            request.form.get('csrf_token') or
+            (request.is_json and isinstance(request.json, dict) and request.json.get('csrf_token'))
+        )
+        
+        if not expected_token or not client_token or not hmac.compare_digest(str(expected_token), str(client_token)):
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'CSRF token missing or invalid',
+                    'erro': 'Token CSRF ausente ou inválido'
+                }), 400
+            flash('Sessão expirada ou token de segurança inválido. Por favor, tente novamente.', 'error')
+            return redirect(request.referrer or url_for('login'))
+
+@app.after_request
+def apply_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 @app.before_request
 def check_authentication():
@@ -489,18 +537,31 @@ def listar_auditoria():
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
     acao = request.args.get('acao', '', type=str)
+    data_filtro = request.args.get('data', '', type=str)
     
     query = AuditLog.query
     if search:
-        search_term = f"%{search}%"
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
         query = query.filter(db.or_(
             AuditLog.usuario_nome.ilike(search_term),
             AuditLog.descricao.ilike(search_term),
+            AuditLog.descricao.ilike(search_plate_term),
             AuditLog.entidade.ilike(search_term),
-            AuditLog.entidade_id.ilike(search_term)
+            AuditLog.entidade_id.ilike(search_term),
+            AuditLog.entidade_id.ilike(search_plate_term)
         ))
     if acao:
         query = query.filter(AuditLog.acao == acao)
+        
+    if data_filtro:
+        try:
+            dt_inicio = datetime.strptime(data_filtro, "%Y-%m-%d")
+            dt_fim = dt_inicio + timedelta(days=1)
+            query = query.filter(AuditLog.data_hora >= dt_inicio, AuditLog.data_hora < dt_fim)
+        except ValueError:
+            pass
         
     paginated = query.order_by(AuditLog.data_hora.desc()).paginate(page=page, per_page=limit, error_out=False)
     
@@ -577,18 +638,41 @@ def criar_moto():
     if not dados or not all(k in dados for k in ('placa', 'modelo', 'cor')):
         return jsonify({'error': 'Missing required fields (registration plate, model and colour are required)', 'erro': 'Dados incompletos'}), 400
         
-    if Motorcycle.query.filter_by(placa=dados['placa']).first():
+    placa = str(dados['placa']).strip().replace(' ', '').upper()
+    if not placa:
+        return jsonify({'error': 'Invalid registration plate', 'erro': 'Placa inválida'}), 400
+
+    if Motorcycle.query.filter_by(placa=placa).first():
         return jsonify({'error': 'Registration plate already registered', 'erro': 'Placa já cadastrada'}), 400
         
+    vencimento_mot = None
+    if dados.get('vencimento_mot'):
+        try:
+            vencimento_mot = datetime.strptime(dados['vencimento_mot'], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    vencimento_tax = None
+    if dados.get('vencimento_tax'):
+        try:
+            vencimento_tax = datetime.strptime(dados['vencimento_tax'], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
     nova_moto = Motorcycle(
-        placa=dados['placa'],
-        modelo=dados['modelo'],
-        cor=dados['cor'],
-        status=dados.get('status', MotoStatus.AVAILABLE.value)
+        placa=placa,
+        modelo=dados['modelo'].strip(),
+        cor=dados['cor'].strip(),
+        status=dados.get('status', MotoStatus.AVAILABLE.value),
+        vencimento_mot=vencimento_mot,
+        vencimento_tax=vencimento_tax
     )
     db.session.add(nova_moto)
     db.session.commit()
     
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('MOTO_CREATE', 'Motorcycle', nova_moto.placa, f"Moto {nova_moto.placa} ({nova_moto.modelo}) cadastrada por {operador_atual}")
+
     return jsonify({'message': 'Motorbike registered successfully', 'mensagem': 'Moto cadastrada com sucesso', 'placa': nova_moto.placa}), 201
 
 @app.route('/api/clientes', methods=['GET'])
@@ -669,17 +753,26 @@ def listar_motos():
     
     query = Motorcycle.query
     if search:
-        search_term = f"%{search}%"
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
         query = query.filter(db.or_(
+            Motorcycle.placa.ilike(search_plate_term),
             Motorcycle.placa.ilike(search_term),
             Motorcycle.modelo.ilike(search_term),
+            Motorcycle.cor.ilike(search_term),
             Motorcycle.status.ilike(search_term)
         ))
         
     paginated = query.order_by(Motorcycle.placa).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
-        'placa': m.placa, 'modelo': m.modelo, 'cor': m.cor, 'status': m.status
+        'placa': m.placa,
+        'modelo': m.modelo,
+        'cor': m.cor,
+        'status': m.status,
+        'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
+        'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None
     } for m in paginated.items]
     
     return jsonify({
@@ -700,6 +793,24 @@ def atualizar_moto(placa):
     if 'modelo' in dados: moto.modelo = dados['modelo']
     if 'cor' in dados: moto.cor = dados['cor']
     if 'status' in dados: moto.status = dados['status']
+    
+    if 'vencimento_mot' in dados:
+        if dados['vencimento_mot']:
+            try:
+                moto.vencimento_mot = datetime.strptime(dados['vencimento_mot'], "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        else:
+            moto.vencimento_mot = None
+            
+    if 'vencimento_tax' in dados:
+        if dados['vencimento_tax']:
+            try:
+                moto.vencimento_tax = datetime.strptime(dados['vencimento_tax'], "%Y-%m-%d").date()
+            except ValueError:
+                pass
+        else:
+            moto.vencimento_tax = None
     
     db.session.commit()
     
@@ -763,7 +874,10 @@ def criar_contrato():
         valor_aluguel_semanal=valor_aluguel_semanal,
         url_seguro=url_seguro,
         status=ContractStatus.ACTIVE.value,
-        criado_por_nome=operador_atual
+        criado_por_nome=operador_atual,
+        data_ultima_checagem_seguro=datetime.utcnow().date(),
+        status_seguro='Valid',
+        seguro_verificado_por=operador_atual
     )
     db.session.add(novo_contrato)
     
@@ -842,6 +956,40 @@ def atualizar_seguro_contrato(id):
             
     return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
 
+@app.route('/api/contratos/<int:id>/verificar-seguro', methods=['POST'])
+@login_required
+def verificar_seguro_contrato(id):
+    contrato = Contract.query.get(id)
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+        
+    dados = request.get_json() or {}
+    novo_status = dados.get('status', 'Valid')
+    if novo_status not in ['Valid', 'Cancelled']:
+        novo_status = 'Valid'
+        
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    hoje_date = datetime.utcnow().date()
+    
+    contrato.data_ultima_checagem_seguro = hoje_date
+    contrato.status_seguro = novo_status
+    contrato.seguro_verificado_por = operador
+    db.session.commit()
+    
+    if novo_status == 'Valid':
+        registrar_log('INSURANCE_VERIFIED', 'Contract', contrato.id, f"Seguro da moto {contrato.placa} verificado como VÁLIDO no askMID por {operador} no Contrato #{contrato.id} (Próxima checagem em 15 dias)")
+        msg = "Insurance verified as VALID on askMID. Next check scheduled in 15 days."
+    else:
+        registrar_log('INSURANCE_CANCELLED', 'Contract', contrato.id, f"ALERTA: Seguro da moto {contrato.placa} reportado CANCELADO/INVÁLIDO no askMID por {operador} no Contrato #{contrato.id}")
+        msg = "ALARM: Insurance flagged as CANCELLED/INVALID on askMID."
+        
+    return jsonify({
+        'message': msg,
+        'status_seguro': contrato.status_seguro,
+        'data_ultima_checagem_seguro': contrato.data_ultima_checagem_seguro.strftime('%Y-%m-%d'),
+        'seguro_verificado_por': contrato.seguro_verificado_por
+    })
+
 @app.route('/api/contratos', methods=['GET'])
 def listar_contratos():
     page = request.args.get('page', 1, type=int)
@@ -850,9 +998,12 @@ def listar_contratos():
     
     query = Contract.query.join(Client, Contract.id_cliente == Client.id)
     if search:
-        search_term = f"%{search}%"
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
         query = query.filter(db.or_(
             Contract.id.cast(db.String).ilike(search_term),
+            Contract.placa.ilike(search_plate_term),
             Contract.placa.ilike(search_term),
             Contract.status.ilike(search_term),
             Client.nome.ilike(search_term)
@@ -930,14 +1081,27 @@ def detalhe_contrato(id):
     # Filter out any deposit refund transactions from customer statement
     transacoes_cliente = [t for t in transacoes if t.tipo.lower() not in ['deposit_refund', 'devolucao_deposito', 'deposit refund']]
     
+    # 15-Day Insurance Check calculation
+    hoje_date = datetime.utcnow().date()
+    ultima_checagem = c.data_ultima_checagem_seguro or (c.data_retirada.date() if c.data_retirada else hoje_date)
+    dias_desde_checagem = (hoje_date - ultima_checagem).days
+    dias_para_proxima = max(0, 15 - dias_desde_checagem)
+    checagem_seguro_devida = (dias_desde_checagem >= 15) or (c.status_seguro == 'Cancelled')
+    
     return jsonify({
         'id': c.id,
         'cliente': cliente.nome if cliente else f'ID {c.id_cliente}',
+        'id_cliente': c.id_cliente,
         'telefone': cliente.telefone if cliente else '-',
         'email': cliente.email if cliente else '-',
+        'endereco': cliente.endereco if cliente else None,
+        'url_habilitacao': cliente.url_habilitacao if cliente else None,
+        'url_comprovante_endereco': cliente.url_comprovante_endereco if cliente else None,
         'placa': c.placa,
         'modelo': moto.modelo if moto else '-',
         'cor': moto.cor if moto else '-',
+        'vencimento_mot': moto.vencimento_mot.strftime('%Y-%m-%d') if (moto and moto.vencimento_mot) else None,
+        'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if (moto and moto.vencimento_tax) else None,
         'data_retirada': c.data_retirada.isoformat() + 'Z' if c.data_retirada else None,
         'data_devolucao': c.data_devolucao.isoformat() + 'Z' if c.data_devolucao else None,
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
@@ -947,6 +1111,12 @@ def detalhe_contrato(id):
         'url_seguro': c.url_seguro,
         'url_comprovante_deposito': c.url_comprovante_deposito,
         'criado_por_nome': c.criado_por_nome or '',
+        'data_ultima_checagem_seguro': c.data_ultima_checagem_seguro.strftime('%Y-%m-%d') if c.data_ultima_checagem_seguro else (c.data_retirada.strftime('%Y-%m-%d') if c.data_retirada else None),
+        'status_seguro': c.status_seguro or 'Valid',
+        'seguro_verificado_por': c.seguro_verificado_por or '',
+        'dias_desde_checagem_seguro': dias_desde_checagem,
+        'dias_para_proxima_checagem_seguro': dias_para_proxima,
+        'checagem_seguro_devida': checagem_seguro_devida,
         'deposito_pago': deposito_pago,
         'deducoes_deposito': deducoes_deposito,
         'saldo_deposito': saldo_deposito,
@@ -1089,10 +1259,13 @@ def listar_vistorias():
     if contrato_id:
         query = query.filter(Inspection.id_contrato == contrato_id)
     if search:
-        search_term = f"%{search}%"
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
         query = query.filter(db.or_(
             Inspection.id_contrato.cast(db.String).ilike(search_term),
             Inspection.tipo.ilike(search_term),
+            Contract.placa.ilike(search_plate_term),
             Contract.placa.ilike(search_term),
             Client.nome.ilike(search_term),
             Inspection.observacoes.ilike(search_term)
@@ -1143,12 +1316,15 @@ def listar_financeiro():
     
     query = FinancialTransaction.query.outerjoin(Contract, FinancialTransaction.id_contrato == Contract.id).outerjoin(Client, Contract.id_cliente == Client.id)
     if search:
-        search_term = f"%{search}%"
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
         query = query.filter(db.or_(
             FinancialTransaction.id.cast(db.String).ilike(search_term),
             FinancialTransaction.id_contrato.cast(db.String).ilike(search_term),
             FinancialTransaction.tipo.ilike(search_term),
             FinancialTransaction.status.ilike(search_term),
+            Contract.placa.ilike(search_plate_term),
             Contract.placa.ilike(search_term),
             Client.nome.ilike(search_term)
         ))
@@ -1211,6 +1387,40 @@ def pagar_transacao(id):
     db.session.commit()
     registrar_log('PAYMENT_RECEIVED', 'Transaction', t.id, f"Baixa de £{float(t.valor):.2f} ({t.tipo}) confirmada via {forma} por {operador_atual} no Contrato #{t.id_contrato}")
     return jsonify({'message': 'Transaction marked as paid successfully', 'mensagem': 'Transação paga com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
+
+@app.route('/api/financeiro/<int:id>/reverter', methods=['POST', 'PUT'])
+@app.route('/api/cobrancas/<int:id>/reverter', methods=['POST', 'PUT'])
+def reverter_pagamento(id):
+    t = FinancialTransaction.query.get(id)
+    if not t:
+        return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
+        
+    if t.status not in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+        return jsonify({'error': 'Transaction is not paid', 'erro': 'Esta transação não está com status pago'}), 400
+        
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    forma_anterior = t.forma_pagamento or 'N/A'
+    data_anterior = t.data_pagamento.strftime('%d/%m/%Y %H:%M') if t.data_pagamento else 'N/A'
+    
+    # Revert to PENDING
+    t.status = TransactionStatus.PENDING.value
+    t.data_pagamento = None
+    t.forma_pagamento = None
+    t.registrado_por_nome = None
+    db.session.commit()
+    
+    registrar_log(
+        'PAYMENT_CANCELLED', 
+        'Transaction', 
+        t.id, 
+        f"PAGAMENTO CANCELADO: Pagamento #{t.id} de £{float(t.valor):.2f} ({t.tipo}) foi revertido para PENDENTE por {operador_atual} no Contrato #{t.id_contrato} (Pagamento anterior via {forma_anterior} em {data_anterior})"
+    )
+    
+    return jsonify({
+        'message': 'Payment cancelled and reverted to Pending successfully', 
+        'mensagem': 'Pagamento cancelado e revertido para Pendente com sucesso',
+        'status': t.status
+    }), 200
 
 @app.route('/recibo/<int:id>')
 def pagina_recibo(id):
@@ -1320,12 +1530,93 @@ def get_dashboard():
             'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
         })
     
+    # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias)
+    hoje_date = datetime.utcnow().date()
+    todas_motos = Motorcycle.query.all()
+    tax_mot_warnings = 0
+    tax_warnings = 0
+    mot_warnings = 0
+    tax_mot_expired = 0
+    tax_mot_expiring_soon = 0
+    
+    for m in todas_motos:
+        has_tax_w = False
+        has_mot_w = False
+        is_m_expired = False
+        
+        if m.vencimento_tax:
+            diff_t = (m.vencimento_tax - hoje_date).days
+            if diff_t < 0:
+                has_tax_w = True
+                is_m_expired = True
+            elif diff_t <= 30:
+                has_tax_w = True
+                
+        if m.vencimento_mot:
+            diff_m = (m.vencimento_mot - hoje_date).days
+            if diff_m < 0:
+                has_mot_w = True
+                is_m_expired = True
+            elif diff_m <= 30:
+                has_mot_w = True
+                
+        if has_tax_w:
+            tax_warnings += 1
+        if has_mot_w:
+            mot_warnings += 1
+        if has_tax_w or has_mot_w:
+            tax_mot_warnings += 1
+            if is_m_expired:
+                tax_mot_expired += 1
+            else:
+                tax_mot_expiring_soon += 1
+                
+    # Compliance: Checagem Quinzenal de Seguro no askMID (15 em 15 dias)
+    contratos_ativos_objs = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+    seguros_pendentes_count = 0
+    seguros_cancelados_count = 0
+    contratos_seguro_alerta = []
+    
+    for ca in contratos_ativos_objs:
+        u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
+        dias_check = (hoje_date - u_check).days
+        cli_nome = ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}"
+        
+        if ca.status_seguro == 'Cancelled':
+            seguros_cancelados_count += 1
+            contratos_seguro_alerta.append({
+                'id': ca.id,
+                'placa': ca.placa,
+                'cliente': cli_nome,
+                'dias': dias_check,
+                'status_seguro': 'Cancelled',
+                'mensagem': f"ALARM: Vehicle {ca.placa} insurance was flagged CANCELLED/INVALID on askMID!"
+            })
+        elif dias_check >= 15:
+            seguros_pendentes_count += 1
+            contratos_seguro_alerta.append({
+                'id': ca.id,
+                'placa': ca.placa,
+                'cliente': cli_nome,
+                'dias': dias_check,
+                'status_seguro': 'Check_Due',
+                'mensagem': f"Contract #{ca.id} ({ca.placa} - {cli_nome}) due for 15-day askMID insurance check (last checked {dias_check} days ago)."
+            })
+    
     return jsonify({
         'total_motos': total_motos,
         'motos_disponiveis': motos_disponiveis,
         'motos_alugadas': motos_alugadas,
         'motos_manutencao': motos_manutencao,
         'motos_manutencao_lista': motos_manutencao_lista,
+        'tax_mot_warnings': tax_mot_warnings,
+        'tax_mot_expired': tax_mot_expired,
+        'tax_mot_expiring_soon': tax_mot_expiring_soon,
+        'tax_warnings': tax_warnings,
+        'mot_warnings': mot_warnings,
+        'seguros_pendentes_count': seguros_pendentes_count,
+        'seguros_cancelados_count': seguros_cancelados_count,
+        'contratos_seguro_alerta': contratos_seguro_alerta,
         'contratos_ativos': contratos_ativos,
         'total_clientes': total_clientes,
         'receita_pendente': receita_pendente,
@@ -1341,11 +1632,10 @@ def get_dashboard():
 @app.route('/api/alertas', methods=['GET'])
 def listar_alertas():
     alertas = []
-    
-    # Deposit hold alerts (14 or 15+ days)
-    contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
     hoje = datetime.utcnow()
     
+    # 1. Deposit hold alerts (14 or 15+ days)
+    contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
     for c in contratos_quarentena:
         if c.data_devolucao:
             dias_passados = (hoje - c.data_devolucao).days

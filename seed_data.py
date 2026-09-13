@@ -1,7 +1,7 @@
 import os
 import shutil
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from app import app
 from database import (
     db, Motorcycle, Client, Contract, Inspection, FinancialTransaction, User, AuditLog,
@@ -10,6 +10,39 @@ from database import (
 
 def seed():
     with app.app_context():
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        uploads_dir = os.path.join(base_dir, 'static', 'uploads')
+        demo_assets_dir = os.path.join(base_dir, 'static', 'demo_assets')
+        
+        # 1. Clean uploads and restore demo assets
+        if os.path.exists(uploads_dir):
+            for item in os.listdir(uploads_dir):
+                if item == '.gitkeep':
+                    continue
+                item_path = os.path.join(uploads_dir, item)
+                try:
+                    if os.path.isfile(item_path) or os.path.islink(item_path):
+                        os.remove(item_path)
+                    elif os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                except Exception:
+                    pass
+        else:
+            os.makedirs(uploads_dir, exist_ok=True)
+            
+        gitkeep_path = os.path.join(uploads_dir, '.gitkeep')
+        if not os.path.exists(gitkeep_path):
+            with open(gitkeep_path, 'w') as f:
+                pass
+                
+        if os.path.exists(demo_assets_dir):
+            for asset in os.listdir(demo_assets_dir):
+                src = os.path.join(demo_assets_dir, asset)
+                dst = os.path.join(uploads_dir, asset)
+                if os.path.isfile(src):
+                    shutil.copy2(src, dst)
+            print("✓ Restored demo asset images to static/uploads")
+
         print("Clearing database tables for clean state...")
         AuditLog.query.delete()
         FinancialTransaction.query.delete()
@@ -55,298 +88,285 @@ def seed():
         db.session.add_all([u_admin, u_staff1, u_staff2])
         db.session.flush()
 
-        print("Seeding motorcycles...")
-        m1 = Motorcycle(placa="XX10 YYY", modelo="Honda Forza 300", cor="Blue Metallic", status=MotoStatus.RENTED.value)
-        m2 = Motorcycle(placa="FF27 MOT", modelo="Honda Vision 110", cor="Pearl White", status=MotoStatus.RENTED.value)
-        m3 = Motorcycle(placa="BK22 NMX", modelo="Yamaha NMAX 125", cor="Midnight Black", status=MotoStatus.AVAILABLE.value)
-        m4 = Motorcycle(placa="WM23 PCX", modelo="Honda PCX 125", cor="Silver Frost", status=MotoStatus.AVAILABLE.value)
-        m5 = Motorcycle(placa="BM19 WKP", modelo="Honda Vision 110", cor="Red Gloss", status=MotoStatus.MAINTENANCE.value)
-        db.session.add_all([m1, m2, m3, m4, m5])
-        db.session.flush()
-
-        print("Seeding clients...")
-        c1 = Client(
-            nome="Thiago Brandao",
-            telefone="07360469902",
-            email="thiago.brandao@example.com",
-            endereco="34 Harrow Road, Kings Heath, Birmingham B14 7RL",
-            url_habilitacao="/static/uploads/demo_driving_licence.webp",
-            url_comprovante_endereco="/static/uploads/demo_proof_address.webp"
-        )
-        c2 = Client(
-            nome="Mohamed da Silva",
-            telefone="07360123456",
-            email="mohamed.silva@example.com",
-            endereco="45 Digbeth Avenue, Birmingham B5 6DY",
-            url_habilitacao="/static/uploads/demo_driving_licence.webp",
-            url_comprovante_endereco="/static/uploads/demo_proof_address.webp"
-        )
-        c3 = Client(
-            nome="Alexandre Smith",
-            telefone="07400987654",
-            email="alex.smith@example.com",
-            endereco="88 Broad Street, Birmingham B1 2HF",
-            url_habilitacao="/static/uploads/demo_driving_licence.webp",
-            url_comprovante_endereco="/static/uploads/demo_proof_address.webp"
-        )
-        db.session.add_all([c1, c2, c3])
-        db.session.flush()
-
         hoje = datetime.utcnow()
+        hoje_date = hoje.date()
 
-        print("Seeding Contract #1 (Honda Forza 300 - Thiago Brandao)...")
-        ct1 = Contract(
-            id_cliente=c1.id,
-            placa=m1.placa,
-            data_retirada=hoje - timedelta(days=14),
-            dia_pagamento_semanal=4, # Friday
-            valor_aluguel_semanal=140.00,
-            status=ContractStatus.ACTIVE.value,
-            url_seguro="/static/uploads/demo_insurance_forza.webp",
-            criado_por_nome=u_admin.nome
-        )
-        db.session.add(ct1)
-        db.session.flush()
-
-        # Contract 1 Ledger
-        t1_dep = FinancialTransaction(
-            id_contrato=ct1.id,
-            tipo=TransactionType.DEPOSIT.value,
-            data_vencimento=ct1.data_retirada,
-            data_pagamento=ct1.data_retirada,
-            valor=400.00,
-            status=TransactionStatus.PAID.value,
-            forma_pagamento="Bank Transfer",
-            registrado_por_nome=u_admin.nome
-        )
-        t1_w1 = FinancialTransaction(
-            id_contrato=ct1.id,
-            tipo=TransactionType.RENT.value,
-            data_vencimento=ct1.data_retirada,
-            data_pagamento=ct1.data_retirada,
-            valor=140.00,
-            status=TransactionStatus.PAID.value,
-            forma_pagamento="Card",
-            registrado_por_nome=u_admin.nome
-        )
-        t1_w2 = FinancialTransaction(
-            id_contrato=ct1.id,
-            tipo=TransactionType.RENT.value,
-            data_vencimento=hoje - timedelta(days=7),
-            data_pagamento=hoje - timedelta(days=7),
-            valor=140.00,
-            status=TransactionStatus.PAID.value,
-            forma_pagamento="Card",
-            registrado_por_nome=u_staff1.nome
-        )
-        t1_w3 = FinancialTransaction(
-            id_contrato=ct1.id,
-            tipo=TransactionType.RENT.value,
-            data_vencimento=hoje + timedelta(days=1),
-            valor=140.00,
-            status=TransactionStatus.PENDING.value
-        )
-        db.session.add_all([t1_dep, t1_w1, t1_w2, t1_w3])
-
-        # Inspection for Contract 1 with 3 distinct real photos (Front, Side, Rear)
-        insp1 = Inspection(
-            id_contrato=ct1.id,
-            tipo=InspectionType.CHECK_OUT.value,
-            data=ct1.data_retirada,
-            observacoes="Vehicle checked out in mint condition. Michelin tires 100%, brakes tested, windshield intact, 2 keys handed over.",
-            url_fotos="/static/uploads/demo_forza_front.webp,/static/uploads/demo_forza_side.webp,/static/uploads/demo_forza_rear.webp",
-            realizado_por_nome=u_admin.nome
-        )
-        db.session.add(insp1)
-
-        print("Seeding Contract #2 (Honda Vision 110 - Mohamed da Silva)...")
-        ct2 = Contract(
-            id_cliente=c2.id,
-            placa=m2.placa,
-            data_retirada=hoje - timedelta(days=3),
-            dia_pagamento_semanal=4, # Friday
-            valor_aluguel_semanal=80.00,
-            status=ContractStatus.ACTIVE.value,
-            url_seguro="/static/uploads/demo_insurance_forza.webp",
-            criado_por_nome=u_staff1.nome
-        )
-        db.session.add(ct2)
-        db.session.flush()
-
-        t2_dep = FinancialTransaction(
-            id_contrato=ct2.id,
-            tipo=TransactionType.DEPOSIT.value,
-            data_vencimento=ct2.data_retirada,
-            data_pagamento=ct2.data_retirada,
-            valor=300.00,
-            status=TransactionStatus.PAID.value,
-            forma_pagamento="Cash",
-            registrado_por_nome=u_staff1.nome
-        )
-        t2_w1 = FinancialTransaction(
-            id_contrato=ct2.id,
-            tipo=TransactionType.RENT.value,
-            data_vencimento=ct2.data_retirada,
-            data_pagamento=ct2.data_retirada,
-            valor=80.00,
-            status=TransactionStatus.PAID.value,
-            forma_pagamento="Cash",
-            registrado_por_nome=u_staff1.nome
-        )
-        t2_w2 = FinancialTransaction(
-            id_contrato=ct2.id,
-            tipo=TransactionType.RENT.value,
-            data_vencimento=hoje + timedelta(days=4),
-            valor=80.00,
-            status=TransactionStatus.PENDING.value
-        )
-        db.session.add_all([t2_dep, t2_w1, t2_w2])
-
-        # Inspection for Contract 2 with 2 distinct real photos
-        insp2 = Inspection(
-            id_contrato=ct2.id,
-            tipo=InspectionType.CHECK_OUT.value,
-            data=ct2.data_retirada,
-            observacoes="Full delivery inspection complete. Clean bodywork, full tank of fuel, delivery box installed, digital speedometer verified.",
-            url_fotos="/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
-            realizado_por_nome=u_staff1.nome
-        )
-        db.session.add(insp2)
-
-        print("Seeding Audit Log history...")
-        logs = [
-            AuditLog(
-                data_hora=hoje - timedelta(days=14, hours=2),
-                id_usuario=u_admin.id,
-                usuario_nome=u_admin.nome,
-                acao="CREATE_CLIENT",
-                entidade="Client",
-                entidade_id=str(c1.id),
-                descricao=f"Cliente {c1.nome} cadastrado com CNH e Comprovante de Endereço por {u_admin.nome}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=14, hours=1),
-                id_usuario=u_admin.id,
-                usuario_nome=u_admin.nome,
-                acao="CREATE_CONTRACT",
-                entidade="Contract",
-                entidade_id=str(ct1.id),
-                descricao=f"Contrato #{ct1.id} aberto para moto {m1.placa} por {u_admin.nome} (Aluguel: £140.00/sem, Depósito: £400.00)",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=14, hours=1),
-                id_usuario=u_admin.id,
-                usuario_nome=u_admin.nome,
-                acao="CREATE_INSPECTION",
-                entidade="Inspection",
-                entidade_id=str(insp1.id),
-                descricao=f"Vistoria de Check-out (3 fotos) realizada por {u_admin.nome} no Contrato #{ct1.id}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=14, minutes=45),
-                id_usuario=u_admin.id,
-                usuario_nome=u_admin.nome,
-                acao="PAYMENT_RECEIVED",
-                entidade="Transaction",
-                entidade_id=str(t1_dep.id),
-                descricao=f"Baixa de £400.00 (Deposit) confirmada via Bank Transfer por {u_admin.nome} no Contrato #{ct1.id}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=14, minutes=40),
-                id_usuario=u_admin.id,
-                usuario_nome=u_admin.nome,
-                acao="PAYMENT_RECEIVED",
-                entidade="Transaction",
-                entidade_id=str(t1_w1.id),
-                descricao=f"Baixa de £140.00 (Rent Semana 1) confirmada via Card por {u_admin.nome} no Contrato #{ct1.id}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=7, hours=3),
-                id_usuario=u_staff1.id,
-                usuario_nome=u_staff1.nome,
-                acao="PAYMENT_RECEIVED",
-                entidade="Transaction",
-                entidade_id=str(t1_w2.id),
-                descricao=f"Baixa de £140.00 (Rent Semana 2) confirmada via Card por {u_staff1.nome} no Contrato #{ct1.id}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=4),
-                id_usuario=u_staff2.id,
-                usuario_nome=u_staff2.nome,
-                acao="MOTO_STATUS_CHANGE",
-                entidade="Motorcycle",
-                entidade_id=m5.placa,
-                descricao=f"Status da moto {m5.placa} alterado para 'Maintenance' por {u_staff2.nome} (Troca de pastilhas de freio)",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=3, hours=4),
-                id_usuario=u_staff1.id,
-                usuario_nome=u_staff1.nome,
-                acao="CREATE_CLIENT",
-                entidade="Client",
-                entidade_id=str(c2.id),
-                descricao=f"Cliente {c2.nome} cadastrado por {u_staff1.nome}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=3, hours=3),
-                id_usuario=u_staff1.id,
-                usuario_nome=u_staff1.nome,
-                acao="CREATE_CONTRACT",
-                entidade="Contract",
-                entidade_id=str(ct2.id),
-                descricao=f"Contrato #{ct2.id} aberto para moto {m2.placa} por {u_staff1.nome} (Aluguel: £80.00/sem, Depósito: £300.00)",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=3, hours=3),
-                id_usuario=u_staff1.id,
-                usuario_nome=u_staff1.nome,
-                acao="CREATE_INSPECTION",
-                entidade="Inspection",
-                entidade_id=str(insp2.id),
-                descricao=f"Vistoria de Check-out (2 fotos) realizada por {u_staff1.nome} no Contrato #{ct2.id}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=3, hours=2),
-                id_usuario=u_staff1.id,
-                usuario_nome=u_staff1.nome,
-                acao="PAYMENT_RECEIVED",
-                entidade="Transaction",
-                entidade_id=str(t2_dep.id),
-                descricao=f"Baixa de £300.00 (Deposit) confirmada via Cash por {u_staff1.nome} no Contrato #{ct2.id}",
-                ip_origem="127.0.0.1"
-            ),
-            AuditLog(
-                data_hora=hoje - timedelta(days=3, hours=2),
-                id_usuario=u_staff1.id,
-                usuario_nome=u_staff1.nome,
-                acao="PAYMENT_RECEIVED",
-                entidade="Transaction",
-                entidade_id=str(t2_w1.id),
-                descricao=f"Baixa de £80.00 (Rent Semana 1) confirmada via Cash por {u_staff1.nome} no Contrato #{ct2.id}",
-                ip_origem="127.0.0.1"
-            )
+        print("Seeding expanded fleet of 18 motorbikes (FF Motors Birmingham)...")
+        # Fleet of 18 bikes: ~14 rented, 3 available, 1 maintenance
+        motos_data = [
+            ("XX10YYY", "Honda Forza 300", "Blue Metallic", MotoStatus.RENTED.value, 240, 210),
+            ("FF27MOT", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 300, 270),
+            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150), # Yellow MOT alert (18d)
+            ("WM23PCX", "Honda PCX 125", "Silver Frost", MotoStatus.AVAILABLE.value, 330, 330),
+            ("BM19WKP", "Honda Vision 110", "Red Gloss", MotoStatus.MAINTENANCE.value, -4, 90), # Expired MOT (-4d)
+            ("BV21XKT", "Honda PCX 125", "Matt Black", MotoStatus.RENTED.value, 180, 14), # Yellow Tax alert (14d)
+            ("BW71FGH", "Yamaha NMAX 125", "Phantom Blue", MotoStatus.RENTED.value, 210, 190),
+            ("BL20ZTR", "Honda Vision 110", "Moondust Grey", MotoStatus.RENTED.value, 270, 240),
+            ("BN22LKP", "Honda PCX 125", "Pearl Jasmine White", MotoStatus.RENTED.value, 310, 290),
+            ("BP23XMN", "Yamaha XMAX 125", "Icon Blue", MotoStatus.RENTED.value, 340, 310),
+            ("BX69VTR", "Honda Forza 125", "Matt Cynos Grey", MotoStatus.RENTED.value, 160, 140),
+            ("WM22KLJ", "Piaggio Liberty 125", "Nero Lucido", MotoStatus.RENTED.value, 220, 200),
+            ("WN21TYU", "Honda Vision 110", "Candy Luster Red", MotoStatus.RENTED.value, 290, 260),
+            ("WO72HJK", "Honda PCX 125", "Matt Dim Gray", MotoStatus.RENTED.value, 320, 300),
+            ("WP20QWE", "Yamaha NMAX 125", "Anvil Grey", MotoStatus.AVAILABLE.value, 250, 220),
+            ("WR23ZXC", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 360, 330),
+            ("WT21OPL", "Honda PCX 125", "Matte Galaxy Black", MotoStatus.RENTED.value, 190, 170),
+            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250), # Just returned from contract 14
         ]
-        db.session.add_all(logs)
+        
+        motos = {}
+        for placa, modelo, cor, status, mot_offset, tax_offset in motos_data:
+            m = Motorcycle(
+                placa=placa,
+                modelo=modelo,
+                cor=cor,
+                status=status,
+                vencimento_mot=hoje_date + timedelta(days=mot_offset),
+                vencimento_tax=hoje_date + timedelta(days=tax_offset)
+            )
+            db.session.add(m)
+            motos[placa] = m
+        db.session.flush()
 
+        print("Seeding clients with Birmingham UK addresses & documents...")
+        clientes_data = [
+            ("Thiago Brandao", "07360469902", "thiago.brandao@example.com", "34 Harrow Road, Kings Heath, Birmingham B14 7RL"),
+            ("Mohamed da Silva", "07360123456", "mohamed.silva@example.com", "45 Digbeth Avenue, Birmingham B5 6DY"),
+            ("Alexandre Smith", "07400987654", "alex.smith@example.com", "88 Broad Street, Birmingham B1 2HF"),
+            ("Lucas Oliveira", "07512345678", "lucas.oliveira@example.com", "12 Moseley Road, Highgate, Birmingham B12 0HG"),
+            ("Gabriel Santos", "07890123456", "gabriel.santos@example.com", "77 Stratford Road, Sparkhill, Birmingham B11 4DA"),
+            ("Mateus Ferreira", "07701928374", "mateus.ferreira@example.com", "104 Alcester Road, Moseley, Birmingham B13 8EE"),
+            ("Bruno Carvalho", "07911223344", "bruno.carvalho@example.com", "23 Soho Road, Handsworth, Birmingham B21 9SN"),
+            ("Rafael Costa", "07455667788", "rafael.costa@example.com", "56 Harborne High Street, Birmingham B17 9NE"),
+            ("Leonardo Souza", "07333444555", "leonardo.souza@example.com", "19 Bristol Road, Edgbaston, Birmingham B5 7TT"),
+            ("David Johnson", "07888999000", "david.johnson@example.com", "82 Coventry Road, Small Heath, Birmingham B10 0UG"),
+            ("Tariq Al-Mansoor", "07555666777", "tariq.mansoor@example.com", "41 Erdington High Street, Birmingham B23 6RH"),
+            ("Felipe Mendes", "07999888777", "felipe.mendes@example.com", "15 Pershore Road, Stirchley, Birmingham B30 2BU"),
+            ("Rodrigo Lima", "07322114455", "rodrigo.lima@example.com", "93 Hagley Road, Edgbaston, Birmingham B16 8QG"),
+            ("Carlos Eduardo", "07844332211", "carlos.eduardo@example.com", "62 Aston Expressway, Birmingham B6 4DA"),
+            ("Anderson Silva", "07777888999", "anderson.silva@example.com", "18 Walsall Road, Perry Barr, Birmingham B42 1SF"),
+            ("Victor Hugo", "07900112233", "victor.hugo@example.com", "50 Jewellery Quarter, Birmingham B18 6EW"),
+        ]
+
+        clients = []
+        for nome, tel, email, endereco in clientes_data:
+            cl = Client(
+                nome=nome,
+                telefone=tel,
+                email=email,
+                endereco=endereco,
+                url_habilitacao="/static/uploads/demo_driving_licence.webp",
+                url_comprovante_endereco="/static/uploads/demo_proof_address.webp"
+            )
+            db.session.add(cl)
+            clients.append(cl)
+        db.session.flush()
+
+        print("Seeding realistic contracts, financial statements & inspections...")
+        staff_pool = [u_admin, u_staff1, u_staff2]
+
+        contracts_specs = [
+            # (client_idx, plate, weeks_active, rent_val, deposit_val, status, pay_day, ins_status, ins_days_ago, notes)
+            (0, "XX10YYY", 4, 140.0, 400.0, ContractStatus.ACTIVE.value, 4, "Valid", 4, "Honda Forza 300 - Premium rental"),
+            (1, "FF27MOT", 2, 80.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 2, "Honda Vision 110 - Delivery contract"),
+            (3, "BV21XKT", 6, 95.0, 350.0, ContractStatus.ACTIVE.value, 0, "Valid", 6, "Honda PCX 125 - UberEats courier"),
+            (4, "BW71FGH", 3, 95.0, 350.0, ContractStatus.ACTIVE.value, 1, "Valid", 1, "Yamaha NMAX 125 - Deliveroo rider"),
+            (5, "BL20ZTR", 8, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 18, "Vision 110 - Triggers 15-day check alert!"),
+            (6, "BN22LKP", 5, 90.0, 350.0, ContractStatus.ACTIVE.value, 2, "Valid", 7, "Honda PCX 125 - Full-time courier"),
+            (7, "BP23XMN", 3, 120.0, 400.0, ContractStatus.ACTIVE.value, 4, "Valid", 3, "Yamaha XMAX 125 - Long-distance delivery"),
+            (8, "BX69VTR", 4, 110.0, 400.0, ContractStatus.ACTIVE.value, 3, "Cancelled", 1, "Forza 125 - FLAGGED CANCELLED INSURANCE ALERT!"),
+            (9, "WM22KLJ", 7, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 10, "Piaggio Liberty 125 - City commuter"),
+            (10, "WN21TYU", 5, 80.0, 300.0, ContractStatus.ACTIVE.value, 5, "Valid", 9, "Vision 110 - JustEat courier"),
+            (11, "WO72HJK", 2, 95.0, 350.0, ContractStatus.ACTIVE.value, 4, "Valid", 4, "PCX 125 - Courier agreement"),
+            (12, "WR23ZXC", 6, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 11, "Vision 110 - Regular customer"),
+            (13, "WT21OPL", 4, 90.0, 350.0, ContractStatus.ACTIVE.value, 0, "Valid", 8, "PCX 125 - Active contract"),
+            (14, "WU22VBN", 10, 95.0, 350.0, ContractStatus.DEPOSIT_HOLD.value, 4, "Valid", 5, "NMAX 125 - Returned, deposit in 14-day hold"),
+            (15, "BM19WKP", 12, 80.0, 300.0, ContractStatus.COMPLETED.value, 4, "Valid", 30, "Vision 110 - Completed contract, refunded"),
+        ]
+
+        all_logs = []
+        created_contracts = []
+
+        for idx, spec in enumerate(contracts_specs):
+            cl_idx, plate, weeks_active, rent_val, dep_val, c_status, pay_day, ins_status, ins_days_ago, desc = spec
+            c_client = clients[cl_idx]
+            staff_member = staff_pool[idx % len(staff_pool)]
+            retirada = hoje - timedelta(days=weeks_active * 7)
+            
+            devolucao = None
+            if c_status == ContractStatus.DEPOSIT_HOLD.value:
+                devolucao = hoje - timedelta(days=5) # returned 5 days ago
+            elif c_status == ContractStatus.COMPLETED.value:
+                devolucao = hoje - timedelta(days=20) # returned 20 days ago
+
+            ct = Contract(
+                id_cliente=c_client.id,
+                placa=plate,
+                data_retirada=retirada,
+                data_devolucao=devolucao,
+                dia_pagamento_semanal=pay_day,
+                valor_aluguel_semanal=rent_val,
+                status=c_status,
+                url_seguro="/static/uploads/demo_insurance_forza.webp",
+                criado_por_nome=staff_member.nome,
+                data_ultima_checagem_seguro=hoje_date - timedelta(days=ins_days_ago),
+                status_seguro=ins_status,
+                seguro_verificado_por=staff_member.nome
+            )
+            db.session.add(ct)
+            db.session.flush()
+            created_contracts.append(ct)
+
+            # Contract Creation Log
+            all_logs.append(AuditLog(
+                data_hora=retirada,
+                id_usuario=staff_member.id,
+                usuario_nome=staff_member.nome,
+                acao="CREATE_CONTRACT",
+                entidade="Contract",
+                entidade_id=str(ct.id),
+                descricao=f"Contrato #{ct.id} aberto para {c_client.nome} ({plate}) por {staff_member.nome} (Aluguel: £{rent_val:.2f}/sem, Depósito: £{dep_val:.2f})",
+                ip_origem="127.0.0.1"
+            ))
+
+            # Initial Deposit Transaction
+            t_dep = FinancialTransaction(
+                id_contrato=ct.id,
+                tipo=TransactionType.DEPOSIT.value,
+                data_vencimento=retirada,
+                data_pagamento=retirada,
+                valor=dep_val,
+                status=TransactionStatus.PAID.value,
+                forma_pagamento="Bank Transfer" if idx % 2 == 0 else "Card",
+                registrado_por_nome=staff_member.nome
+            )
+            db.session.add(t_dep)
+
+            # Weekly Rent Transactions
+            for w in range(weeks_active):
+                venc = retirada + timedelta(days=w * 7)
+                if venc <= hoje - timedelta(days=7):
+                    # Past week: paid
+                    t_rent = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.RENT.value,
+                        data_vencimento=venc,
+                        data_pagamento=venc,
+                        valor=rent_val,
+                        status=TransactionStatus.PAID.value,
+                        forma_pagamento="Card" if w % 2 == 0 else "Cash",
+                        registrado_por_nome=staff_pool[(w + idx) % len(staff_pool)].nome
+                    )
+                elif venc <= hoje:
+                    # Current week: some paid, some pending
+                    is_paid = (idx % 3 != 0)
+                    t_rent = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.RENT.value,
+                        data_vencimento=venc,
+                        data_pagamento=venc if is_paid else None,
+                        valor=rent_val,
+                        status=TransactionStatus.PAID.value if is_paid else TransactionStatus.PENDING.value,
+                        forma_pagamento="Card" if is_paid else None,
+                        registrado_por_nome=staff_member.nome if is_paid else None
+                    )
+                else:
+                    # Future scheduled week
+                    t_rent = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.RENT.value,
+                        data_vencimento=venc,
+                        valor=rent_val,
+                        status=TransactionStatus.PENDING.value
+                    )
+                db.session.add(t_rent)
+
+            # Check-out Inspection
+            is_forza = "forza" in plate.lower() or "xx10" in plate.lower() or "bx69" in plate.lower()
+            insp_checkout = Inspection(
+                id_contrato=ct.id,
+                tipo=InspectionType.CHECK_OUT.value,
+                data=retirada,
+                observacoes=f"Full pre-delivery checkout for {plate}. Tires checked, brakes tested, full tank of petrol, helmet and lock handed over.",
+                url_fotos="/static/uploads/demo_forza_front.webp,/static/uploads/demo_forza_side.webp,/static/uploads/demo_forza_rear.webp" if is_forza else "/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
+                realizado_por_nome=staff_member.nome
+            )
+            db.session.add(insp_checkout)
+
+            # Special cases: Deposit Hold and Completed
+            if c_status == ContractStatus.DEPOSIT_HOLD.value:
+                # Returned bike check-in
+                insp_checkin = Inspection(
+                    id_contrato=ct.id,
+                    tipo=InspectionType.CHECK_IN.value,
+                    data=devolucao,
+                    observacoes=f"Bike {plate} returned in good order. Minimal wear on rear tyre. Retained deposit under standard 14-day quarantine hold.",
+                    url_fotos="/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
+                    realizado_por_nome=staff_pool[1].nome
+                )
+                db.session.add(insp_checkin)
+                all_logs.append(AuditLog(
+                    data_hora=devolucao,
+                    id_usuario=staff_pool[1].id,
+                    usuario_nome=staff_pool[1].nome,
+                    acao="RETURN_VEHICLE",
+                    entidade="Contract",
+                    entidade_id=str(ct.id),
+                    descricao=f"Moto {plate} devolvida no Contrato #{ct.id}. Depósito de £{dep_val:.2f} retido em quarentena de 14 dias.",
+                    ip_origem="127.0.0.1"
+                ))
+
+            elif c_status == ContractStatus.COMPLETED.value:
+                # Full completed contract with deposit refund
+                t_refund = FinancialTransaction(
+                    id_contrato=ct.id,
+                    tipo=TransactionType.DEPOSIT_REFUND.value,
+                    data_vencimento=devolucao + timedelta(days=14),
+                    data_pagamento=devolucao + timedelta(days=14),
+                    valor=dep_val,
+                    status=TransactionStatus.PAID.value,
+                    forma_pagamento="Bank Transfer",
+                    registrado_por_nome=u_admin.nome
+                )
+                db.session.add(t_refund)
+                all_logs.append(AuditLog(
+                    data_hora=devolucao + timedelta(days=14),
+                    id_usuario=u_admin.id,
+                    usuario_nome=u_admin.nome,
+                    acao="REFUND_DEPOSIT",
+                    entidade="Contract",
+                    entidade_id=str(ct.id),
+                    descricao=f"Devolução de caução de £{dep_val:.2f} confirmada por {u_admin.nome} via Bank Transfer no Contrato #{ct.id}",
+                    ip_origem="127.0.0.1"
+                ))
+
+        # Add recent staff payment received logs for rich audit stream
+        recent_payments = FinancialTransaction.query.filter_by(status=TransactionStatus.PAID.value).limit(8).all()
+        for p in recent_payments:
+            all_logs.append(AuditLog(
+                data_hora=p.data_pagamento or hoje - timedelta(days=2),
+                id_usuario=u_staff1.id,
+                usuario_nome=p.registrado_por_nome or u_staff1.nome,
+                acao="PAYMENT_RECEIVED",
+                entidade="Transaction",
+                entidade_id=str(p.id),
+                descricao=f"Baixa de £{float(p.valor):.2f} ({p.tipo}) confirmada via {p.forma_pagamento or 'Card'} no Contrato #{p.id_contrato}",
+                ip_origem="127.0.0.1"
+            ))
+
+        db.session.add_all(all_logs)
         db.session.commit()
-        print("\nDatabase seeded successfully with new structure & staff attribution!")
-        print(f"✓ {User.query.count()} Users (Admin + 2 Staff members)")
-        print(f"✓ {Motorcycle.query.count()} Motorbikes")
-        print(f"✓ {Client.query.count()} Clients (with DVLA Licence and Birmingham Council Tax proofs)")
-        print(f"✓ {Contract.query.count()} Contracts (with Fleet Insurance & active schedules)")
-        print(f"✓ {FinancialTransaction.query.count()} Financial Transactions (Paid & Pending with staff badges)")
-        print(f"✓ {Inspection.query.count()} Inspections (with unique multi-angle galleries & operator names)")
-        print(f"✓ {AuditLog.query.count()} Audit Log Events in timeline")
+
+        print("\n=======================================================")
+        print("🎉 COMPREHENSIVE SEED COMPLETED SUCCESSFULLY!")
+        print(f"✓ {User.query.count()} Staff Accounts (Thiago Brandão, Carlos Silva, Emma Watson)")
+        print(f"✓ {Motorcycle.query.count()} Motorbikes in Birmingham Fleet (~14 Rented, 3 Available, 1 Maintenance)")
+        print(f"✓ {Client.query.count()} Clients with full UK addresses & KYC document proofs")
+        print(f"✓ {Contract.query.count()} Contracts (Active, 14-day Deposit Hold, and Completed)")
+        print(f"✓ {FinancialTransaction.query.count()} Financial Ledger Transactions (Deposits, Rents, Refunds)")
+        print(f"✓ {Inspection.query.count()} Inspections with Multi-angle galleries & staff operator attribution")
+        print(f"✓ {AuditLog.query.count()} Audit Log activities across the internal timeline")
+        print("=======================================================\n")
 
 if __name__ == '__main__':
     seed()

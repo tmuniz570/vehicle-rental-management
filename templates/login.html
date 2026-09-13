@@ -10,6 +10,7 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="192x192" href="/static/icon.png">
     <link rel="apple-touch-icon" href="/static/icon.png">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Sign In | FF Motors Birmingham</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -58,17 +59,17 @@
         .login-header h1 {
             font-size: 1.6rem;
             font-weight: 700;
-            margin-bottom: 0.35rem;
             color: var(--text-primary);
+            margin-bottom: 0.5rem;
         }
         .login-header p {
             color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: 0.9rem;
         }
         .alert-box {
-            padding: 0.85rem 1rem;
+            padding: 0.85rem 1.25rem;
             border-radius: 12px;
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
@@ -129,6 +130,7 @@
         {% endwith %}
 
         <form action="/login" method="POST" class="modern-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="next" value="{{ next_url or '' }}">
             
             <div class="form-group">

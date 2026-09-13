@@ -156,7 +156,7 @@ async function carregarVistorias() {
                         Contract #${v.id_contrato} &rarr;
                     </a>
                 </td>
-                <td><span class="badge-plate">${v.placa || '-'}</span></td>
+                <td class="nowrap"><span class="badge-plate">${v.placa || '-'}</span></td>
                 <td style="font-weight: 500; white-space: nowrap;" title="${v.cliente || ''}">${v.cliente || '-'}</td>
                 <td>${tipoBadge}</td>
                 <td>${obsSnippet}</td>

@@ -31,7 +31,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Instant Overdue Alerts:** Immediate notification of late payments and actionable shortcuts.
 
 ### 🛵 2. Fleet & Vehicle Lifecycle
-* **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10 YYY`) and status management (`Available`, `Rented`, `Maintenance`).
+* **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`).
+* **UK MOT & Road Tax (VED) Compliance:** Annual MOT test and DVLA Road Tax expiry date tracking with proactive warning badges (🟢 Valid, 🟡 Expiring within 30 days, 🔴 Expired).
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
 
 ### 👥 3. Customer Relationship Management
@@ -48,9 +49,11 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Client-Side Image Compression:** Automatic compression via `browser-image-compression` converting high-res smartphone captures to lightweight WebP formats before upload, saving bandwidth and cloud storage.
 * **High-Definition Gallery:** Inspection modals with zoomable image grids and timestamped condition logs.
 
-### 💳 6. Financial Statements & Receipts
+### 💳 6. Financial Statements, Overdue Reports & Receipts
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
-* **Receipt Printing:** Printable payment confirmation receipts with branded layout, QR/ID transaction reference, and PDF-friendly styling.
+* **Payment Cancellation & Reversal:** Operational ability to cancel a completed payment, revert transaction to pending, and automatically record the action in the employee audit log.
+* **Overdue Report:** Dedicated centralized page (`/relatorio-vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions.
+* **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, and PDF-friendly styling.
 * **Automated Rent Generation:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices on designated weekly payment days.
 
 ### 📱 7. Mobile-First & PWA Experience
@@ -59,13 +62,15 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 🔐 8. Authentication, User Management & Internal Audit Trail
 * **Secure Session Auth:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`).
+* **CSRF Web Security & HTTP Headers:** Universal CSRF protection intercepting all state-altering requests (`POST`, `PUT`, `DELETE`, `PATCH`), accompanied by strict HTTP security headers (`X-Frame-Options`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`).
 * **Branded Login Experience:** Modern glassmorphism dark-mode login interface with flash message feedback and "Remember Me" session persistence.
 * **Staff & Operator Management:** Full administrative panel (`/usuarios`) to create, edit, suspend, and reset passwords for team operators.
-* **Internal Accountability & Audit Trail:** Automatic tracking of which staff member created contracts, marked payments as received, or conducted vehicle inspections. Live activity stream with filters for complete company oversight.
-* **Client Privacy Guarantee:** Customer-facing documents (such as printable receipts) strictly remain 100% corporate under FF Motors branding with zero exposure of internal employee records.
+* **Internal Accountability & Audit Trail:** Automatic tracking of which staff member created contracts, marked payments as received, cancelled transactions, or conducted vehicle inspections. Live activity stream with filters for complete company oversight.
+* **Client Privacy Guarantee:** Customer-facing documents strictly remain 100% corporate under FF Motors branding with zero exposure of internal employee records.
 
-### 🛡️ 9. Data Security, Production Server & Backup Suite
-* **Production-Ready WSGI:** Multi-threaded production server powered by `Waitress` (`wsgi.py`) ensuring concurrent connection handling on Windows and Linux.
+### 🛡️ 9. Production WSGI Architecture, Database Agnosticism & Backup Suite
+* **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (Render, Railway, AWS, DigitalOcean).
+* **Universal Database Compatibility:** Fully agnostic architecture supporting both local development on `SQLite` and enterprise production on `PostgreSQL` via SQLAlchemy 2.0 and `psycopg2-binary`.
 * **Point-in-Time Backups:** Automated script (`backup.py`) packaging database snapshots and asset files into compressed zip archives.
 * **Disaster Recovery:** Dedicated restore script (`restore.py`) and development sanitation utility (`reset_data.py`).
 
@@ -76,9 +81,10 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 | Layer | Technology |
 |---|---|
 | **Backend** | Python 3.10+, Flask 3.0, Flask-Login, Flask-SQLAlchemy, SQLAlchemy 2.0 |
-| **WSGI Server** | Waitress (Production multi-threaded WSGI server) |
+| **WSGI Servers** | Waitress (Windows/Local Multi-Threaded) & Gunicorn (Linux/Cloud Multi-Worker) |
+| **Databases** | PostgreSQL (Production) & SQLite 3 (Development/Local) |
 | **Scheduler** | APScheduler (Background task runner for automated rent billing) |
-| **Database** | SQLite 3 (ACID-compliant relational database with foreign key support) |
+| **Security** | CSRF Protection, HTTP Hardening Headers, Werkzeug Password Hashing |
 | **Frontend** | Vanilla HTML5, Modern CSS (Glassmorphism design system), JavaScript ES6+ |
 | **Client Compression** | Browser Image Compression (HTML5 Canvas & Web Workers) |
 | **Image Processing** | Pillow (PIL) |
@@ -174,7 +180,9 @@ To access and test the app on your mobile device outside the local Wi-Fi network
 ```text
 FF Motors APP/
 ├── app.py                     # Main Flask application, routes & API endpoints
-├── wsgi.py                    # Production WSGI server runner (Waitress)
+├── wsgi.py                    # Production WSGI server runner (Waitress / Multi-threaded)
+├── gunicorn_config.py         # Production Gunicorn server config for Linux cloud deployment
+├── Procfile                   # Cloud PaaS entrypoint (Render, Railway, Heroku)
 ├── database.py                # Database models (User, Clients, Motos, Contracts, Inspections, Transactions)
 ├── backup.py                  # Automated database & asset backup utility
 ├── restore.py                 # Restoration utility for backup archives
@@ -186,7 +194,7 @@ FF Motors APP/
 │   ├── css/
 │   │   └── styles.css         # Glassmorphism design system & responsive rules
 │   ├── js/
-│   │   ├── app_shared.js      # Global layout scripts
+│   │   ├── app_shared.js      # Global layout & universal CSRF fetch interceptor
 │   │   ├── detalhe_contrato.js# Contract ledger, modal accounting & inspection handling
 │   │   ├── financeiro.js      # Financial transactions filtering & payment modals
 │   │   ├── motos.js           # Fleet management logic & maintenance triggers
@@ -203,6 +211,7 @@ FF Motors APP/
     ├── contratos.html         # Contracts list & status filtering
     ├── detalhe_contrato.html  # Comprehensive agreement view & financial statement
     ├── financeiro.html        # Central finance statement & transaction ledger
+    ├── relatorio_vencidos.html# Fleet-wide overdue receivables & collection hub
     ├── motos.html             # Fleet inventory & maintenance board
     ├── vistorias_lista.html   # Vehicle inspection records & photo history
     └── recibo.html            # Branded payment receipt printable template

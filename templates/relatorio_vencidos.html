@@ -56,7 +56,7 @@
 </head>
 <body>
     <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <a href="/financeiro" class="btn-print btn-back" data-back="true" style="background: #475569; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">&larr; Back to Financial</a>
+        <button onclick="handleBack()" class="btn-print" style="background: #475569; border: none; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; cursor: pointer;">&larr; Back</button>
         <button class="btn-print" onclick="window.print()">🖨️ Print / Save PDF</button>
     </div>
 
@@ -107,13 +107,13 @@
         FF Motors Fleet Management &bull; Birmingham UK &bull; Confidential
     </div>
     <script>
-        document.addEventListener('click', (e) => {
-            const btn = e.target.closest('.btn-back, [data-back="true"]');
-            if (btn && document.referrer && document.referrer.startsWith(window.location.origin) && document.referrer !== window.location.href) {
-                e.preventDefault();
+        function handleBack() {
+            if (window.history.length > 1 && document.referrer && document.referrer.startsWith(window.location.origin) && document.referrer !== window.location.href) {
                 window.history.back();
+            } else {
+                window.location.href = '/dashboard';
             }
-        });
+        }
     </script>
 </body>
 </html>

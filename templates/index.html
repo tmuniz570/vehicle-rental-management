@@ -22,7 +22,7 @@
         <a href="/clientes/novo" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <span>👤</span> Add Customer
         </a>
-        <a href="/relatorios/vencidos" target="_blank" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; color: #f87171; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 6px;">
+        <a href="/relatorios/vencidos" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; color: #f87171; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 6px;">
             <span>⚠️</span> Overdue Report
         </a>
     </div>
@@ -73,14 +73,14 @@
 
 <!-- Row 2: Financial & Arrears -->
 <div class="dashboard-grid" style="margin-bottom: 1.75rem;">
-    <!-- Total Customers -->
-    <a href="/clientes" class="stat-card interactive" style="text-decoration: none;">
+    <!-- TAX & MOT Warnings -->
+    <a href="/motos" class="stat-card interactive" id="cardTaxMotWarnings" style="text-decoration: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span class="stat-title">Total Customers</span>
-            <span style="font-size: 1.25rem;">👥</span>
+            <span class="stat-title" id="tax_mot_title">TAX & MOT Warnings</span>
+            <span style="font-size: 1.25rem;" id="tax_mot_icon">🛡️</span>
         </div>
-        <div class="stat-value" id="total_clientes">-</div>
-        <div class="stat-desc">Registered clients in system</div>
+        <div class="stat-value" id="tax_mot_warnings">-</div>
+        <div class="stat-desc" id="tax_mot_desc">Fleet compliance status</div>
     </a>
 
     <!-- Expected Weekly Revenue -->
@@ -211,56 +211,6 @@
             </div>
         </div>
 
-        <!-- CARD: Quick System Shortcuts -->
-        <div class="stat-card">
-            <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
-                <span>⚡</span> Quick Management
-            </h3>
-            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                <a href="/motos" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); transition: all 0.2s ease;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2rem;">🛵</span>
-                        <div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">Fleet Management</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Register, edit models or plates</div>
-                        </div>
-                    </div>
-                    <span style="color: var(--accent);">&rarr;</span>
-                </a>
-
-                <a href="/clientes" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); transition: all 0.2s ease;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2rem;">👥</span>
-                        <div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">Customer Directory</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Customers: <span id="quickTotalClientes">0</span></div>
-                        </div>
-                    </div>
-                    <span style="color: var(--accent);">&rarr;</span>
-                </a>
-
-                <a href="/financeiro" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); text-decoration: none; color: var(--text-primary); transition: all 0.2s ease;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2rem;">💳</span>
-                        <div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">Financial Statements</div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary);">Payments, charges, and receipts</div>
-                        </div>
-                    </div>
-                    <span style="color: var(--accent);">&rarr;</span>
-                </a>
-
-                <a href="/relatorios/vencidos" target="_blank" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem; border-radius: 10px; background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); text-decoration: none; color: #f87171; transition: all 0.2s ease;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span style="font-size: 1.2rem;">🖨️</span>
-                        <div>
-                            <div style="font-weight: 600; font-size: 0.9rem;">Print Overdue Arrears Report</div>
-                            <div style="font-size: 0.75rem; color: rgba(248,113,113,0.8);">Download or print arrears PDF</div>
-                        </div>
-                    </div>
-                    <span>&rarr;</span>
-                </a>
-            </div>
         </div>
 
     </div>
@@ -287,6 +237,50 @@
             document.getElementById('motos_alugadas').textContent = data.motos_alugadas || 0;
             document.getElementById('motos_manutencao').textContent = data.motos_manutencao || 0;
             
+            // TAX & MOT Warnings Stat Card
+            const elTaxMot = document.getElementById('tax_mot_warnings');
+            const elTaxMotDesc = document.getElementById('tax_mot_desc');
+            const elTaxMotIcon = document.getElementById('tax_mot_icon');
+            const cardTaxMot = document.getElementById('cardTaxMotWarnings');
+            const totalWarnings = data.tax_mot_warnings || 0;
+            
+            if (elTaxMot) elTaxMot.textContent = totalWarnings;
+            
+            if (totalWarnings > 0) {
+                if (data.tax_mot_expired > 0) {
+                    if (elTaxMot) elTaxMot.style.color = '#f87171';
+                    if (elTaxMotIcon) elTaxMotIcon.textContent = '🚨';
+                    if (cardTaxMot) {
+                        cardTaxMot.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                        cardTaxMot.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.12)';
+                    }
+                    if (elTaxMotDesc) {
+                        elTaxMotDesc.innerHTML = `<strong style="color: #fca5a5;">${data.tax_mot_expired} expired</strong>${data.tax_mot_expiring_soon > 0 ? ` • ${data.tax_mot_expiring_soon} soon` : ''}`;
+                    }
+                } else {
+                    if (elTaxMot) elTaxMot.style.color = '#f59e0b';
+                    if (elTaxMotIcon) elTaxMotIcon.textContent = '⏳';
+                    if (cardTaxMot) {
+                        cardTaxMot.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                        cardTaxMot.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.12)';
+                    }
+                    if (elTaxMotDesc) {
+                        elTaxMotDesc.innerHTML = `<span style="color: #fcd34d;">${totalWarnings} expiring in &le; 30 days</span>`;
+                    }
+                }
+            } else {
+                if (elTaxMot) elTaxMot.style.color = 'var(--success)';
+                if (elTaxMotIcon) elTaxMotIcon.textContent = '✅';
+                if (cardTaxMot) {
+                    cardTaxMot.style.borderColor = 'var(--border-color)';
+                    cardTaxMot.style.boxShadow = 'none';
+                }
+                if (elTaxMotDesc) {
+                    elTaxMotDesc.textContent = 'All fleet Tax & MOT up to date';
+                    elTaxMotDesc.style.color = 'var(--text-secondary)';
+                }
+            }
+            
             const elTotalClientes = document.getElementById('total_clientes');
             if (elTotalClientes) elTotalClientes.textContent = data.total_clientes || 0;
             
@@ -302,9 +296,6 @@
             
             document.getElementById('quarentenas_count').textContent = data.quarentenas_count || 0;
             document.getElementById('quarentenas_valor').textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor || 0)}`;
-
-            const elQuickClientes = document.getElementById('quickTotalClientes');
-            if (elQuickClientes) elQuickClientes.textContent = data.total_clientes || 0;
 
             // Highlight maintenance card if > 0
             const cardManut = document.getElementById('cardManutencao');
@@ -519,14 +510,44 @@
             
             let html = '';
 
-            // 1. Check for deposit return due alerts
+            // 1. Process contract & compliance alerts (Deposit Hold, Insurance Due, Insurance Cancelled)
             if (alertas && alertas.length > 0) {
                 alertas.forEach(a => {
+                    let titulo = 'Notice';
+                    let badgeText = `${a.dias}d`;
+                    let badgeClass = 'badge-danger';
+                    let borderClr = 'var(--error)';
+                    let bgTint = 'rgba(220, 53, 69, 0.1)';
+                    let titleClr = 'var(--error)';
+
+                    if (a.tipo === 'insurance_cancelled') {
+                        titulo = '🚨 URGENT: Insurance Cancelled!';
+                        badgeText = 'UNINSURED';
+                        badgeClass = 'badge-danger';
+                        borderClr = '#ef4444';
+                        bgTint = 'rgba(239, 68, 68, 0.15)';
+                        titleClr = '#f87171';
+                    } else if (a.tipo === 'insurance_check_due') {
+                        titulo = '🔍 15-Day Insurance Check Due';
+                        badgeText = `${a.dias}d Since Check`;
+                        badgeClass = 'badge-warning';
+                        borderClr = '#f59e0b';
+                        bgTint = 'rgba(245, 158, 11, 0.1)';
+                        titleClr = '#fbbf24';
+                    } else if (a.tipo === 'deposit_hold_due') {
+                        titulo = '💰 Deposit Return Due!';
+                        badgeText = `${a.dias} days held`;
+                        badgeClass = 'badge-danger';
+                        borderClr = 'var(--error)';
+                        bgTint = 'rgba(220, 53, 69, 0.1)';
+                        titleClr = 'var(--error)';
+                    }
+
                     html += `
-                    <div style="background: rgba(220, 53, 69, 0.1); border-left: 4px solid var(--error); padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="background: ${bgTint}; border-left: 4px solid ${borderClr}; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                            <h4 style="margin: 0 0 5px 0; color: var(--error); font-size: 0.95rem;">Deposit Return Due!</h4>
-                            <span class="badge badge-danger" style="font-size: 0.75rem;">${a.dias} days held</span>
+                            <h4 style="margin: 0 0 5px 0; color: ${titleClr}; font-size: 0.95rem;">${titulo}</h4>
+                            <span class="badge ${badgeClass}" style="font-size: 0.75rem;">${badgeText}</span>
                         </div>
                         <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">${a.mensagem || a.message}</p>
                         <a href="/contratos/${a.contrato_id}" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
@@ -547,13 +568,95 @@
                     <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
                         Total of <strong>${formatoMoeda.format(dashData.receita_vencida)}</strong> in overdue arrears requiring collection.
                     </p>
-                    <a href="/relatorios/vencidos" target="_blank" style="color: #f87171; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
+                    <a href="/relatorios/vencidos" style="color: #f87171; text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
                         Print Overdue Report &rarr;
                     </a>
                 </div>`;
             }
 
-            // 3. If no alerts
+            // 3. Check for Road Tax & MOT Compliance Warnings
+            if (dashData && dashData.tax_mot_warnings > 0) {
+                const hasExpired = dashData.tax_mot_expired > 0;
+                const borderClr = hasExpired ? '#ef4444' : '#f59e0b';
+                const bgTint = hasExpired ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)';
+                const titleClr = hasExpired ? '#f87171' : '#fbbf24';
+                const badgeClass = hasExpired ? 'badge-danger' : 'badge-warning';
+                const badgeText = hasExpired ? `${dashData.tax_mot_expired} Expired` : `${dashData.tax_mot_expiring_soon} Expiring Soon`;
+
+                html += `
+                <div style="background: ${bgTint}; border-left: 4px solid ${borderClr}; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: ${titleClr}; font-size: 0.95rem;">
+                            ${hasExpired ? '🚨 Urgent: Road Tax / MOT Expired' : '⏳ Action Required: Road Tax / MOT Expiring Soon'}
+                        </h4>
+                        <span class="badge ${badgeClass}" style="font-size: 0.75rem;">${badgeText}</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        ${dashData.tax_mot_warnings} motorbike(s) require compliance renewal (${dashData.tax_warnings} Tax alerts, ${dashData.mot_warnings} MOT alerts).
+                    </p>
+                    <a href="/motos" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
+                        View Motorbike Fleet &rarr;
+                    </a>
+                </div>`;
+            }
+
+            // 4. Check for Cancelled Insurance Alerts (Critical)
+            const contratosCanc = (dashData && dashData.contratos_seguro_alerta || []).filter(c => c.status_seguro === 'Cancelled');
+            if (contratosCanc.length > 0) {
+                let itemsCancHtml = '';
+                contratosCanc.forEach(ca => {
+                    itemsCancHtml += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
+                            <span>🚨 Contract #${ca.id} (<strong style="font-family:monospace; color:var(--text-primary);">${ca.placa}</strong> - ${ca.cliente}) • <span style="color:#f87171; font-weight:700;">CANCELLED on askMID</span></span>
+                            <a href="/contratos/${ca.id}" style="color:var(--accent); text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Open Contract &rarr;</a>
+                        </div>
+                    `;
+                });
+
+                html += `
+                <div style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: #f87171; font-size: 0.95rem;">🚨 CRITICAL: Motorcycle Insurance Flagged CANCELLED</h4>
+                        <span class="badge badge-danger" style="font-size: 0.75rem;">${contratosCanc.length} Uninsured</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        Immediate shop intervention required! Active customer has had their insurance cancelled and is riding uninsured.
+                    </p>
+                    <div style="margin-top: 6px;">
+                        ${itemsCancHtml}
+                    </div>
+                </div>`;
+            }
+
+            // 5. Check for 15-Day Routine askMID Checks Due (Amber warning)
+            const contratosDue = (dashData && dashData.contratos_seguro_alerta || []).filter(c => c.status_seguro !== 'Cancelled');
+            if (contratosDue.length > 0) {
+                let itemsDueHtml = '';
+                contratosDue.forEach(ca => {
+                    itemsDueHtml += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
+                            <span>🔍 Contract #${ca.id} (<strong style="font-family:monospace; color:var(--text-primary);">${ca.placa}</strong> - ${ca.cliente}) • <span style="color:#fbbf24;">Last checked ${ca.dias}d ago</span></span>
+                            <a href="/contratos/${ca.id}" style="color:var(--accent); text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Open Contract &rarr;</a>
+                        </div>
+                    `;
+                });
+
+                html += `
+                <div style="background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: #fbbf24; font-size: 0.95rem;">🔍 15-Day askMID Insurance Checks Due</h4>
+                        <span class="badge badge-warning" style="font-size: 0.75rem;">${contratosDue.length} Check Due</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        Routine government database (askMID) check is due to verify insurance status for active rentals.
+                    </p>
+                    <div style="margin-top: 6px;">
+                        ${itemsDueHtml}
+                    </div>
+                </div>`;
+            }
+
+            // 5. If no alerts
             if (!html) {
                 html = `
                     <div style="display: flex; align-items: center; gap: 10px; padding: 1rem; border-radius: 8px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2);">

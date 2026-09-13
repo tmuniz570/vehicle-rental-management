@@ -51,7 +51,7 @@ async function carregarContratos() {
             tr.innerHTML = `
                 <td>#${c.id}</td>
                 <td style="font-weight:600; white-space: nowrap;" title="${nomeCliente}">${nomeCliente}</td>
-                <td style="font-weight:600;">${c.placa}</td>
+                <td class="nowrap"><span class="badge-plate">${c.placa}</span></td>
                 <td>${dataRetirada}</td>
                 <td>${diaVenc}</td>
                 <td>${valorFmt}</td>

@@ -4,7 +4,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from enum import Enum
 import os
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 db = SQLAlchemy()
 
 class User(db.Model, UserMixin):
@@ -97,6 +97,8 @@ class Motorcycle(db.Model):
     modelo = db.Column(db.String(100), nullable=False)
     cor = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default=MotoStatus.DISPONIVEL.value, nullable=False)
+    vencimento_mot = db.Column(db.Date, nullable=True)
+    vencimento_tax = db.Column(db.Date, nullable=True)
     
     contratos = db.relationship('Contract', backref='moto', lazy=True)
 
@@ -115,6 +117,11 @@ class Contract(db.Model):
     url_seguro = db.Column(db.String(255), nullable=True)
     url_comprovante_deposito = db.Column(db.String(255), nullable=True)
     criado_por_nome = db.Column(db.String(100), nullable=True)
+    
+    # 15-Day Insurance Compliance (askMID Verification)
+    data_ultima_checagem_seguro = db.Column(db.Date, nullable=True)
+    status_seguro = db.Column(db.String(20), default='Valid', nullable=False) # Valid, Cancelled
+    seguro_verificado_por = db.Column(db.String(100), nullable=True)
     
     vistorias = db.relationship('Inspection', backref='contrato', lazy=True)
     transacoes = db.relationship('FinancialTransaction', backref='contrato', lazy=True)
@@ -157,28 +164,53 @@ class AuditLog(db.Model):
     ip_origem = db.Column(db.String(50), nullable=True)
 
 def init_db(app):
-    db.init_app(app)
+    if 'sqlalchemy' not in app.extensions:
+        db.init_app(app)
     with app.app_context():
         db.create_all()
         try:
+            inspector = inspect(db.engine)
+            existing_tables = inspector.get_table_names()
             with db.engine.connect() as conn:
-                res_c = conn.execute(db.text("PRAGMA table_info(contratos)")).fetchall()
-                cols_c = [r[1] for r in res_c]
-                if 'criado_por_nome' not in cols_c:
-                    conn.execute(db.text("ALTER TABLE contratos ADD COLUMN criado_por_nome VARCHAR(100)"))
-                    conn.commit()
+                # Contratos
+                if 'contratos' in existing_tables:
+                    cols_c = [col['name'] for col in inspector.get_columns('contratos')]
+                    if 'criado_por_nome' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN criado_por_nome VARCHAR(100)"))
+                        conn.commit()
+                    if 'data_ultima_checagem_seguro' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN data_ultima_checagem_seguro DATE"))
+                        conn.commit()
+                    if 'status_seguro' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN status_seguro VARCHAR(20) DEFAULT 'Valid'"))
+                        conn.commit()
+                    if 'seguro_verificado_por' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN seguro_verificado_por VARCHAR(100)"))
+                        conn.commit()
                     
-                res_i = conn.execute(db.text("PRAGMA table_info(vistorias)")).fetchall()
-                cols_i = [r[1] for r in res_i]
-                if 'realizado_por_nome' not in cols_i:
-                    conn.execute(db.text("ALTER TABLE vistorias ADD COLUMN realizado_por_nome VARCHAR(100)"))
-                    conn.commit()
+                # Vistorias
+                if 'vistorias' in existing_tables:
+                    cols_i = [col['name'] for col in inspector.get_columns('vistorias')]
+                    if 'realizado_por_nome' not in cols_i:
+                        conn.execute(db.text("ALTER TABLE vistorias ADD COLUMN realizado_por_nome VARCHAR(100)"))
+                        conn.commit()
                     
-                res_t = conn.execute(db.text("PRAGMA table_info(financeiro_transacoes)")).fetchall()
-                cols_t = [r[1] for r in res_t]
-                if 'registrado_por_nome' not in cols_t:
-                    conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN registrado_por_nome VARCHAR(100)"))
-                    conn.commit()
+                # Financeiro Transações
+                if 'financeiro_transacoes' in existing_tables:
+                    cols_t = [col['name'] for col in inspector.get_columns('financeiro_transacoes')]
+                    if 'registrado_por_nome' not in cols_t:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN registrado_por_nome VARCHAR(100)"))
+                        conn.commit()
+
+                # Motos
+                if 'motos' in existing_tables:
+                    cols_m = [col['name'] for col in inspector.get_columns('motos')]
+                    if 'vencimento_mot' not in cols_m:
+                        conn.execute(db.text("ALTER TABLE motos ADD COLUMN vencimento_mot DATE"))
+                        conn.commit()
+                    if 'vencimento_tax' not in cols_m:
+                        conn.execute(db.text("ALTER TABLE motos ADD COLUMN vencimento_tax DATE"))
+                        conn.commit()
         except Exception as e:
             print(f"[DB Auto-Migration] Info: {e}")
 

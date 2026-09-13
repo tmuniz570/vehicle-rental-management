@@ -4,6 +4,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnText = submitBtn.querySelector('.btn-text');
     const loader = submitBtn.querySelector('.loader');
     const feedbackMsg = document.getElementById('feedbackMessage');
+    const placaInput = document.getElementById('placa');
+
+    if (placaInput) {
+        // Disallow pressing the Spacebar
+        placaInput.addEventListener('keydown', (e) => {
+            if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+            }
+        });
+        // Automatically sanitize spaces and convert to uppercase in real time
+        placaInput.addEventListener('input', () => {
+            placaInput.value = placaInput.value.replace(/\s+/g, '').toUpperCase();
+        });
+        // Handle paste events to strip any spaces copied from elsewhere
+        placaInput.addEventListener('paste', () => {
+            setTimeout(() => {
+                placaInput.value = placaInput.value.replace(/\s+/g, '').toUpperCase();
+            }, 0);
+        });
+    }
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -11,15 +31,23 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackMsg.classList.add('hidden');
         feedbackMsg.className = 'feedback-message hidden';
         
+        const cleanPlaca = (document.getElementById('placa').value || '').replace(/\s+/g, '').toUpperCase();
+        if (!cleanPlaca) {
+            showFeedback('Please provide a valid registration plate without spaces.', 'error');
+            return;
+        }
+
         submitBtn.disabled = true;
         btnText.classList.add('hidden');
         loader.classList.remove('hidden');
 
         // Gather data
         const formData = {
-            placa: document.getElementById('placa').value.trim().toUpperCase(),
+            placa: cleanPlaca,
             modelo: document.getElementById('modelo').value.trim(),
-            cor: document.getElementById('cor').value.trim()
+            cor: document.getElementById('cor').value.trim(),
+            vencimento_mot: document.getElementById('vencimento_mot') ? document.getElementById('vencimento_mot').value || null : null,
+            vencimento_tax: document.getElementById('vencimento_tax') ? document.getElementById('vencimento_tax').value || null : null
         };
 
         try {

@@ -47,10 +47,90 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await response.json();
         
         // 1. Customer Card
+        const elClienteId = document.getElementById('info_cliente_id');
+        if (elClienteId) {
+            elClienteId.textContent = data.id_cliente ? `ID #${data.id_cliente}` : 'ID -';
+        }
         document.getElementById('info_cliente').textContent = data.cliente || '-';
-        document.getElementById('info_tel').textContent = data.telefone ? `📞 ${data.telefone}` : '-';
-        document.getElementById('info_email').textContent = data.email ? `✉️ ${data.email}` : '-';
         
+        const elTel = document.getElementById('info_tel');
+        if (elTel) {
+            if (data.telefone) {
+                elTel.innerHTML = `
+                    <a href="tel:${data.telefone}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${data.telefone}">
+                        <span>📞</span> <span style="text-decoration:underline;">${data.telefone}</span>
+                    </a>
+                `;
+            } else {
+                elTel.innerHTML = '<span>📞 No phone</span>';
+            }
+        }
+        
+        const elEmail = document.getElementById('info_email');
+        if (elEmail) {
+            if (data.email) {
+                elEmail.innerHTML = `
+                    <a href="mailto:${data.email}" style="color:#60a5fa; text-decoration:underline; word-break:break-all; display:inline-flex; align-items:center; gap:6px;" title="Send email to ${data.email}">
+                        <span>✉️</span> <span>${data.email}</span>
+                    </a>
+                `;
+            } else {
+                elEmail.innerHTML = '<span>✉️ No email</span>';
+            }
+        }
+        
+        const elEndereco = document.getElementById('info_endereco');
+        if (elEndereco) {
+            if (data.endereco) {
+                const mapQuery = encodeURIComponent(data.endereco);
+                elEndereco.innerHTML = `
+                    <a href="https://www.google.com/maps/search/?api=1&query=${mapQuery}" target="_blank" style="color:var(--text-primary); text-decoration:none; display:flex; justify-content:space-between; align-items:flex-start; gap:8px;" title="Open in Google Maps">
+                        <span>${escapeHtml(data.endereco)}</span>
+                        <span style="color:var(--accent); font-size:0.75rem; font-weight:600; white-space:nowrap; background:rgba(217,119,6,0.1); border:1px solid rgba(217,119,6,0.25); padding:2px 6px; border-radius:4px;">Maps ↗</span>
+                    </a>
+                `;
+            } else {
+                elEndereco.textContent = 'No registered address';
+            }
+        }
+
+        const docsContainer = document.getElementById('info_cliente_docs');
+        if (docsContainer) {
+            let docsHtml = '';
+            if (data.url_habilitacao) {
+                docsHtml += `
+                    <a href="${data.url_habilitacao}" target="_blank" class="btn-action" style="padding: 6px 10px; font-size: 0.78rem; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; border-radius: 6px;">
+                        <span>🪪 Driving Licence (DVLA)</span>
+                        <span style="font-size: 0.75rem;">View ↗</span>
+                    </a>
+                `;
+            } else {
+                docsHtml += `
+                    <div style="padding: 6px 10px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); color: var(--text-secondary); border-radius: 6px;">
+                        <span>🪪 Driving Licence</span>
+                        <span style="font-size: 0.72rem; opacity: 0.6;">Not uploaded</span>
+                    </div>
+                `;
+            }
+
+            if (data.url_comprovante_endereco) {
+                docsHtml += `
+                    <a href="${data.url_comprovante_endereco}" target="_blank" class="btn-action" style="padding: 6px 10px; font-size: 0.78rem; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; border-radius: 6px;">
+                        <span>🏠 Proof of Address</span>
+                        <span style="font-size: 0.75rem;">View ↗</span>
+                    </a>
+                `;
+            } else {
+                docsHtml += `
+                    <div style="padding: 6px 10px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); color: var(--text-secondary); border-radius: 6px;">
+                        <span>🏠 Proof of Address</span>
+                        <span style="font-size: 0.72rem; opacity: 0.6;">Not uploaded</span>
+                    </div>
+                `;
+            }
+            docsContainer.innerHTML = docsHtml;
+        }
+
         const linksCliente = document.getElementById('info_cliente_links');
         if (linksCliente) {
             linksCliente.innerHTML = '';
@@ -60,10 +140,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 waLink.href = `https://wa.me/${waNumber}`;
                 waLink.target = '_blank';
                 waLink.className = 'btn-action';
-                waLink.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.8rem; padding: 4px 10px; text-decoration: none;';
-                waLink.innerHTML = '💬 WhatsApp';
+                waLink.style.cssText = 'flex: 1; text-align: center; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.8rem; padding: 6px 10px; text-decoration: none; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;';
+                waLink.innerHTML = '<span>💬 WhatsApp</span>';
                 linksCliente.appendChild(waLink);
             }
+            const clientProfileLink = document.createElement('a');
+            clientProfileLink.href = `/clientes?search=${encodeURIComponent(data.id_cliente || data.cliente || '')}`;
+            clientProfileLink.className = 'btn-action';
+            clientProfileLink.style.cssText = 'flex: 1; text-align: center; font-size: 0.8rem; padding: 6px 10px; text-decoration: none; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary);';
+            clientProfileLink.innerHTML = '<span>👥 View Client</span>';
+            linksCliente.appendChild(clientProfileLink);
         }
         
         // 2. Vehicle Card
@@ -73,17 +159,281 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (data.data_retirada) {
             document.getElementById('info_data_retirada').textContent = 'Collection: ' + new Date(data.data_retirada).toLocaleDateString('en-GB');
         }
+
+        // Helper for compliance date evaluation
+        function evaluateCompliance(dateStr) {
+            if (!dateStr) return { status: 'none', diffDays: null, formattedDate: '-' };
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return { status: 'none', diffDays: null, formattedDate: dateStr };
+            const due = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) return { status: 'expired', diffDays: Math.abs(diffDays), formattedDate };
+            if (diffDays <= 30) return { status: 'warning', diffDays, formattedDate };
+            return { status: 'valid', diffDays, formattedDate };
+        }
+
+        function renderComplianceRow(title, evalResult) {
+            if (evalResult.status === 'expired') {
+                return `
+                    <div style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block;">${title}</span>
+                            <strong style="color: #f87171;">${evalResult.formattedDate}</strong>
+                        </div>
+                        <span class="badge badge-danger" style="font-weight: 700; font-size: 0.72rem; padding: 3px 8px; letter-spacing: 0.02em;">
+                            🚨 EXPIRED (${evalResult.diffDays}d ago)
+                        </span>
+                    </div>
+                `;
+            } else if (evalResult.status === 'warning') {
+                return `
+                    <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.45); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block;">${title}</span>
+                            <strong style="color: #fbbf24;">${evalResult.formattedDate}</strong>
+                        </div>
+                        <span class="badge badge-warning" style="font-weight: 700; font-size: 0.72rem; padding: 3px 8px; letter-spacing: 0.02em;">
+                            ⏳ Due in ${evalResult.diffDays}d
+                        </span>
+                    </div>
+                `;
+            } else if (evalResult.status === 'valid') {
+                return `
+                    <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block;">${title}</span>
+                            <strong style="color: var(--text-primary);">${evalResult.formattedDate}</strong>
+                        </div>
+                        <span style="color: #4ade80; font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 4px;">
+                            ✓ Valid
+                        </span>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block;">${title}</span>
+                            <span style="color: var(--text-secondary);">-</span>
+                        </div>
+                        <span style="color: var(--text-secondary); font-size: 0.75rem;">Not registered</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Road Tax evaluated first, then MOT
+        const taxEval = evaluateCompliance(data.vencimento_tax);
+        const motEval = evaluateCompliance(data.vencimento_mot);
+
+        const motTaxBox = document.getElementById('info_mot_tax');
+        if (motTaxBox) {
+            motTaxBox.innerHTML = renderComplianceRow('Road Tax Expiry', taxEval) + renderComplianceRow('MOT Expiry', motEval);
+        }
+
+        // Top Compliance Warning Banner
+        const compBanner = document.getElementById('compliance_alert_banner');
+        if (compBanner) {
+            const expiredList = [];
+            const warningList = [];
+            
+            if (taxEval.status === 'expired') expiredList.push(`Road Tax (expired ${taxEval.diffDays}d ago on ${taxEval.formattedDate})`);
+            else if (taxEval.status === 'warning') warningList.push(`Road Tax (due in ${taxEval.diffDays}d on ${taxEval.formattedDate})`);
+
+            if (motEval.status === 'expired') expiredList.push(`MOT (expired ${motEval.diffDays}d ago on ${motEval.formattedDate})`);
+            else if (motEval.status === 'warning') warningList.push(`MOT (due in ${motEval.diffDays}d on ${motEval.formattedDate})`);
+
+            // Include Insurance status in top banner
+            if (data.status_seguro === 'Cancelled') {
+                expiredList.push('Motor Insurance (FLAGGED CANCELLED ON askMID)');
+            } else if (data.checagem_seguro_devida) {
+                warningList.push(`15-day askMID Insurance Check Due (${data.dias_desde_checagem_seguro}d since last check)`);
+            }
+
+            if (expiredList.length > 0) {
+                compBanner.style.display = 'block';
+                compBanner.innerHTML = `
+                    <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; border-left: 5px solid #ef4444; border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 1.75rem;">🚨</span>
+                            <div>
+                                <strong style="color: #f87171; font-size: 1rem; display: block;">URGENT FLEET COMPLIANCE ALERT</strong>
+                                <span style="color: var(--text-primary); font-size: 0.88rem;">
+                                    Vehicle <strong>${data.placa}</strong> has EXPIRED compliance: <strong>${expiredList.join(' • ')}</strong>. This motorbike cannot be legally ridden on UK roads!
+                                </span>
+                            </div>
+                        </div>
+                        <a href="/motos" class="btn-action" style="background: #ef4444; color: #fff; text-decoration: none; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; border-radius: 6px; white-space: nowrap;">
+                            Manage in Fleet &rarr;
+                        </a>
+                    </div>
+                `;
+            } else if (warningList.length > 0) {
+                compBanner.style.display = 'block';
+                compBanner.innerHTML = `
+                    <div style="background: rgba(245, 158, 11, 0.12); border: 1px solid #f59e0b; border-left: 5px solid #f59e0b; border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="font-size: 1.75rem;">⏳</span>
+                            <div>
+                                <strong style="color: #fbbf24; font-size: 1rem; display: block;">UPCOMING COMPLIANCE RENEWAL</strong>
+                                <span style="color: var(--text-primary); font-size: 0.88rem;">
+                                    Vehicle <strong>${data.placa}</strong> renewal due soon: <strong>${warningList.join(' • ')}</strong>.
+                                </span>
+                            </div>
+                        </div>
+                        <a href="/motos" class="btn-action" style="background: #f59e0b; color: #000; text-decoration: none; padding: 8px 16px; font-size: 0.85rem; font-weight: 600; border-radius: 6px; white-space: nowrap;">
+                            Manage in Fleet &rarr;
+                        </a>
+                    </div>
+                `;
+            } else {
+                compBanner.style.display = 'none';
+                compBanner.innerHTML = '';
+            }
+        }
+        
+        // 3. 15-Day askMID Insurance Compliance Rendering
+        const badgeSeguro = document.getElementById('badge_status_seguro');
+        const boxSeguro = document.getElementById('box_seguro_compliance');
+        const dataVerifEl = document.getElementById('info_seguro_data_verif');
+        const proxVerifEl = document.getElementById('info_seguro_proxima_verif');
+        const verifPorEl = document.getElementById('info_seguro_verificado_por');
+        const verifPorRow = document.getElementById('info_seguro_verif_por_row');
+
+        if (badgeSeguro) {
+            if (data.status_seguro === 'Cancelled') {
+                badgeSeguro.className = 'badge badge-danger';
+                badgeSeguro.innerHTML = '🚨 CANCELLED / UNINSURED';
+                badgeSeguro.style.cssText = 'background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); font-weight:700;';
+                if (boxSeguro) {
+                    boxSeguro.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                    boxSeguro.style.background = 'rgba(239, 68, 68, 0.08)';
+                }
+            } else if (data.checagem_seguro_devida) {
+                badgeSeguro.className = 'badge badge-warning';
+                badgeSeguro.innerHTML = `⏳ Check Due (${data.dias_desde_checagem_seguro}d ago)`;
+                badgeSeguro.style.cssText = 'background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight:700;';
+                if (boxSeguro) {
+                    boxSeguro.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+                    boxSeguro.style.background = 'rgba(245, 158, 11, 0.08)';
+                }
+            } else {
+                badgeSeguro.className = 'badge badge-success';
+                badgeSeguro.innerHTML = '✓ Active on askMID';
+                badgeSeguro.style.cssText = 'background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight:600;';
+                if (boxSeguro) {
+                    boxSeguro.style.borderColor = 'var(--border-color)';
+                    boxSeguro.style.background = 'rgba(255,255,255,0.03)';
+                }
+            }
+        }
+
+        if (dataVerifEl) {
+            const dv = data.data_ultima_checagem_seguro ? new Date(data.data_ultima_checagem_seguro + 'T00:00:00').toLocaleDateString('en-GB') : '-';
+            dataVerifEl.innerHTML = `${dv} <span style="color: var(--text-secondary); font-size: 0.75rem; font-weight: normal;">(${data.dias_desde_checagem_seguro || 0}d ago)</span>`;
+        }
+
+        if (proxVerifEl) {
+            if (data.status_seguro === 'Cancelled') {
+                proxVerifEl.innerHTML = '<span style="color: #f87171; font-weight: 700;">UNINSURED ALERT</span>';
+            } else if (data.checagem_seguro_devida) {
+                const overdue = (data.dias_desde_checagem_seguro || 15) - 15;
+                proxVerifEl.innerHTML = `<span style="color: #fbbf24; font-weight: 700;">CHECK DUE NOW (${overdue > 0 ? `${overdue}d overdue` : 'Today'})</span>`;
+            } else {
+                proxVerifEl.innerHTML = `<span style="color: #4ade80;">Due in ${data.dias_para_proxima_checagem_seguro || 0} days</span>`;
+            }
+        }
+
+        if (verifPorEl) {
+            if (data.seguro_verificado_por) {
+                verifPorEl.textContent = data.seguro_verificado_por;
+                if (verifPorRow) verifPorRow.style.display = 'flex';
+            } else {
+                if (verifPorRow) verifPorRow.style.display = 'none';
+            }
+        }
+
+        // Setup askMID check and verification buttons
+        const btnCheckAskMid = document.getElementById('btnCheckAskMid');
+        if (btnCheckAskMid) {
+            btnCheckAskMid.onclick = () => {
+                if (data.placa) {
+                    navigator.clipboard.writeText(data.placa).then(() => {
+                        alert(`Registration plate "${data.placa}" copied to clipboard!\n\nOpening official askMID.com database to verify vehicle insurance status...`);
+                    }).catch(() => {
+                        alert(`Opening askMID.com for plate: ${data.placa}`);
+                    });
+                }
+                window.open('https://www.askmid.com/', '_blank');
+            };
+        }
+
+        const btnConfirmarSeguroValido = document.getElementById('btnConfirmarSeguroValido');
+        if (btnConfirmarSeguroValido) {
+            btnConfirmarSeguroValido.onclick = async () => {
+                if (!confirm(`Confirm that insurance for motorbike ${data.placa} is ACTIVE and VALID on askMID today?\n\nThis will record your staff verification and reset the 15-day check schedule.`)) {
+                    return;
+                }
+                try {
+                    const res = await fetch(`/api/contratos/${CONTRATO_ID}/verificar-seguro`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: 'Valid' })
+                    });
+                    const resData = await res.json();
+                    if (res.ok) {
+                        alert(resData.message || 'Insurance verified successfully!');
+                        location.reload();
+                    } else {
+                        alert(resData.error || 'Failed to record verification');
+                    }
+                } catch (e) {
+                    console.error('Error verifying insurance:', e);
+                    alert('Connection error');
+                }
+            };
+        }
+
+        const btnReportarSeguroCancelado = document.getElementById('btnReportarSeguroCancelado');
+        if (btnReportarSeguroCancelado) {
+            btnReportarSeguroCancelado.onclick = async () => {
+                if (!confirm(`🚨 CRITICAL WARNING:\n\nAre you sure you want to flag vehicle ${data.placa} as UNINSURED / CANCELLED?\n\nThis will trigger urgent compliance alerts across the dashboard and contract.`)) {
+                    return;
+                }
+                try {
+                    const res = await fetch(`/api/contratos/${CONTRATO_ID}/verificar-seguro`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: 'Cancelled' })
+                    });
+                    const resData = await res.json();
+                    if (res.ok) {
+                        alert(resData.message || 'Insurance cancellation recorded!');
+                        location.reload();
+                    } else {
+                        alert(resData.error || 'Failed to record cancellation');
+                    }
+                } catch (e) {
+                    console.error('Error reporting cancelled insurance:', e);
+                    alert('Connection error');
+                }
+            };
+        }
         
         const infoSeguro = document.getElementById('info_seguro');
         if (infoSeguro) {
             if (data.url_seguro) {
                 infoSeguro.innerHTML = `
-                    <a href="${data.url_seguro}" target="_blank" class="btn-action" style="font-size: 0.8rem; padding: 6px 12px; text-decoration: none;">📄 View Insurance</a>
-                    <button class="btn-action btn-atualizar-seguro" style="font-size: 0.8rem; padding: 6px 12px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary);">Update</button>
+                    <a href="${data.url_seguro}" target="_blank" class="btn-action" style="font-size: 0.75rem; padding: 5px 8px; text-decoration: none; flex: 1; text-align: center; border-radius: 6px;">📄 Policy</a>
+                    <button class="btn-action btn-atualizar-seguro" style="font-size: 0.75rem; padding: 5px 8px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">Update</button>
                 `;
             } else {
                 infoSeguro.innerHTML = `
-                    <button class="btn-action btn-atualizar-seguro" style="font-size: 0.8rem; padding: 6px 12px; background: var(--accent);">+ Attach Insurance</button>
+                    <button class="btn-action btn-atualizar-seguro" style="font-size: 0.75rem; padding: 5px 8px; background: var(--accent); flex: 1; border-radius: 6px;">+ Attach Policy</button>
                 `;
             }
         }
@@ -346,9 +696,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     `;
                 } else if (isPaid) {
                     acoesHtml = `
-                        <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 12px; font-size:0.8rem;">
-                            🧾 Receipt
-                        </button>
+                        <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
+                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
+                                🧾 Receipt
+                            </button>
+                            <button class="btn-action btn-reverter-pagamento" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 9px; font-size:0.8rem; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
+                                ↩ Cancel / Revert
+                            </button>
+                        </div>
                     `;
                 }
 
@@ -425,6 +780,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (recLink) recLink.href = `/recibo/${id}`;
 
                     abrirModal('reciboModal');
+                });
+            });
+
+            // Revert / Cancel Payment Logic
+            document.querySelectorAll('.btn-reverter-pagamento').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const b = e.target.closest('button');
+                    const cobId = b.getAttribute('data-id');
+                    const tipo = b.getAttribute('data-tipo');
+                    const valor = parseFloat(b.getAttribute('data-valor')) || 0;
+
+                    const confirmar = confirm(`Are you sure you want to CANCEL this completed payment?\n\n• Transaction: #${cobId} (${tipo})\n• Amount: £${valor.toFixed(2)}\n\nThis will reset the transaction back to PENDING and record this cancellation in the audit trail.`);
+                    if (!confirmar) return;
+
+                    b.disabled = true;
+                    b.textContent = 'Reverting...';
+                    try {
+                        const res = await fetch(`/api/financeiro/${cobId}/reverter`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        const resJson = await res.json();
+                        if (!res.ok) {
+                            alert(resJson.error || resJson.erro || 'Failed to revert payment.');
+                            b.disabled = false;
+                            b.textContent = '↩ Cancel / Revert';
+                            return;
+                        }
+                        location.reload();
+                    } catch (err) {
+                        console.error('Error reverting payment:', err);
+                        alert('Connection error while cancelling payment.');
+                        b.disabled = false;
+                        b.textContent = '↩ Cancel / Revert';
+                    }
                 });
             });
 

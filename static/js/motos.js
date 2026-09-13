@@ -1,6 +1,27 @@
 let paginaAtual = 1;
 let termoBusca = '';
 
+function formatExpiryBadge(dateStr) {
+    if (!dateStr) return '<span style="color:var(--text-secondary); opacity:0.6;">-</span>';
+    
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const due = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+    const diffDays = Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+        return `<span class="badge badge-danger" title="Expired ${Math.abs(diffDays)} days ago">⚠️ Expired (${formattedDate})</span>`;
+    } else if (diffDays <= 30) {
+        return `<span class="badge badge-warning" title="Expiring in ${diffDays} days">⏳ ${formattedDate}</span>`;
+    } else {
+        return `<span style="color:#4ade80; font-weight:600; font-size:0.85rem; display:inline-flex; align-items:center; gap:3px;">✓ ${formattedDate}</span>`;
+    }
+}
+
 async function carregarMotos() {
     const tbody = document.querySelector('#motosTable tbody');
     const paginationInfo = document.getElementById('paginationInfo');
@@ -11,7 +32,7 @@ async function carregarMotos() {
         const motos = data.itens || [];
         
         if (motos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No motorbikes found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No motorbikes found.</td></tr>';
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
@@ -27,12 +48,17 @@ async function carregarMotos() {
             else if (st === 'rented' || st === 'alugada') statusBadge = '<span class="badge badge-info">Rented</span>';
             else statusBadge = `<span class="badge badge-danger">${m.status}</span>`;
             
-            const btnEdit = `<button class="btn-edit" data-placa="${m.placa}" data-modelo="${m.modelo}" data-cor="${m.cor}" data-status="${m.status}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
+            const btnEdit = `<button class="btn-edit" data-placa="${m.placa}" data-modelo="${m.modelo}" data-cor="${m.cor}" data-status="${m.status}" data-mot="${m.vencimento_mot || ''}" data-tax="${m.vencimento_tax || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
+            const motBadge = formatExpiryBadge(m.vencimento_mot);
+            const taxBadge = formatExpiryBadge(m.vencimento_tax);
+
             tr.innerHTML = `
-                <td style="font-weight:600;">${m.placa}</td>
+                <td class="nowrap"><span class="badge-plate">${m.placa}</span></td>
                 <td>${m.modelo}</td>
                 <td>${m.cor}</td>
+                <td data-sort="${m.vencimento_tax || ''}" class="nowrap">${taxBadge}</td>
+                <td data-sort="${m.vencimento_mot || ''}" class="nowrap">${motBadge}</td>
                 <td>${statusBadge}</td>
                 <td>${btnEdit}</td>
             `;
@@ -58,6 +84,8 @@ async function carregarMotos() {
                 document.getElementById('edit_modelo').value = e.target.getAttribute('data-modelo');
                 document.getElementById('edit_cor').value = e.target.getAttribute('data-cor');
                 document.getElementById('edit_status').value = e.target.getAttribute('data-status');
+                document.getElementById('edit_mot').value = e.target.getAttribute('data-mot') || '';
+                document.getElementById('edit_tax').value = e.target.getAttribute('data-tax') || '';
                 modal.style.display = 'flex';
             });
         });
@@ -66,7 +94,7 @@ async function carregarMotos() {
         }
         
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
     }
 }
 
@@ -103,7 +131,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = {
             modelo: document.getElementById('edit_modelo').value,
             cor: document.getElementById('edit_cor').value,
-            status: document.getElementById('edit_status').value
+            status: document.getElementById('edit_status').value,
+            vencimento_mot: document.getElementById('edit_mot').value || null,
+            vencimento_tax: document.getElementById('edit_tax').value || null
         };
         
         try {

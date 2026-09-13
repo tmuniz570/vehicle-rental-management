@@ -5,6 +5,7 @@ let abaAtual = 'users';
 let auditPaginaAtual = 1;
 let auditTermoBusca = '';
 let auditAcaoFiltro = '';
+let auditDataFiltro = '';
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarUsuarios();
@@ -31,11 +32,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Audit Log Controls
     const auditSearch = document.getElementById('auditSearchInput');
+    let searchTimeout;
     if (auditSearch) {
         auditSearch.addEventListener('input', (e) => {
-            auditTermoBusca = e.target.value.trim();
-            auditPaginaAtual = 1;
-            carregarAuditoria();
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                auditTermoBusca = e.target.value.trim();
+                auditPaginaAtual = 1;
+                carregarAuditoria();
+            }, 300);
         });
     }
 
@@ -43,6 +48,29 @@ document.addEventListener('DOMContentLoaded', () => {
     if (auditAcao) {
         auditAcao.addEventListener('change', (e) => {
             auditAcaoFiltro = e.target.value;
+            auditPaginaAtual = 1;
+            carregarAuditoria();
+        });
+    }
+
+    const auditDate = document.getElementById('auditDateFilter');
+    const btnClearAuditDate = document.getElementById('btnClearAuditDate');
+    if (auditDate) {
+        auditDate.addEventListener('change', (e) => {
+            auditDataFiltro = e.target.value;
+            if (btnClearAuditDate) {
+                btnClearAuditDate.style.display = auditDataFiltro ? 'inline-block' : 'none';
+            }
+            auditPaginaAtual = 1;
+            carregarAuditoria();
+        });
+    }
+
+    if (btnClearAuditDate) {
+        btnClearAuditDate.addEventListener('click', () => {
+            if (auditDate) auditDate.value = '';
+            auditDataFiltro = '';
+            btnClearAuditDate.style.display = 'none';
             auditPaginaAtual = 1;
             carregarAuditoria();
         });
@@ -244,6 +272,10 @@ function renderizarTabela(usuarios) {
 
         tbody.appendChild(tr);
     });
+
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('usersTable');
+    }
 }
 
 // --- Modal Handlers ---
@@ -458,7 +490,8 @@ async function carregarAuditoria() {
             page: auditPaginaAtual,
             limit: 20,
             search: auditTermoBusca,
-            acao: auditAcaoFiltro
+            acao: auditAcaoFiltro,
+            data: auditDataFiltro
         });
 
         const res = await fetch(`/api/auditoria?${params.toString()}`);
@@ -488,7 +521,9 @@ async function carregarAuditoria() {
             // Action Badge
             let acaoBadge = '';
             const a = log.acao || '';
-            if (a.includes('PAYMENT')) {
+            if (a.includes('CANCEL')) {
+                acaoBadge = '<span class="badge badge-danger">Cancelled</span>';
+            } else if (a.includes('PAYMENT')) {
                 acaoBadge = '<span class="badge badge-success">Payment</span>';
             } else if (a.includes('CONTRACT')) {
                 acaoBadge = '<span class="badge badge-info">Contract</span>';
@@ -505,23 +540,27 @@ async function carregarAuditoria() {
             const targetTxt = log.entidade ? `${log.entidade} ${log.entidade_id ? '#' + log.entidade_id : ''}` : '-';
 
             tr.innerHTML = `
-                <td style="font-size:0.85rem; color:var(--text-secondary); white-space:nowrap;">${dataFmt}</td>
-                <td style="font-weight:600; color:var(--text-primary); white-space:nowrap;">
+                <td data-sort="${log.data_hora || ''}" style="font-size:0.85rem; color:var(--text-secondary); white-space:nowrap;">${dataFmt}</td>
+                <td data-sort="${escapeHtml(log.usuario_nome || 'System')}" style="font-weight:600; color:var(--text-primary); white-space:nowrap;">
                     👤 ${escapeHtml(log.usuario_nome || 'System')}
                 </td>
-                <td class="nowrap">${acaoBadge}</td>
-                <td style="font-size:0.9rem; color:var(--text-primary); max-width:380px;">
+                <td data-sort="${escapeHtml(log.acao || '')}" class="nowrap">${acaoBadge}</td>
+                <td data-sort="${escapeHtml(log.descricao || '')}" style="font-size:0.9rem; color:var(--text-primary); max-width:380px;">
                     ${escapeHtml(log.descricao)}
                 </td>
-                <td style="font-family:monospace; font-size:0.82rem; color:var(--text-secondary); white-space:nowrap;">
+                <td data-sort="${escapeHtml(targetTxt)}" style="font-family:monospace; font-size:0.82rem; color:var(--text-secondary); white-space:nowrap;">
                     ${escapeHtml(targetTxt)}
                 </td>
-                <td style="font-size:0.8rem; color:var(--text-secondary); opacity:0.7; white-space:nowrap;">
+                <td data-sort="${escapeHtml(log.ip_origem || '')}" style="font-size:0.8rem; color:var(--text-secondary); opacity:0.7; white-space:nowrap;">
                     ${escapeHtml(log.ip_origem || '-')}
                 </td>
             `;
             tbody.appendChild(tr);
         });
+
+        if (typeof enableTableSorting === 'function') {
+            enableTableSorting('auditTable');
+        }
 
         if (paginationInfo) {
             paginationInfo.textContent = `Page ${data.pagina_atual} of ${data.paginas || 1} (${data.total} events)`;

@@ -28,7 +28,24 @@
         
         <div class="form-group">
             <label for="placa">Registration Plate (Reg No.)</label>
-            <input type="text" id="placa" name="placa" placeholder="BP21 XYZ" required autocapitalize="characters" style="text-transform: uppercase;">
+            <input type="text" id="placa" name="placa" placeholder="BP21XYZ" required autocapitalize="characters" style="text-transform: uppercase;" autocomplete="off" spellcheck="false" maxlength="10">
+            <small style="display: block; margin-top: 6px; font-size: 0.8rem; color: var(--text-secondary);">
+                ℹ️ Digite a placa sem espaços (ex: <strong>BP21XYZ</strong>). Espaços não são permitidos.
+            </small>
+        </div>
+
+        <div class="form-row" style="margin-top: 1rem;">
+            <div class="form-group half">
+                <label for="vencimento_tax">Road Tax Expiry Date</label>
+                <input type="date" id="vencimento_tax" name="vencimento_tax" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">UK DVLA Road Tax (VED)</small>
+            </div>
+
+            <div class="form-group half">
+                <label for="vencimento_mot">MOT Expiry Date</label>
+                <input type="date" id="vencimento_mot" name="vencimento_mot" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Annual UK MOT validity</small>
+            </div>
         </div>
 
         <div id="feedbackMessage" class="feedback-message hidden"></div>

@@ -417,6 +417,21 @@ body {
     }
 }
 
+/* Contract Cards Grid (2 cards per line, 2 lines total) */
+.contract-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .contract-cards-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* --- NOVO: COMPONENTES GERAIS --- */
 
 .page-header {
@@ -861,16 +876,27 @@ tr:hover td {
 
 /* --- VISTORIAS & TABELAS ENHANCEMENTS --- */
 .badge-plate {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap !important;
+    word-break: keep-all !important;
     font-family: 'Courier New', Courier, monospace;
     font-weight: 700;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
-    padding: 0.2rem 0.6rem;
+    padding: 0.25rem 0.65rem;
     border-radius: 6px;
-    background: rgba(15, 23, 42, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.18);
     color: #f1f5f9;
+    vertical-align: middle;
+}
+
+td:has(.badge-plate),
+th.col-plate,
+td.col-plate {
+    white-space: nowrap !important;
 }
 
 .link-contrato {

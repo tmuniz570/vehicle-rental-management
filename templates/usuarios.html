@@ -80,14 +80,18 @@
 <!-- Tab 2: Audit Trail Section -->
 <div id="tabContentAudit" style="display: none;">
     <!-- Audit Filter Controls -->
-    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
-        <div style="flex: 1; min-width: 240px;">
-            <input type="text" id="auditSearchInput" placeholder="Search by operator, action, plate, or details..." style="width: 100%; padding: 0.875rem 1.25rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.95rem;">
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <div style="flex: 2; min-width: 240px; position: relative;">
+            <input type="text" id="auditSearchInput" placeholder="Search by operator, action, plate, or details..." style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none;">
+            <svg style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none;" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
         </div>
-        <div style="min-width: 180px;">
-            <select id="auditAcaoFilter" style="width: 100%; height: 100%; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.9); color: var(--text-primary); font-size: 0.95rem;">
+        <div style="flex: 1; min-width: 180px;">
+            <select id="auditAcaoFilter" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
                 <option value="">All Operational Actions</option>
                 <option value="PAYMENT_RECEIVED">Payment Received</option>
+                <option value="PAYMENT_CANCELLED">Payment Cancelled</option>
                 <option value="CREATE_CONTRACT">Contract Created</option>
                 <option value="CREATE_INSPECTION">Inspection Performed</option>
                 <option value="RETURN_VEHICLE">Vehicle Returned</option>
@@ -98,6 +102,13 @@
                 <option value="USER_DELETE">User Account Deleted</option>
             </select>
         </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem 0.85rem; border-radius: 12px; border: 1px solid var(--border-color);">
+            <label for="auditDateFilter" style="color: var(--text-secondary); font-size: 0.85rem;">Date:</label>
+            <input type="date" id="auditDateFilter" style="padding: 0.4rem; border: none; background: transparent; color: var(--text-primary); outline: none; cursor: pointer;">
+        </div>
+        <button type="button" id="btnClearAuditDate" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem 1rem; border-radius: 12px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
+            Clear Date
+        </button>
         <button type="button" id="btnRefreshAudit" class="btn-secondary" style="padding: 0.75rem 1.25rem; width: auto; font-size: 0.9rem;" title="Refresh Audit Trail">
             🔄 Refresh
         </button>

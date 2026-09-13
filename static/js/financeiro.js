@@ -116,9 +116,16 @@ async function carregarFinanceiro() {
                     Mark Paid
                 </button>`;
             } else if (isPaid) {
-                actBtn = `<button class="btn-action btn-abrir-recibo" data-index="${index}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary);">
-                    🧾 Receipt
-                </button>`;
+                actBtn = `
+                    <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
+                        <button class="btn-action btn-abrir-recibo" data-index="${index}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 8px;" title="View Receipt">
+                            🧾 Receipt
+                        </button>
+                        <button class="btn-action btn-reverter-fin" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 8px; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
+                            ↩ Revert
+                        </button>
+                    </div>
+                `;
             }
             
             tr.innerHTML = `
@@ -129,7 +136,7 @@ async function carregarFinanceiro() {
                     </a>
                 </td>
                 <td style="font-weight:500; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${t.cliente || ''}">${t.cliente || '-'}</td>
-                <td><span class="badge-plate">${t.placa || '-'}</span></td>
+                <td class="nowrap"><span class="badge-plate">${t.placa || '-'}</span></td>
                 <td class="nowrap">${tipoBadge}</td>
                 <td class="nowrap" style="font-weight:700; font-size:1rem; color:var(--text-primary);">${valorFmt}</td>
                 <td class="nowrap">${celulaVencimento}</td>
@@ -162,6 +169,41 @@ async function carregarFinanceiro() {
             btn.addEventListener('click', (e) => {
                 const idx = parseInt(btn.getAttribute('data-index'), 10);
                 abrirModalRecibo(transacoesCache[idx]);
+            });
+        });
+
+        // Listeners for Revert Payment
+        document.querySelectorAll('.btn-reverter-fin').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const b = e.target.closest('button');
+                const id = b.getAttribute('data-id');
+                const tipo = b.getAttribute('data-tipo');
+                const valor = parseFloat(b.getAttribute('data-valor')) || 0;
+
+                const confirmar = confirm(`Are you sure you want to CANCEL this completed payment?\n\n• Transaction: #${id} (${tipo})\n• Amount: ${formatoMoeda.format(valor)}\n\nThis will reset the transaction back to PENDING and record this cancellation in the audit trail.`);
+                if (!confirmar) return;
+
+                b.disabled = true;
+                b.textContent = 'Reverting...';
+                try {
+                    const res = await fetch(`/api/financeiro/${id}/reverter`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const resJson = await res.json();
+                    if (!res.ok) {
+                        alert(resJson.error || resJson.erro || 'Failed to revert payment.');
+                        b.disabled = false;
+                        b.textContent = '↩ Revert';
+                        return;
+                    }
+                    carregarTransacoes();
+                } catch (err) {
+                    console.error('Error reverting payment:', err);
+                    alert('Connection error while cancelling payment.');
+                    b.disabled = false;
+                    b.textContent = '↩ Revert';
+                }
             });
         });
 

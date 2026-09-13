@@ -19,20 +19,40 @@
     </div>
 </div>
 
-<!-- 3 Summary Cards at Top -->
-<div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+<!-- Dynamic Compliance Alert Banner for Expired / Expiring Tax & MOT -->
+<div id="compliance_alert_banner" style="display: none; margin-bottom: 1.5rem;"></div>
+
+<!-- 4 Summary Cards at Top: Customer, Vehicle, Contract & Terms, Inspections -->
+<div class="contract-cards-grid">
     <!-- Customer Card -->
     <div class="stat-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
         <div>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.75rem;">
-                <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Customer</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Customer</span>
+                    <span id="info_cliente_id" class="badge" style="font-size:0.75rem; background:rgba(217,119,6,0.15); color:var(--accent); border:1px solid rgba(217,119,6,0.3); font-weight:700;">ID -</span>
+                </div>
                 <span style="font-size: 1.2rem;">👤</span>
             </div>
             <div id="info_cliente" style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">-</div>
             <div id="info_tel" style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 0.25rem;">-</div>
-            <div id="info_email" style="color: var(--text-secondary); font-size: 0.9rem; word-break: break-all;">-</div>
+            <div id="info_email" style="color: var(--text-secondary); font-size: 0.88rem; word-break: break-all; margin-bottom: 0.5rem;">-</div>
+
+            <!-- Address Box -->
+            <div id="box_endereco" style="margin-top: 0.65rem; padding: 0.65rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); font-size: 0.82rem; line-height: 1.4;">
+                <span style="display: block; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">📍 Registered Address</span>
+                <span id="info_endereco" style="color: var(--text-primary); font-weight: 500;">-</span>
+            </div>
+
+            <!-- Customer Documents Box -->
+            <div style="margin-top: 0.75rem;">
+                <span style="display: block; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.4rem; letter-spacing: 0.05em;">📁 Identity & Address Documents</span>
+                <div id="info_cliente_docs" style="display: flex; flex-direction: column; gap: 0.4rem;">
+                    <!-- Populated by JS: Driving Licence & Proof of Address links -->
+                </div>
+            </div>
         </div>
-        <div id="info_cliente_links" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; gap: 0.5rem;">
+        <div id="info_cliente_links" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color); display: flex; gap: 0.5rem; flex-wrap: wrap;">
             <!-- Dynamic links via JS -->
         </div>
     </div>
@@ -48,11 +68,54 @@
                 <span id="info_placa" class="badge-plate" style="font-size: 1.35rem; padding: 0.3rem 0.75rem;">-</span>
             </div>
             <div id="info_modelo_cor" style="color: var(--text-primary); font-weight: 500; font-size: 1rem; margin-bottom: 0.25rem;">-</div>
-            <div id="info_data_retirada" style="color: var(--text-secondary); font-size: 0.85rem;">Collection Date: -</div>
+            <div id="info_data_retirada" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Collection Date: -</div>
+            <div id="info_mot_tax" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;"></div>
         </div>
         
-        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-color);">
-            <div id="info_seguro" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
+        <!-- Insurance & 15-Day askMID Compliance -->
+        <div style="margin-top: 1rem; padding-top: 0.85rem; border-top: 1px solid var(--border-color);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.05em;">
+                    🛡️ Motor Insurance (askMID)
+                </span>
+                <span id="badge_status_seguro" class="badge" style="font-size: 0.72rem;">-</span>
+            </div>
+
+            <!-- Insurance Verification Details Box -->
+            <div id="box_seguro_compliance" style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.75rem; font-size: 0.82rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <span style="color: var(--text-secondary);">Last Verified:</span>
+                    <strong id="info_seguro_data_verif" style="color: var(--text-primary);">-</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <span style="color: var(--text-secondary);">Next Check:</span>
+                    <strong id="info_seguro_proxima_verif" style="color: var(--text-primary);">-</strong>
+                </div>
+                <div id="info_seguro_verif_por_row" style="display: flex; justify-content: space-between; color: #c084fc; font-size: 0.78rem;">
+                    <span>Checked by:</span>
+                    <strong id="info_seguro_verificado_por">-</strong>
+                </div>
+            </div>
+
+            <!-- Action Buttons: askMID Check & Validation -->
+            <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" id="btnCheckAskMid" class="btn-action" style="flex: 1; font-size: 0.8rem; padding: 7px 10px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #60a5fa; text-align: center; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;" title="Copies plate and opens askMID.com">
+                        <span>🔍 Check askMID</span>
+                    </button>
+                    <button type="button" id="btnConfirmarSeguroValido" class="btn-action" style="flex: 1; font-size: 0.8rem; padding: 7px 10px; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.35); color: #4ade80; text-align: center; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px;" title="Mark insurance verified valid today (resets 15-day timer)">
+                        <span>✅ Mark Valid</span>
+                    </button>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" id="btnReportarSeguroCancelado" class="btn-action" style="flex: 1; font-size: 0.75rem; padding: 5px 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; text-align: center; border-radius: 6px; cursor: pointer;" title="Report insurance cancelled or invalid">
+                        🚨 Flag Cancelled
+                    </button>
+                    <div id="info_seguro" style="flex: 1; display: flex;"></div>
+                </div>
+            </div>
+            
             <input type="file" id="update_seguro_file" accept="image/*,.pdf" style="display:none;">
         </div>
     </div>
@@ -107,62 +170,30 @@
             <div id="info_comprovante"></div>
         </div>
     </div>
-</div>
 
-<!-- Lower Grid: Financial Statement (2/3) + Inspections (1/3) -->
-<div class="contract-details-grid">
-    <!-- Financial Statement -->
-    <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column;">
-        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-            <div>
-                <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Financial Statement</h3>
-                <span id="resumoExtrato" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+    <!-- Inspections Card -->
+    <div class="stat-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Inspections</span>
+                    <span style="font-size: 1.1rem;">📷</span>
+                </div>
+                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                    <a href="/vistorias/nova?contrato_id={{ contrato_id }}" class="btn-primary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; width: auto; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none;">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                        Inspection
+                    </a>
+                    <button id="btnNovaOcorr" class="btn-primary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; width: auto; display: inline-flex; align-items: center; gap: 0.3rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        Incident
+                    </button>
+                </div>
             </div>
-            <button id="btnLancCob" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; width: auto; display: inline-flex; align-items: center; gap: 0.4rem;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                Add Charge
-            </button>
-        </div>
 
-        <div class="table-container" style="box-shadow: none; border: 1px solid var(--border-color); flex-grow: 1;">
-            <table id="extratoTable">
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Amount</th>
-                        <th>Due Date</th>
-                        <th>Payment Date</th>
-                        <th>Status</th>
-                        <th style="text-align: right;">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="extratoTableBody">
-                    <tr>
-                        <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Loading statement...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Inspections -->
-    <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column;">
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
-            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Inspections</h3>
-            <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                <a href="/vistorias/nova?contrato_id={{ contrato_id }}" class="btn-primary" style="padding: 0.5rem 0.85rem; font-size: 0.82rem; width: auto; display: inline-flex; align-items: center; gap: 0.35rem; text-decoration: none;">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                    Inspection
-                </a>
-                <button id="btnNovaOcorr" class="btn-primary" style="padding: 0.5rem 0.85rem; font-size: 0.82rem; width: auto; display: inline-flex; align-items: center; gap: 0.35rem; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    Incident
-                </button>
+            <div id="vistoriasList" style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem;">
+                <p style="color: var(--text-secondary); text-align: center; padding: 1.5rem 0; font-size: 0.85rem;">Loading...</p>
             </div>
-        </div>
-
-        <div id="vistoriasList" style="flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem;">
-            <p style="color: var(--text-secondary); text-align: center; padding: 2rem 0;">Loading...</p>
         </div>
 
         <div style="margin-top: 1rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
@@ -170,6 +201,40 @@
                 View Full Inspection History &rarr;
             </a>
         </div>
+    </div>
+</div>
+
+<!-- Financial Statement (Alone in its own full-width row) -->
+<div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column; width: 100%; margin-bottom: 2rem;">
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Financial Statement</h3>
+            <span id="resumoExtrato" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+        </div>
+        <button id="btnLancCob" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; width: auto; display: inline-flex; align-items: center; gap: 0.4rem;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Add Charge
+        </button>
+    </div>
+
+    <div class="table-container" style="box-shadow: none; border: 1px solid var(--border-color); flex-grow: 1;">
+        <table id="extratoTable">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Due Date</th>
+                    <th>Payment Date</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="extratoTableBody">
+                <tr>
+                    <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Loading statement...</td>
+                </tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -430,5 +495,5 @@
 <script>
     const CONTRATO_ID = {{ contrato_id }};
 </script>
-<script src="/static/js/detalhe_contrato.js?v=7"></script>
+<script src="/static/js/detalhe_contrato.js?v=8"></script>
 {% endblock %}

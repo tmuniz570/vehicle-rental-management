@@ -1,8 +1,37 @@
 /**
  * FF Motors - Shared UI Utilities
+ * - Automatic CSRF Token Injection for all fetch requests
  * - Interactive Table Column Sorting
  * - Smart History Back Navigation
  */
+
+// Universal CSRF Token Injection for all fetch mutations
+(function() {
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        options = options || {};
+        const method = (options.method || 'GET').toUpperCase();
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const token = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            if (token) {
+                if (!options.headers) {
+                    options.headers = {};
+                }
+                if (options.headers instanceof Headers) {
+                    if (!options.headers.has('X-CSRFToken') && !options.headers.has('X-CSRF-Token')) {
+                        options.headers.append('X-CSRFToken', token);
+                    }
+                } else if (typeof options.headers === 'object') {
+                    if (!options.headers['X-CSRFToken'] && !options.headers['X-CSRF-Token']) {
+                        options.headers['X-CSRFToken'] = token;
+                    }
+                }
+            }
+        }
+        return originalFetch.call(this, url, options);
+    };
+})();
 
 // 1. Smart History Back Button
 document.addEventListener('DOMContentLoaded', () => {
@@ -137,7 +166,7 @@ function sortTableByColumn(table, colIndex) {
 
 // Auto-initialize sortable tables on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-    ['motosTable', 'clientesTable', 'contratosTable', 'vistoriasTable', 'financeiroTable', 'usersTable'].forEach(id => {
+    ['motosTable', 'clientesTable', 'contratosTable', 'vistoriasTable', 'financeiroTable', 'usersTable', 'auditTable'].forEach(id => {
         enableTableSorting(id);
     });
 });

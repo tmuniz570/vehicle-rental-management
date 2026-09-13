@@ -23,7 +23,7 @@ async function carregarClientes() {
         const clientes = data.itens || [];
         
         if (clientes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No customers found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No customers found.</td></tr>';
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
@@ -44,6 +44,7 @@ async function carregarClientes() {
                 : (c.telefone || '-');
             
             tr.innerHTML = `
+                <td class="nowrap"><span style="font-weight:700; color:var(--accent); background:rgba(217,119,6,0.12); border:1px solid rgba(217,119,6,0.25); padding:3px 8px; border-radius:6px; font-size:0.85rem;">#${c.id}</span></td>
                 <td><strong>${c.nome}</strong></td>
                 <td class="nowrap">${telHtml}</td>
                 <td>${c.email}</td>
@@ -80,7 +81,7 @@ async function carregarClientes() {
         }
         
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--error);">Error loading customers.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--error);">Error loading customers.</td></tr>';
     }
 }
 

@@ -19,6 +19,8 @@ Thumbs.db
 backups/
 .temp*
 *.log
+.env
+*.env
 
 # SQLite temporary/journal files
 *.db-journal
