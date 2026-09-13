@@ -190,6 +190,7 @@ FF Motors APP/
 ├── seed_data.py               # Demo data seeder for immediate testing
 ├── requirements.txt           # Production Python dependencies
 ├── .env.example               # Template environment configuration
+├── CHANGELOG.md               # Detailed history of releases and changes
 ├── static/
 │   ├── css/
 │   │   └── styles.css         # Glassmorphism design system & responsive rules
