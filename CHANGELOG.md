@@ -35,6 +35,8 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
   - Conexões configuradas com `PRAGMA journal_mode = WAL;` e `PRAGMA synchronous = NORMAL;`, permitindo leituras concorrentes simultâneas durante gravações e reduzindo travamentos de disco.
   - Ativação obrigatória de integridade relacional com `PRAGMA foreign_keys = ON;`.
   - Timeout de conexão estendido para 30 segundos (`connect_args={'timeout': 30}`).
+* **Exclusão Segura de Usuários com Integridade Referencial:**
+  - Desacoplamento automático de referências em `logs_auditoria` (`id_usuario = NULL`) antes da exclusão de contas, preservando a trilha histórica e evitando erros de integridade referencial com chaves estrangeiras ativas.
 * **Modernização SQLAlchemy 2.0:**
   - Substituição de todas as 23 ocorrências legadas de `Model.query.get(id)` e `Model.query.get_or_404(id)` por `db.session.get(Model, id)`.
 

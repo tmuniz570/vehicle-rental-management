@@ -626,11 +626,18 @@ def deletar_usuario(user_id):
         
     nome_antigo = user.nome
     email_antigo = user.email
-    db.session.delete(user)
-    db.session.commit()
-    
-    registrar_log('USER_DELETE', 'User', user_id, f"Usuário excluído: {nome_antigo} ({email_antigo})")
-    return jsonify({'message': f'User {nome_antigo} deleted successfully'}), 200
+
+    try:
+        # Decouple foreign key references in audit logs so historical activity is preserved
+        AuditLog.query.filter_by(id_usuario=user_id).update({'id_usuario': None}, synchronize_session=False)
+        db.session.delete(user)
+        db.session.commit()
+        
+        registrar_log('USER_DELETE', 'User', user_id, f"Usuário excluído: {nome_antigo} ({email_antigo})")
+        return jsonify({'message': f'User {nome_antigo} deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
 
 @app.route('/api/auditoria', methods=['GET'])
 @admin_required

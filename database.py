@@ -172,7 +172,7 @@ class AuditLog(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     data_hora = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
-    id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='SET NULL'), nullable=True)
     usuario_nome = db.Column(db.String(100), nullable=True)
     acao = db.Column(db.String(50), nullable=False, index=True)
     entidade = db.Column(db.String(50), nullable=False)
