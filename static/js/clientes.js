@@ -12,13 +12,15 @@ function formatWhatsAppNumber(phone) {
 
 let paginaAtual = 1;
 let termoBusca = '';
+let sortCol = 'id';
+let sortOrder = 'desc';
 
 async function carregarClientes() {
     const tbody = document.querySelector('#clientesTable tbody');
     const paginationInfo = document.getElementById('paginationInfo');
     
     try {
-        const res = await fetch(`/api/clientes?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}`);
+        const res = await fetch(`/api/clientes?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}&sort_by=${encodeURIComponent(sortCol)}&sort_order=${encodeURIComponent(sortOrder)}`);
         const data = await res.json();
         const clientes = data.itens || [];
         
@@ -79,8 +81,8 @@ async function carregarClientes() {
                 modal.style.display = 'flex';
             });
         });
-        if (typeof enableTableSorting === 'function') {
-            enableTableSorting('clientesTable');
+        if (typeof setTableSortIndicator === 'function') {
+            setTableSortIndicator('clientesTable', sortCol, sortOrder);
         }
         
     } catch(e) {
@@ -89,6 +91,15 @@ async function carregarClientes() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('clientesTable', (field, order) => {
+            sortCol = field;
+            sortOrder = order;
+            paginaAtual = 1;
+            carregarClientes();
+        });
+    }
+
     carregarClientes();
     
     // Pagination Buttons

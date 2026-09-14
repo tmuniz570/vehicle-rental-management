@@ -3,6 +3,8 @@ let termoBusca = '';
 let tipoFiltro = '';
 let dataFiltro = '';
 let contratoFiltro = '';
+let sortCol = 'data';
+let sortOrder = 'desc';
 let vistoriasCache = [];
 
 async function atualizarBannerEControlesContrato() {
@@ -99,7 +101,9 @@ async function carregarVistorias() {
             limit: 15,
             search: termoBusca,
             tipo: tipoFiltro,
-            data: dataFiltro
+            data: dataFiltro,
+            sort_by: sortCol,
+            sort_order: sortOrder
         });
         if (contratoFiltro) {
             params.set('contrato_id', contratoFiltro);
@@ -186,8 +190,8 @@ async function carregarVistorias() {
             });
         });
 
-        if (typeof enableTableSorting === 'function') {
-            enableTableSorting('vistoriasTable');
+        if (typeof setTableSortIndicator === 'function') {
+            setTableSortIndicator('vistoriasTable', sortCol, sortOrder);
         }
         
     } catch (e) {
@@ -344,6 +348,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tipoFiltro = '';
             dataFiltro = '';
             contratoFiltro = '';
+            sortCol = 'data';
+            sortOrder = 'desc';
             paginaAtual = 1;
             if (window.history.replaceState) {
                 const url = new URL(window.location);
@@ -351,6 +357,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 url.searchParams.delete('contrato');
                 window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
             }
+            carregarVistorias();
+        });
+    }
+
+    // Enable Server-Side Table Sorting
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('vistoriasTable', (field, order) => {
+            sortCol = field;
+            sortOrder = order;
+            paginaAtual = 1;
             carregarVistorias();
         });
     }

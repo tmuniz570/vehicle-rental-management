@@ -2,6 +2,11 @@ let paginaAtual = 1;
 let termoBusca = '';
 let statusFiltro = 'pendentes';
 let tipoFiltro = '';
+let campoData = 'vencimento';
+let dataInicio = '';
+let dataFim = '';
+let sortCol = 'data_vencimento';
+let sortOrder = 'asc';
 let transacoesCache = [];
 
 const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
@@ -13,7 +18,7 @@ async function carregarFinanceiro() {
 
     // Clear Filters Button
     if (btnClear) {
-        btnClear.style.display = (termoBusca || statusFiltro !== 'pendentes' || tipoFiltro) ? 'block' : 'none';
+        btnClear.style.display = (termoBusca || statusFiltro !== 'pendentes' || tipoFiltro || dataInicio || dataFim || campoData !== 'vencimento') ? 'block' : 'none';
     }
 
     try {
@@ -28,7 +33,12 @@ async function carregarFinanceiro() {
             search: termoBusca,
             status: statusParam,
             pendentes: pendentesParam,
-            tipo: tipoFiltro
+            tipo: tipoFiltro,
+            campo_data: campoData,
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            sort_by: sortCol,
+            sort_order: sortOrder
         });
 
         const res = await fetch(`/api/financeiro?${params.toString()}`);
@@ -197,7 +207,7 @@ async function carregarFinanceiro() {
                         b.textContent = '↩ Revert';
                         return;
                     }
-                    carregarTransacoes();
+                    carregarFinanceiro();
                 } catch (err) {
                     console.error('Error reverting payment:', err);
                     alert('Connection error while cancelling payment.');
@@ -207,8 +217,8 @@ async function carregarFinanceiro() {
             });
         });
 
-        if (typeof enableTableSorting === 'function') {
-            enableTableSorting('financeiroTable');
+        if (typeof setTableSortIndicator === 'function') {
+            setTableSortIndicator('financeiroTable', sortCol, sortOrder);
         }
         
     } catch(e) {
@@ -336,6 +346,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Date Filters
+    const filterCampoData = document.getElementById('filterCampoData');
+    if (filterCampoData) {
+        filterCampoData.addEventListener('change', (e) => {
+            campoData = e.target.value;
+            paginaAtual = 1;
+            carregarFinanceiro();
+        });
+    }
+
+    const filterDataInicio = document.getElementById('filterDataInicio');
+    if (filterDataInicio) {
+        filterDataInicio.addEventListener('change', (e) => {
+            dataInicio = e.target.value;
+            paginaAtual = 1;
+            carregarFinanceiro();
+        });
+    }
+
+    const filterDataFim = document.getElementById('filterDataFim');
+    if (filterDataFim) {
+        filterDataFim.addEventListener('change', (e) => {
+            dataFim = e.target.value;
+            paginaAtual = 1;
+            carregarFinanceiro();
+        });
+    }
+
+    // Enable Server-Side Table Sorting
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('financeiroTable', (field, order) => {
+            sortCol = field;
+            sortOrder = order;
+            paginaAtual = 1;
+            carregarFinanceiro();
+        });
+    }
+
     // Clear Filters Button
     const btnClear = document.getElementById('btnClearFilters');
     if (btnClear) {
@@ -343,9 +391,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (searchInput) searchInput.value = '';
             if (filterStatus) filterStatus.value = 'pendentes';
             if (filterTipo) filterTipo.value = '';
+            if (filterCampoData) filterCampoData.value = 'vencimento';
+            if (filterDataInicio) filterDataInicio.value = '';
+            if (filterDataFim) filterDataFim.value = '';
             termoBusca = '';
             statusFiltro = 'pendentes';
             tipoFiltro = '';
+            campoData = 'vencimento';
+            dataInicio = '';
+            dataFim = '';
+            sortCol = 'data_vencimento';
+            sortOrder = 'asc';
             paginaAtual = 1;
             carregarFinanceiro();
         });

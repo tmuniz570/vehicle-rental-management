@@ -549,6 +549,8 @@ def listar_auditoria():
     search = request.args.get('search', '', type=str)
     acao = request.args.get('acao', '', type=str)
     data_filtro = request.args.get('data', '', type=str)
+    sort_by = request.args.get('sort_by', 'data_hora', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
     query = AuditLog.query
     if search:
@@ -573,8 +575,23 @@ def listar_auditoria():
             query = query.filter(AuditLog.data_hora >= dt_inicio, AuditLog.data_hora < dt_fim)
         except ValueError:
             pass
-        
-    paginated = query.order_by(AuditLog.data_hora.desc()).paginate(page=page, per_page=limit, error_out=False)
+            
+    sort_map = {
+        'data_hora': AuditLog.data_hora,
+        'data': AuditLog.data_hora,
+        'date': AuditLog.data_hora,
+        'usuario_nome': AuditLog.usuario_nome,
+        'usuario': AuditLog.usuario_nome,
+        'user': AuditLog.usuario_nome,
+        'acao': AuditLog.acao,
+        'action': AuditLog.acao,
+        'entidade': AuditLog.entidade,
+        'entidade_id': AuditLog.entidade_id,
+        'descricao': AuditLog.descricao
+    }
+    target_col = sort_map.get(sort_by, AuditLog.data_hora)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': a.id,
@@ -709,6 +726,8 @@ def listar_clientes():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
+    sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
     query = Client.query
     if search:
@@ -719,7 +738,19 @@ def listar_clientes():
             Client.email.ilike(search_term)
         ))
     
-    paginated = query.order_by(Client.id.desc()).paginate(page=page, per_page=limit, error_out=False)
+    sort_map = {
+        'id': Client.id,
+        'nome': Client.nome,
+        'name': Client.nome,
+        'telefone': Client.telefone,
+        'phone': Client.telefone,
+        'email': Client.email,
+        'endereco': Client.endereco,
+        'address': Client.endereco
+    }
+    target_col = sort_map.get(sort_by, Client.id)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': c.id, 'nome': c.nome, 'telefone': c.telefone, 'email': c.email, 'endereco': c.endereco,
@@ -796,6 +827,8 @@ def listar_motos():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
+    sort_by = request.args.get('sort_by', 'placa', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'asc', type=str).strip().lower()
     
     query = Motorcycle.query
     if search:
@@ -810,7 +843,23 @@ def listar_motos():
             Motorcycle.status.ilike(search_term)
         ))
         
-    paginated = query.order_by(Motorcycle.placa).paginate(page=page, per_page=limit, error_out=False)
+    sort_map = {
+        'placa': Motorcycle.placa,
+        'reg': Motorcycle.placa,
+        'modelo': Motorcycle.modelo,
+        'model': Motorcycle.modelo,
+        'cor': Motorcycle.cor,
+        'colour': Motorcycle.cor,
+        'color': Motorcycle.cor,
+        'status': Motorcycle.status,
+        'vencimento_mot': Motorcycle.vencimento_mot,
+        'mot': Motorcycle.vencimento_mot,
+        'vencimento_tax': Motorcycle.vencimento_tax,
+        'tax': Motorcycle.vencimento_tax
+    }
+    target_col = sort_map.get(sort_by, Motorcycle.placa)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'placa': m.placa,
@@ -1041,6 +1090,8 @@ def listar_contratos():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
+    sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
     query = Contract.query.join(Client, Contract.id_cliente == Client.id)
     if search:
@@ -1073,7 +1124,26 @@ def listar_contratos():
                 ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'
             ]))
         
-    paginated = query.order_by(Contract.id.desc()).paginate(page=page, per_page=limit, error_out=False)
+    sort_map = {
+        'id': Contract.id,
+        'cliente': Client.nome,
+        'customer': Client.nome,
+        'placa': Contract.placa,
+        'data_retirada': Contract.data_retirada,
+        'data': Contract.data_retirada,
+        'collection': Contract.data_retirada,
+        'dia_pagamento_semanal': Contract.dia_pagamento_semanal,
+        'due_day': Contract.dia_pagamento_semanal,
+        'valor_aluguel_semanal': Contract.valor_aluguel_semanal,
+        'rent': Contract.valor_aluguel_semanal,
+        'data_devolucao': Contract.data_devolucao,
+        'return': Contract.data_devolucao,
+        'status': Contract.status,
+        'status_seguro': Contract.status_seguro
+    }
+    target_col = sort_map.get(sort_by, Contract.id)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': c.id, 'id_cliente': c.id_cliente, 'cliente_nome': c.cliente.nome, 'placa': c.placa,
@@ -1302,6 +1372,8 @@ def listar_vistorias():
     tipo = request.args.get('tipo', '', type=str)
     data_filtro = request.args.get('data', '', type=str)
     contrato_id = request.args.get('contrato_id', type=int)
+    sort_by = request.args.get('sort_by', 'data', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
     query = Inspection.query.join(Contract, Inspection.id_contrato == Contract.id).join(Client, Contract.id_cliente == Client.id)
     if contrato_id:
@@ -1329,8 +1401,20 @@ def listar_vistorias():
             query = query.filter(Inspection.data >= dt_inicio, Inspection.data < dt_fim)
         except ValueError:
             pass
-        
-    paginated = query.order_by(Inspection.data.desc()).paginate(page=page, per_page=limit, error_out=False)
+            
+    sort_map = {
+        'id': Inspection.id,
+        'contrato': Inspection.id_contrato,
+        'id_contrato': Inspection.id_contrato,
+        'placa': Contract.placa,
+        'cliente': Client.nome,
+        'tipo': Inspection.tipo,
+        'data': Inspection.data,
+        'realizado_por_nome': Inspection.realizado_por_nome
+    }
+    target_col = sort_map.get(sort_by, Inspection.data)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': v.id,
@@ -1361,6 +1445,11 @@ def listar_financeiro():
     status_filtro = request.args.get('status', '', type=str)
     tipo_filtro = request.args.get('tipo', '', type=str)
     pendentes = request.args.get('pendentes') == 'true'
+    data_inicio = request.args.get('data_inicio', '', type=str).strip()
+    data_fim = request.args.get('data_fim', '', type=str).strip()
+    campo_data = request.args.get('campo_data', 'vencimento', type=str).strip().lower()
+    sort_by = request.args.get('sort_by', 'data_vencimento', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'asc', type=str).strip().lower()
     
     query = FinancialTransaction.query.outerjoin(Contract, FinancialTransaction.id_contrato == Contract.id).outerjoin(Client, Contract.id_cliente == Client.id)
     if search:
@@ -1391,8 +1480,41 @@ def listar_financeiro():
         
     if tipo_filtro:
         query = query.filter(FinancialTransaction.tipo == tipo_filtro)
-        
-    paginated = query.order_by(FinancialTransaction.data_vencimento.asc()).paginate(page=page, per_page=limit, error_out=False)
+
+    # Date Range Filter
+    col_data = FinancialTransaction.data_pagamento if campo_data == 'pagamento' else FinancialTransaction.data_vencimento
+    if data_inicio:
+        try:
+            dt_ini = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(col_data >= dt_ini)
+        except ValueError:
+            pass
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(col_data < dt_fim)
+        except ValueError:
+            pass
+
+    # Server-side Sorting
+    sort_map = {
+        'id': FinancialTransaction.id,
+        'contrato': FinancialTransaction.id_contrato,
+        'id_contrato': FinancialTransaction.id_contrato,
+        'cliente': Client.nome,
+        'nome': Client.nome,
+        'placa': Contract.placa,
+        'tipo': FinancialTransaction.tipo,
+        'valor': FinancialTransaction.valor,
+        'data_vencimento': FinancialTransaction.data_vencimento,
+        'vencimento': FinancialTransaction.data_vencimento,
+        'data_pagamento': FinancialTransaction.data_pagamento,
+        'pagamento': FinancialTransaction.data_pagamento,
+        'status': FinancialTransaction.status,
+    }
+    target_col = sort_map.get(sort_by, FinancialTransaction.data_vencimento)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': t.id,

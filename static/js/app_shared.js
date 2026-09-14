@@ -75,9 +75,59 @@ function parseSortVal(val) {
     return { type: 2, val: val.toLowerCase() };
 }
 
-function enableTableSorting(tableId) {
+function deriveSortField(text) {
+    if (!text) return '';
+    const clean = text.replace(/[^a-zA-Z0-9]/g, ' ').trim().toLowerCase();
+    if (clean === 'id' || clean.startsWith('id ')) return 'id';
+    if (clean.includes('customer') || clean.includes('name') || clean.includes('cliente')) return 'cliente';
+    if (clean.includes('plate') || clean.includes('placa') || clean.includes('reg') || clean.includes('motorbike')) return 'placa';
+    if (clean.includes('due date') || clean.includes('vencimento')) return 'data_vencimento';
+    if (clean.includes('payment') || clean.includes('pagamento')) return 'data_pagamento';
+    if (clean.includes('mot')) return 'vencimento_mot';
+    if (clean.includes('tax')) return 'vencimento_tax';
+    if (clean.includes('amount') || clean.includes('valor')) return 'valor';
+    if (clean.includes('rent')) return 'valor_aluguel_semanal';
+    if (clean.includes('collection') || clean.includes('start')) return 'data_retirada';
+    if (clean.includes('return')) return 'data_devolucao';
+    if (clean.includes('date') || clean.includes('data')) return 'data';
+    if (clean.includes('status')) return 'status';
+    if (clean.includes('type') || clean.includes('tipo')) return 'tipo';
+    if (clean.includes('model') || clean.includes('modelo')) return 'modelo';
+    if (clean.includes('colour') || clean.includes('color') || clean.includes('cor')) return 'cor';
+    if (clean.includes('phone') || clean.includes('telefone')) return 'telefone';
+    if (clean.includes('email')) return 'email';
+    if (clean.includes('address') || clean.includes('endereco')) return 'endereco';
+    return clean.replace(/\s+/g, '_');
+}
+
+function setTableSortIndicator(tableId, field, order) {
     const table = document.getElementById(tableId);
     if (!table) return;
+    const thead = table.querySelector('thead');
+    if (!thead) return;
+    const ths = thead.querySelectorAll('th');
+    ths.forEach(th => {
+        const thField = th.getAttribute('data-sort-field') || deriveSortField(th.textContent);
+        if (thField === field) {
+            th.classList.remove('sorted-asc', 'sorted-desc');
+            th.classList.add(order === 'desc' ? 'sorted-desc' : 'sorted-asc');
+            const ind = th.querySelector('.sort-indicator');
+            if (ind) ind.textContent = (order === 'desc') ? '▼' : '▲';
+        } else {
+            th.classList.remove('sorted-asc', 'sorted-desc');
+            const ind = th.querySelector('.sort-indicator');
+            if (ind) ind.textContent = '⇅';
+        }
+    });
+}
+
+function enableTableSorting(tableId, onSortCallback) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+
+    if (typeof onSortCallback === 'function') {
+        table._onSortCallback = onSortCallback;
+    }
 
     const thead = table.querySelector('thead');
     if (!thead) return;
@@ -86,12 +136,12 @@ function enableTableSorting(tableId) {
     headers.forEach((th, index) => {
         const title = th.textContent.trim().toLowerCase();
         // Ignore action / non-sortable columns
-        if (title.includes('action') || title === 'actions' || title === 'edit' || title.includes('view') || title === 'documents' || title === 'doc' || title === 'docs') {
+        if (title.includes('action') || title === 'actions' || title === 'edit' || title.includes('view') || title === 'documents' || title === 'doc' || title === 'docs' || title === 'photos' || title === 'observations') {
             return;
         }
 
         th.classList.add('sortable-th');
-        th.setAttribute('title', 'Click to sort');
+        th.setAttribute('title', 'Click to sort entire table');
         if (!th.querySelector('.sort-indicator')) {
             const indicator = document.createElement('span');
             indicator.className = 'sort-indicator';
@@ -103,7 +153,30 @@ function enableTableSorting(tableId) {
         th._hasSortListener = true;
 
         th.addEventListener('click', () => {
-            sortTableByColumn(table, index);
+            const sortField = th.getAttribute('data-sort-field') || deriveSortField(th.textContent);
+            const isAsc = th.classList.contains('sorted-asc');
+            const newOrder = isAsc ? 'desc' : 'asc';
+
+            // Reset other headers
+            headers.forEach(h => {
+                h.classList.remove('sorted-asc', 'sorted-desc');
+                const ind = h.querySelector('.sort-indicator');
+                if (ind) ind.textContent = '⇅';
+            });
+
+            th.classList.add(newOrder === 'desc' ? 'sorted-desc' : 'sorted-asc');
+            const activeInd = th.querySelector('.sort-indicator');
+            if (activeInd) activeInd.textContent = (newOrder === 'desc') ? '▼' : '▲';
+
+            // Server-side sort callback prioritized
+            if (typeof table._onSortCallback === 'function') {
+                table._onSortCallback(sortField, newOrder);
+            } else if (typeof window[`onSort_${tableId}`] === 'function') {
+                window[`onSort_${tableId}`](sortField, newOrder);
+            } else {
+                // Client-side fallback if no server callback attached
+                sortTableByColumn(table, index);
+            }
         });
     });
 }

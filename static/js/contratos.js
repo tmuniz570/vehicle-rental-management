@@ -1,5 +1,7 @@
 let paginaAtual = 1;
 let termoBusca = '';
+let sortCol = 'id';
+let sortOrder = 'desc';
 
 async function carregarContratos() {
     const tbody = document.querySelector('#contratosTable tbody');
@@ -9,7 +11,7 @@ async function carregarContratos() {
         const filterStatus = document.getElementById('filterStatus');
         const statusVal = filterStatus ? filterStatus.value : 'open';
         
-        let url = `/api/contratos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}`;
+        let url = `/api/contratos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}&sort_by=${encodeURIComponent(sortCol)}&sort_order=${encodeURIComponent(sortOrder)}`;
         if (statusVal === 'open') {
             url += '&nao_finalizados=true';
         } else if (statusVal !== 'all') {
@@ -73,8 +75,8 @@ async function carregarContratos() {
         if(btnPrev) btnPrev.disabled = data.pagina_atual <= 1;
         if(btnNext) btnNext.disabled = data.pagina_atual >= data.paginas;
 
-        if (typeof enableTableSorting === 'function') {
-            enableTableSorting('contratosTable');
+        if (typeof setTableSortIndicator === 'function') {
+            setTableSortIndicator('contratosTable', sortCol, sortOrder);
         }
         
     } catch(e) {
@@ -95,6 +97,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (paramStatus.toLowerCase() === 'completed') {
             filterStatus.value = 'Completed';
         }
+    }
+
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('contratosTable', (field, order) => {
+            sortCol = field;
+            sortOrder = order;
+            paginaAtual = 1;
+            carregarContratos();
+        });
     }
 
     carregarContratos();

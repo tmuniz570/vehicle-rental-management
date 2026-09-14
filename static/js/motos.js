@@ -1,5 +1,7 @@
 let paginaAtual = 1;
 let termoBusca = '';
+let sortCol = 'placa';
+let sortOrder = 'asc';
 
 function formatExpiryBadge(dateStr) {
     if (!dateStr) return '<span style="color:var(--text-secondary); opacity:0.6;">-</span>';
@@ -27,7 +29,7 @@ async function carregarMotos() {
     const paginationInfo = document.getElementById('paginationInfo');
     
     try {
-        const res = await fetch(`/api/motos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}`);
+        const res = await fetch(`/api/motos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}&sort_by=${encodeURIComponent(sortCol)}&sort_order=${encodeURIComponent(sortOrder)}`);
         const data = await res.json();
         const motos = data.itens || [];
         
@@ -89,8 +91,8 @@ async function carregarMotos() {
                 modal.style.display = 'flex';
             });
         });
-        if (typeof enableTableSorting === 'function') {
-            enableTableSorting('motosTable');
+        if (typeof setTableSortIndicator === 'function') {
+            setTableSortIndicator('motosTable', sortCol, sortOrder);
         }
         
     } catch(e) {
@@ -99,6 +101,15 @@ async function carregarMotos() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('motosTable', (field, order) => {
+            sortCol = field;
+            sortOrder = order;
+            paginaAtual = 1;
+            carregarMotos();
+        });
+    }
+
     carregarMotos();
     
     // Pagination Buttons

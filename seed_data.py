@@ -91,27 +91,31 @@ def seed():
         hoje = datetime.utcnow()
         hoje_date = hoje.date()
 
-        print("Seeding expanded fleet of 18 motorbikes (FF Motors Birmingham)...")
-        # Fleet of 18 bikes: ~14 rented, 3 available, 1 maintenance
+        print("Seeding fleet with diverse operational alert states (FF Motors Birmingham)...")
+        # Fleet of 18 bikes covering all states:
+        # - Available bikes (some fresh, one with MOT expiring soon)
+        # - Rented bikes (some fresh, one with Tax expiring soon, one with insurance cancelled, one with 15-day check overdue)
+        # - Maintenance bikes (one with MOT already expired!)
         motos_data = [
+            # (plate, model, colour, status, mot_days_ahead, tax_days_ahead, scenario_note)
             ("XX10YYY", "Honda Forza 300", "Blue Metallic", MotoStatus.RENTED.value, 240, 210),
             ("FF27MOT", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 300, 270),
-            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150), # Yellow MOT alert (18d)
-            ("WM23PCX", "Honda PCX 125", "Silver Frost", MotoStatus.AVAILABLE.value, 330, 330),
-            ("BM19WKP", "Honda Vision 110", "Red Gloss", MotoStatus.MAINTENANCE.value, -4, 90), # Expired MOT (-4d)
-            ("BV21XKT", "Honda PCX 125", "Matt Black", MotoStatus.RENTED.value, 180, 14), # Yellow Tax alert (14d)
+            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150),  # YELLOW ALERT: MOT due in 18 days!
+            ("WM23PCX", "Honda PCX 125", "Silver Frost", MotoStatus.AVAILABLE.value, 330, 330),     # AVAILABLE: 100% valid
+            ("BM19WKP", "Honda Vision 110", "Red Gloss", MotoStatus.MAINTENANCE.value, -4, 90),     # RED ALERT: Expired MOT (-4 days)!
+            ("BV21XKT", "Honda PCX 125", "Matt Black", MotoStatus.RENTED.value, 180, 14),           # YELLOW ALERT: Road Tax due in 14 days!
             ("BW71FGH", "Yamaha NMAX 125", "Phantom Blue", MotoStatus.RENTED.value, 210, 190),
-            ("BL20ZTR", "Honda Vision 110", "Moondust Grey", MotoStatus.RENTED.value, 270, 240),
+            ("BL20ZTR", "Honda Vision 110", "Moondust Grey", MotoStatus.RENTED.value, 270, 240),    # CONTRACT ALERT: 15-day insurance check due!
             ("BN22LKP", "Honda PCX 125", "Pearl Jasmine White", MotoStatus.RENTED.value, 310, 290),
             ("BP23XMN", "Yamaha XMAX 125", "Icon Blue", MotoStatus.RENTED.value, 340, 310),
-            ("BX69VTR", "Honda Forza 125", "Matt Cynos Grey", MotoStatus.RENTED.value, 160, 140),
-            ("WM22KLJ", "Piaggio Liberty 125", "Nero Lucido", MotoStatus.RENTED.value, 220, 200),
-            ("WN21TYU", "Honda Vision 110", "Candy Luster Red", MotoStatus.RENTED.value, 290, 260),
+            ("BX69VTR", "Honda Forza 125", "Matt Cynos Grey", MotoStatus.RENTED.value, 160, 140),  # RED ALERT: Insurance CANCELLED!
+            ("WM22KLJ", "Piaggio Liberty 125", "Nero Lucido", MotoStatus.RENTED.value, 220, 200),  # OVERDUE ALERT: 2 weeks rent behind (£170)!
+            ("WN21TYU", "Honda Vision 110", "Candy Luster Red", MotoStatus.RENTED.value, 290, 260),# OVERDUE ALERT: 1 week rent behind (£80)!
             ("WO72HJK", "Honda PCX 125", "Matt Dim Gray", MotoStatus.RENTED.value, 320, 300),
-            ("WP20QWE", "Yamaha NMAX 125", "Anvil Grey", MotoStatus.AVAILABLE.value, 250, 220),
+            ("WP20QWE", "Yamaha NMAX 125", "Anvil Grey", MotoStatus.AVAILABLE.value, 250, 220),     # AVAILABLE: 100% valid
             ("WR23ZXC", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 360, 330),
             ("WT21OPL", "Honda PCX 125", "Matte Galaxy Black", MotoStatus.RENTED.value, 190, 170),
-            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250), # Just returned from contract 14
+            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250),     # AVAILABLE: Just returned from contract
         ]
         
         motos = {}
@@ -128,67 +132,77 @@ def seed():
             motos[placa] = m
         db.session.flush()
 
-        print("Seeding clients with Birmingham UK addresses & documents...")
-        clientes_data = [
-            ("Thiago Brandao", "07360469902", "thiago.brandao@example.com", "34 Harrow Road, Kings Heath, Birmingham B14 7RL"),
-            ("Mohamed da Silva", "07360123456", "mohamed.silva@example.com", "45 Digbeth Avenue, Birmingham B5 6DY"),
-            ("Alexandre Smith", "07400987654", "alex.smith@example.com", "88 Broad Street, Birmingham B1 2HF"),
-            ("Lucas Oliveira", "07512345678", "lucas.oliveira@example.com", "12 Moseley Road, Highgate, Birmingham B12 0HG"),
-            ("Gabriel Santos", "07890123456", "gabriel.santos@example.com", "77 Stratford Road, Sparkhill, Birmingham B11 4DA"),
-            ("Mateus Ferreira", "07701928374", "mateus.ferreira@example.com", "104 Alcester Road, Moseley, Birmingham B13 8EE"),
-            ("Bruno Carvalho", "07911223344", "bruno.carvalho@example.com", "23 Soho Road, Handsworth, Birmingham B21 9SN"),
-            ("Rafael Costa", "07455667788", "rafael.costa@example.com", "56 Harborne High Street, Birmingham B17 9NE"),
-            ("Leonardo Souza", "07333444555", "leonardo.souza@example.com", "19 Bristol Road, Edgbaston, Birmingham B5 7TT"),
-            ("David Johnson", "07888999000", "david.johnson@example.com", "82 Coventry Road, Small Heath, Birmingham B10 0UG"),
-            ("Tariq Al-Mansoor", "07555666777", "tariq.mansoor@example.com", "41 Erdington High Street, Birmingham B23 6RH"),
-            ("Felipe Mendes", "07999888777", "felipe.mendes@example.com", "15 Pershore Road, Stirchley, Birmingham B30 2BU"),
-            ("Rodrigo Lima", "07322114455", "rodrigo.lima@example.com", "93 Hagley Road, Edgbaston, Birmingham B16 8QG"),
-            ("Carlos Eduardo", "07844332211", "carlos.eduardo@example.com", "62 Aston Expressway, Birmingham B6 4DA"),
-            ("Anderson Silva", "07777888999", "anderson.silva@example.com", "18 Walsall Road, Perry Barr, Birmingham B42 1SF"),
-            ("Victor Hugo", "07900112233", "victor.hugo@example.com", "50 Jewellery Quarter, Birmingham B18 6EW"),
+        print("Seeding clients with diverse document combinations (Full Licence, CBT, Incomplete, Missing Back)...")
+        # Client situations:
+        # 1. Full UK Licence: Front + Back + Address (No CBT needed)
+        # 2. Provisional Licence with CBT: Front + Back + CBT + Address
+        # 3. Incomplete: Missing Back of Licence (Only Front + Address)
+        # 4. Incomplete: Missing Proof of Address (Front + Back + CBT)
+        # 5. New lead / Initial: Only Front uploaded
+        clientes_specs = [
+            # (name, phone, email, address, has_front, has_back, has_cbt, has_addr, description)
+            ("Thiago Brandao", "07360469902", "thiago.brandao@example.com", "34 Harrow Road, Kings Heath, Birmingham B14 7RL", True, True, False, True, "Full UK Licence (Front + Back + Address)"),
+            ("Mohamed da Silva", "07360123456", "mohamed.silva@example.com", "45 Digbeth Avenue, Birmingham B5 6DY", True, True, True, True, "Provisional + CBT Courier (All 4 docs complete)"),
+            ("Alexandre Smith", "07400987654", "alex.smith@example.com", "88 Broad Street, Birmingham B1 2HF", True, True, False, True, "Full UK Driving Licence (Full A2)"),
+            ("Lucas Oliveira", "07512345678", "lucas.oliveira@example.com", "12 Moseley Road, Highgate, Birmingham B12 0HG", True, False, False, True, "MISSING BACK SIDE: Only Front + Address uploaded"),
+            ("Gabriel Santos", "07890123456", "gabriel.santos@example.com", "77 Stratford Road, Sparkhill, Birmingham B11 4DA", True, True, True, True, "Provisional + CBT (All 4 docs complete)"),
+            ("Mateus Ferreira", "07701928374", "mateus.ferreira@example.com", "104 Alcester Road, Moseley, Birmingham B13 8EE", True, True, False, True, "Full UK Licence (Front + Back + Address)"),
+            ("Bruno Carvalho", "07911223344", "bruno.carvalho@example.com", "23 Soho Road, Handsworth, Birmingham B21 9SN", True, True, True, False, "MISSING ADDRESS: Front + Back + CBT (No Address)"),
+            ("Rafael Costa", "07455667788", "rafael.costa@example.com", "56 Harborne High Street, Birmingham B17 9NE", True, True, True, True, "Provisional + CBT (All 4 docs complete)"),
+            ("Leonardo Souza", "07333444555", "leonardo.souza@example.com", "19 Bristol Road, Edgbaston, Birmingham B5 7TT", True, True, False, True, "Full UK Driving Licence (Front + Back + Address)"),
+            ("David Johnson", "07888999000", "david.johnson@example.com", "82 Coventry Road, Small Heath, Birmingham B10 0UG", True, False, False, False, "NEW LEAD: Only Licence Front uploaded"),
+            ("Tariq Al-Mansoor", "07555666777", "tariq.mansoor@example.com", "41 Erdington High Street, Birmingham B23 6RH", True, True, True, True, "Provisional + CBT (All 4 docs complete)"),
+            ("Felipe Mendes", "07999888777", "felipe.mendes@example.com", "15 Pershore Road, Stirchley, Birmingham B30 2BU", True, True, False, True, "Full UK Licence (Front + Back + Address)"),
+            ("Rodrigo Lima", "07322114455", "rodrigo.lima@example.com", "93 Hagley Road, Edgbaston, Birmingham B16 8QG", True, True, True, True, "Provisional + CBT (All 4 docs complete)"),
+            ("Carlos Eduardo", "07844332211", "carlos.eduardo@example.com", "62 Aston Expressway, Birmingham B6 4DA", True, True, False, True, "Full UK Licence (Front + Back + Address)"),
+            ("Anderson Silva", "07777888999", "anderson.silva@example.com", "18 Walsall Road, Perry Barr, Birmingham B42 1SF", True, True, False, True, "Completed contract client (Full Licence)"),
+            ("Victor Hugo", "07900112233", "victor.hugo@example.com", "50 Jewellery Quarter, Birmingham B18 6EW", True, True, True, True, "Quarantine deposit client (All 4 docs)"),
         ]
 
         clients = []
-        for nome, tel, email, endereco in clientes_data:
+        for nome, tel, email, endereco, has_front, has_back, has_cbt, has_addr, desc in clientes_specs:
             cl = Client(
                 nome=nome,
                 telefone=tel,
                 email=email,
                 endereco=endereco,
-                url_habilitacao="/static/uploads/demo_driving_licence.webp",
-                url_comprovante_endereco="/static/uploads/demo_proof_address.webp"
+                url_habilitacao="/static/uploads/demo_driving_licence.webp" if has_front else None,
+                url_habilitacao_verso="/static/uploads/demo_licence_back.webp" if has_back else None,
+                url_cbt="/static/uploads/demo_cbt_certificate.webp" if has_cbt else None,
+                url_comprovante_endereco="/static/uploads/demo_proof_address.webp" if has_addr else None
             )
             db.session.add(cl)
             clients.append(cl)
         db.session.flush()
 
-        print("Seeding realistic contracts, financial statements & inspections...")
+        print("Seeding diverse contract scenarios (Up to date, Overdue, Cancelled insurance, 15-day check due, Quarantine, Completed)...")
         staff_pool = [u_admin, u_staff1, u_staff2]
 
         contracts_specs = [
-            # (client_idx, plate, weeks_active, rent_val, deposit_val, status, pay_day, ins_status, ins_days_ago, notes)
-            (0, "XX10YYY", 4, 140.0, 400.0, ContractStatus.ACTIVE.value, 4, "Valid", 4, "Honda Forza 300 - Premium rental"),
-            (1, "FF27MOT", 2, 80.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 2, "Honda Vision 110 - Delivery contract"),
-            (3, "BV21XKT", 6, 95.0, 350.0, ContractStatus.ACTIVE.value, 0, "Valid", 6, "Honda PCX 125 - UberEats courier"),
-            (4, "BW71FGH", 3, 95.0, 350.0, ContractStatus.ACTIVE.value, 1, "Valid", 1, "Yamaha NMAX 125 - Deliveroo rider"),
-            (5, "BL20ZTR", 8, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 18, "Vision 110 - Triggers 15-day check alert!"),
-            (6, "BN22LKP", 5, 90.0, 350.0, ContractStatus.ACTIVE.value, 2, "Valid", 7, "Honda PCX 125 - Full-time courier"),
-            (7, "BP23XMN", 3, 120.0, 400.0, ContractStatus.ACTIVE.value, 4, "Valid", 3, "Yamaha XMAX 125 - Long-distance delivery"),
-            (8, "BX69VTR", 4, 110.0, 400.0, ContractStatus.ACTIVE.value, 3, "Cancelled", 1, "Forza 125 - FLAGGED CANCELLED INSURANCE ALERT!"),
-            (9, "WM22KLJ", 7, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 10, "Piaggio Liberty 125 - City commuter"),
-            (10, "WN21TYU", 5, 80.0, 300.0, ContractStatus.ACTIVE.value, 5, "Valid", 9, "Vision 110 - JustEat courier"),
-            (11, "WO72HJK", 2, 95.0, 350.0, ContractStatus.ACTIVE.value, 4, "Valid", 4, "PCX 125 - Courier agreement"),
-            (12, "WR23ZXC", 6, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 11, "Vision 110 - Regular customer"),
-            (13, "WT21OPL", 4, 90.0, 350.0, ContractStatus.ACTIVE.value, 0, "Valid", 8, "PCX 125 - Active contract"),
-            (14, "WU22VBN", 10, 95.0, 350.0, ContractStatus.DEPOSIT_HOLD.value, 4, "Valid", 5, "NMAX 125 - Returned, deposit in 14-day hold"),
-            (15, "BM19WKP", 12, 80.0, 300.0, ContractStatus.COMPLETED.value, 4, "Valid", 30, "Vision 110 - Completed contract, refunded"),
+            # (client_idx, plate, weeks_active, rent_val, deposit_val, status, pay_day, ins_status, ins_days_ago, overdue_weeks, notes)
+            (0, "XX10YYY", 4, 140.0, 400.0, ContractStatus.ACTIVE.value, 4, "Valid", 4, 0, "Honda Forza 300 - Premium rental, 100% up to date"),
+            (1, "FF27MOT", 2, 80.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 2, 0, "Honda Vision 110 - Delivery rider, up to date"),
+            (2, "WM23PCX", 3, 90.0, 350.0, ContractStatus.COMPLETED.value, 4, "Valid", 25, 0, "Past contract with £50 damage deduction (£300 refunded)"),
+            (3, "BV21XKT", 6, 95.0, 350.0, ContractStatus.ACTIVE.value, 0, "Valid", 6, 0, "Honda PCX 125 - Bike has Road Tax due in 14 days"),
+            (4, "BW71FGH", 3, 95.0, 350.0, ContractStatus.ACTIVE.value, 1, "Valid", 1, 0, "Yamaha NMAX 125 - Up to date, recently checked"),
+            (5, "BL20ZTR", 8, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 18, 0, "ALERT: 15-Day Insurance Check overdue (checked 18 days ago)!"),
+            (6, "BN22LKP", 5, 90.0, 350.0, ContractStatus.ACTIVE.value, 2, "Valid", 7, 0, "Honda PCX 125 - Up to date, full-time courier"),
+            (7, "BP23XMN", 3, 120.0, 400.0, ContractStatus.ACTIVE.value, 4, "Valid", 3, 0, "Yamaha XMAX 125 - Up to date"),
+            (8, "BX69VTR", 4, 110.0, 400.0, ContractStatus.ACTIVE.value, 3, "Cancelled", 1, 0, "CRITICAL ALERT: Insurance CANCELLED! Action required"),
+            (9, "WM22KLJ", 7, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 10, 2, "OVERDUE ALERT: 2 weeks late (£170 overdue in reports)"),
+            (10, "WN21TYU", 5, 80.0, 300.0, ContractStatus.ACTIVE.value, 5, "Valid", 9, 1, "OVERDUE ALERT: 1 week late (£80 overdue in reports)"),
+            (11, "WO72HJK", 2, 95.0, 350.0, ContractStatus.ACTIVE.value, 4, "Valid", 4, 0, "PCX 125 - Up to date courier"),
+            (12, "WR23ZXC", 6, 85.0, 300.0, ContractStatus.ACTIVE.value, 4, "Valid", 11, 0, "Vision 110 - Regular customer, on time"),
+            (13, "WT21OPL", 4, 90.0, 350.0, ContractStatus.ACTIVE.value, 0, "Valid", 8, 0, "PCX 125 - Active contract"),
+            (14, "BM19WKP", 12, 80.0, 300.0, ContractStatus.COMPLETED.value, 4, "Valid", 30, 0, "COMPLETED: Full £300 deposit refunded via Bank Transfer"),
+            (15, "WU22VBN", 10, 95.0, 350.0, ContractStatus.DEPOSIT_HOLD.value, 4, "Valid", 5, 0, "DEPOSIT HOLD: Bike returned 5 days ago, £350 in 14-day hold"),
         ]
 
         all_logs = []
         created_contracts = []
 
         for idx, spec in enumerate(contracts_specs):
-            cl_idx, plate, weeks_active, rent_val, dep_val, c_status, pay_day, ins_status, ins_days_ago, desc = spec
+            cl_idx, plate, weeks_active, rent_val, dep_val, c_status, pay_day, ins_status, ins_days_ago, overdue_wks, desc = spec
             c_client = clients[cl_idx]
             staff_member = staff_pool[idx % len(staff_pool)]
             retirada = hoje - timedelta(days=weeks_active * 7)
@@ -208,6 +222,7 @@ def seed():
                 valor_aluguel_semanal=rent_val,
                 status=c_status,
                 url_seguro="/static/uploads/demo_insurance_forza.webp",
+                url_comprovante_deposito="/static/uploads/demo_proof_address.webp",
                 criado_por_nome=staff_member.nome,
                 data_ultima_checagem_seguro=hoje_date - timedelta(days=ins_days_ago),
                 status_seguro=ins_status,
@@ -217,7 +232,7 @@ def seed():
             db.session.flush()
             created_contracts.append(ct)
 
-            # Contract Creation Log
+            # Contract Creation Audit Log
             all_logs.append(AuditLog(
                 data_hora=retirada,
                 id_usuario=staff_member.id,
@@ -245,8 +260,22 @@ def seed():
             # Weekly Rent Transactions
             for w in range(weeks_active):
                 venc = retirada + timedelta(days=w * 7)
-                if venc <= hoje - timedelta(days=7):
-                    # Past week: paid
+                is_overdue_week = (overdue_wks > 0) and (w >= weeks_active - overdue_wks)
+
+                if is_overdue_week:
+                    # Explicitly overdue transaction: dueDate is in the past, status is PENDING!
+                    t_rent = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.RENT.value,
+                        data_vencimento=venc,
+                        data_pagamento=None,
+                        valor=rent_val,
+                        status=TransactionStatus.PENDING.value,
+                        forma_pagamento=None,
+                        registrado_por_nome=None
+                    )
+                elif venc <= hoje - timedelta(days=7):
+                    # Past week: paid on time
                     t_rent = FinancialTransaction(
                         id_contrato=ct.id,
                         tipo=TransactionType.RENT.value,
@@ -258,20 +287,19 @@ def seed():
                         registrado_por_nome=staff_pool[(w + idx) % len(staff_pool)].nome
                     )
                 elif venc <= hoje:
-                    # Current week: some paid, some pending
-                    is_paid = (idx % 3 != 0)
+                    # Current week: on time
                     t_rent = FinancialTransaction(
                         id_contrato=ct.id,
                         tipo=TransactionType.RENT.value,
                         data_vencimento=venc,
-                        data_pagamento=venc if is_paid else None,
+                        data_pagamento=venc,
                         valor=rent_val,
-                        status=TransactionStatus.PAID.value if is_paid else TransactionStatus.PENDING.value,
-                        forma_pagamento="Card" if is_paid else None,
-                        registrado_por_nome=staff_member.nome if is_paid else None
+                        status=TransactionStatus.PAID.value,
+                        forma_pagamento="Card",
+                        registrado_por_nome=staff_member.nome
                     )
                 else:
-                    # Future scheduled week
+                    # Future week scheduled
                     t_rent = FinancialTransaction(
                         id_contrato=ct.id,
                         tipo=TransactionType.RENT.value,
@@ -293,7 +321,7 @@ def seed():
             )
             db.session.add(insp_checkout)
 
-            # Special cases: Deposit Hold and Completed
+            # Special Cases: Deposit Hold, Completed Full, and Completed with Damage Deduction
             if c_status == ContractStatus.DEPOSIT_HOLD.value:
                 # Returned bike check-in
                 insp_checkin = Inspection(
@@ -313,6 +341,43 @@ def seed():
                     entidade="Contract",
                     entidade_id=str(ct.id),
                     descricao=f"Moto {plate} devolvida no Contrato #{ct.id}. Depósito de £{dep_val:.2f} retido em quarentena de 14 dias.",
+                    ip_origem="127.0.0.1"
+                ))
+
+            elif c_status == ContractStatus.COMPLETED.value and idx == 2:
+                # Completed with Damage Deduction (£50 damage deduction, £300 refunded)
+                t_deduction = FinancialTransaction(
+                    id_contrato=ct.id,
+                    tipo=TransactionType.FINE.value,
+                    data_vencimento=devolucao,
+                    data_pagamento=devolucao,
+                    valor=50.0,
+                    status=TransactionStatus.PAID.value,
+                    forma_pagamento="Damage / Deposit Deduction",
+                    registrado_por_nome=u_admin.nome
+                )
+                db.session.add(t_deduction)
+
+                t_refund = FinancialTransaction(
+                    id_contrato=ct.id,
+                    tipo=TransactionType.DEPOSIT_REFUND.value,
+                    data_vencimento=devolucao + timedelta(days=14),
+                    data_pagamento=devolucao + timedelta(days=14),
+                    valor=dep_val - 50.0,
+                    status=TransactionStatus.PAID.value,
+                    forma_pagamento="Bank Transfer",
+                    registrado_por_nome=u_admin.nome
+                )
+                db.session.add(t_refund)
+
+                all_logs.append(AuditLog(
+                    data_hora=devolucao + timedelta(days=14),
+                    id_usuario=u_admin.id,
+                    usuario_nome=u_admin.nome,
+                    acao="REFUND_DEPOSIT",
+                    entidade="Contract",
+                    entidade_id=str(ct.id),
+                    descricao=f"Devolução parcial de caução: £50.00 deduzidos por danos no retrovisor, £{dep_val - 50.0:.2f} restituídos via Bank Transfer no Contrato #{ct.id}",
                     ip_origem="127.0.0.1"
                 ))
 
@@ -336,12 +401,12 @@ def seed():
                     acao="REFUND_DEPOSIT",
                     entidade="Contract",
                     entidade_id=str(ct.id),
-                    descricao=f"Devolução de caução de £{dep_val:.2f} confirmada por {u_admin.nome} via Bank Transfer no Contrato #{ct.id}",
+                    descricao=f"Devolução integral de caução de £{dep_val:.2f} confirmada por {u_admin.nome} via Bank Transfer no Contrato #{ct.id}",
                     ip_origem="127.0.0.1"
                 ))
 
         # Add recent staff payment received logs for rich audit stream
-        recent_payments = FinancialTransaction.query.filter_by(status=TransactionStatus.PAID.value).limit(8).all()
+        recent_payments = FinancialTransaction.query.filter_by(status=TransactionStatus.PAID.value).limit(10).all()
         for p in recent_payments:
             all_logs.append(AuditLog(
                 data_hora=p.data_pagamento or hoje - timedelta(days=2),
@@ -358,14 +423,24 @@ def seed():
         db.session.commit()
 
         print("\n=======================================================")
-        print("🎉 COMPREHENSIVE SEED COMPLETED SUCCESSFULLY!")
-        print(f"✓ {User.query.count()} Staff Accounts (Thiago Brandão, Carlos Silva, Emma Watson)")
-        print(f"✓ {Motorcycle.query.count()} Motorbikes in Birmingham Fleet (~14 Rented, 3 Available, 1 Maintenance)")
-        print(f"✓ {Client.query.count()} Clients with full UK addresses & KYC document proofs")
-        print(f"✓ {Contract.query.count()} Contracts (Active, 14-day Deposit Hold, and Completed)")
-        print(f"✓ {FinancialTransaction.query.count()} Financial Ledger Transactions (Deposits, Rents, Refunds)")
-        print(f"✓ {Inspection.query.count()} Inspections with Multi-angle galleries & staff operator attribution")
-        print(f"✓ {AuditLog.query.count()} Audit Log activities across the internal timeline")
+        print("🎉 RICH REALISTIC SEED COMPLETED SUCCESSFULLY!")
+        print(f"✓ {User.query.count()} Staff Accounts (Thiago Brandão [Admin], Carlos Silva, Emma Watson)")
+        print(f"✓ {Motorcycle.query.count()} Motorbikes in Birmingham Fleet:")
+        print("    - 4 Available (including 1 with MOT due in 18d)")
+        print("    - 13 Rented (including 1 with Tax due in 14d, 1 with Cancelled Insurance, 1 with 15-day check overdue)")
+        print("    - 1 Maintenance (with MOT expired -4 days)")
+        print(f"✓ {Client.query.count()} Clients with varied document profiles:")
+        print("    - Full UK Licences (Front + Back + Address, no CBT)")
+        print("    - Provisional + CBT Couriers (Front + Back + CBT + Address)")
+        print("    - Incomplete (Missing Back, Missing Address, or New Lead)")
+        print(f"✓ {Contract.query.count()} Contracts:")
+        print("    - Up to date active rentals")
+        print("    - Overdue rentals (1 week and 2 weeks behind in rent)")
+        print("    - 14-day Deposit Hold (quarantine after bike return)")
+        print("    - Completed rentals (1 with £50 damage deduction, 1 with full refund)")
+        print(f"✓ {FinancialTransaction.query.count()} Financial Ledger Transactions")
+        print(f"✓ {Inspection.query.count()} Check-out and Check-in Inspections with multi-photo galleries")
+        print(f"✓ {AuditLog.query.count()} Audit Log activities across the timeline")
         print("=======================================================\n")
 
 if __name__ == '__main__':

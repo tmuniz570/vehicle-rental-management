@@ -43,6 +43,18 @@
         </select>
     </div>
 
+    <!-- Date Filter Section -->
+    <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.45rem 0.85rem; border-radius: 12px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+        <select id="filterCampoData" style="background: transparent; border: none; color: var(--accent); font-size: 0.85rem; font-weight: 600; outline: none; cursor: pointer; padding-right: 0.25rem;">
+            <option value="vencimento" selected style="background: #1e293b; color: white;">📅 Due Date</option>
+            <option value="pagamento" style="background: #1e293b; color: white;">💳 Payment Date</option>
+        </select>
+        <span style="color: var(--text-secondary); font-size: 0.8rem;">From:</span>
+        <input type="date" id="filterDataInicio" title="Start date" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); padding: 0.35rem 0.5rem; font-size: 0.85rem; outline: none; cursor: pointer;">
+        <span style="color: var(--text-secondary); font-size: 0.8rem;">To:</span>
+        <input type="date" id="filterDataFim" title="End date" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); padding: 0.35rem 0.5rem; font-size: 0.85rem; outline: none; cursor: pointer;">
+    </div>
+
     <button id="btnClearFilters" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem 1rem; border-radius: 12px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
         Clear Filters
     </button>
@@ -52,15 +64,15 @@
     <table id="financeiroTable">
         <thead>
             <tr>
-                <th>ID</th>
-                <th>Contract</th>
-                <th>Customer</th>
-                <th>Motorbike</th>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Due Date</th>
-                <th>Payment Date</th>
-                <th>Status</th>
+                <th data-sort-field="id" style="width: 70px;">ID</th>
+                <th data-sort-field="contrato">Contract</th>
+                <th data-sort-field="cliente">Customer</th>
+                <th data-sort-field="placa">Motorbike</th>
+                <th data-sort-field="tipo">Type</th>
+                <th data-sort-field="valor">Amount</th>
+                <th data-sort-field="data_vencimento">Due Date</th>
+                <th data-sort-field="data_pagamento">Payment Date</th>
+                <th data-sort-field="status">Status</th>
                 <th style="text-align: right;">Actions</th>
             </tr>
         </thead>
