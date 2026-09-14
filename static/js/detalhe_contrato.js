@@ -97,22 +97,58 @@ document.addEventListener('DOMContentLoaded', async () => {
         const docsContainer = document.getElementById('info_cliente_docs');
         if (docsContainer) {
             let docsHtml = '';
+            // Licence Front
             if (data.url_habilitacao) {
                 docsHtml += `
                     <a href="${data.url_habilitacao}" target="_blank" class="btn-action" style="padding: 6px 10px; font-size: 0.78rem; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; border-radius: 6px;">
-                        <span>🪪 Driving Licence (DVLA)</span>
+                        <span>🪪 Licence Front (DVLA)</span>
                         <span style="font-size: 0.75rem;">View ↗</span>
                     </a>
                 `;
             } else {
                 docsHtml += `
                     <div style="padding: 6px 10px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); color: var(--text-secondary); border-radius: 6px;">
-                        <span>🪪 Driving Licence</span>
+                        <span>🪪 Licence Front</span>
                         <span style="font-size: 0.72rem; opacity: 0.6;">Not uploaded</span>
                     </div>
                 `;
             }
 
+            // Licence Back
+            if (data.url_habilitacao_verso) {
+                docsHtml += `
+                    <a href="${data.url_habilitacao_verso}" target="_blank" class="btn-action" style="padding: 6px 10px; font-size: 0.78rem; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; border-radius: 6px;">
+                        <span>🪪 Licence Back (DVLA)</span>
+                        <span style="font-size: 0.75rem;">View ↗</span>
+                    </a>
+                `;
+            } else {
+                docsHtml += `
+                    <div style="padding: 6px 10px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); color: var(--text-secondary); border-radius: 6px;">
+                        <span>🪪 Licence Back</span>
+                        <span style="font-size: 0.72rem; opacity: 0.6;">Not uploaded</span>
+                    </div>
+                `;
+            }
+
+            // CBT Certificate
+            if (data.url_cbt) {
+                docsHtml += `
+                    <a href="${data.url_cbt}" target="_blank" class="btn-action" style="padding: 6px 10px; font-size: 0.78rem; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; border-radius: 6px;">
+                        <span>📜 CBT Certificate</span>
+                        <span style="font-size: 0.75rem;">View ↗</span>
+                    </a>
+                `;
+            } else {
+                docsHtml += `
+                    <div style="padding: 6px 10px; font-size: 0.78rem; display: flex; align-items: center; justify-content: space-between; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); color: var(--text-secondary); border-radius: 6px;">
+                        <span>📜 CBT Certificate</span>
+                        <span style="font-size: 0.72rem; opacity: 0.6;">Not required / None</span>
+                    </div>
+                `;
+            }
+
+            // Proof of Address
             if (data.url_comprovante_endereco) {
                 docsHtml += `
                     <a href="${data.url_comprovante_endereco}" target="_blank" class="btn-action" style="padding: 6px 10px; font-size: 0.78rem; text-decoration: none; display: flex; align-items: center; justify-content: space-between; background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.3); color: #c084fc; border-radius: 6px;">

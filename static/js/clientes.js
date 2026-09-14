@@ -32,9 +32,12 @@ async function carregarClientes() {
         clientes.forEach(c => {
             const tr = document.createElement('tr');
             
-            let docsHtml = '';
-            if(c.url_habilitacao) docsHtml += `<a href="${c.url_habilitacao}" target="_blank" style="color:var(--accent);margin-right:10px;">Driving Licence</a>`;
-            if(c.url_comprovante_endereco) docsHtml += `<br><a href="${c.url_comprovante_endereco}" target="_blank" style="color:var(--accent);margin-right:10px;">Proof of Address</a>`;
+            let docs = [];
+            if(c.url_habilitacao) docs.push(`<a href="${c.url_habilitacao}" target="_blank" style="color:var(--accent); text-decoration:none;" title="Driving Licence Front">🪪 Licence Front</a>`);
+            if(c.url_habilitacao_verso) docs.push(`<a href="${c.url_habilitacao_verso}" target="_blank" style="color:var(--accent); text-decoration:none;" title="Driving Licence Back">🪪 Licence Back</a>`);
+            if(c.url_cbt) docs.push(`<a href="${c.url_cbt}" target="_blank" style="color:#10b981; text-decoration:none;" title="CBT Certificate">📜 CBT</a>`);
+            if(c.url_comprovante_endereco) docs.push(`<a href="${c.url_comprovante_endereco}" target="_blank" style="color:#c084fc; text-decoration:none;" title="Proof of Address">🏠 Address</a>`);
+            const docsHtml = docs.length > 0 ? docs.join('<br>') : '-';
             
             const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${c.nome}" data-tel="${c.telefone}" data-email="${c.email}" data-endereco="${c.endereco || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
@@ -131,33 +134,27 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const extReplacement = isIOS ? '.jpg' : '.webp';
         
-        const hFile = document.getElementById('edit_habilitacao').files[0];
-        if(hFile) {
-            if (hFile.type.startsWith('image/')) {
-                try {
-                    const compressedFile = await imageCompression(hFile, compOptions);
-                    data.append('habilitacao', compressedFile, hFile.name.replace(/\.[^/.]+$/, extReplacement));
-                } catch (err) {
-                    data.append('habilitacao', hFile);
+        const appendEditFile = async (fieldId, formKey) => {
+            const input = document.getElementById(fieldId);
+            if (input && input.files.length > 0) {
+                const file = input.files[0];
+                if (file.type.startsWith('image/')) {
+                    try {
+                        const compressedFile = await imageCompression(file, compOptions);
+                        data.append(formKey, compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
+                    } catch (err) {
+                        data.append(formKey, file);
+                    }
+                } else {
+                    data.append(formKey, file);
                 }
-            } else {
-                data.append('habilitacao', hFile);
             }
-        }
-        
-        const ceFile = document.getElementById('edit_comprovante_endereco').files[0];
-        if(ceFile) {
-            if (ceFile.type.startsWith('image/')) {
-                try {
-                    const compressedFile = await imageCompression(ceFile, compOptions);
-                    data.append('comprovante_endereco', compressedFile, ceFile.name.replace(/\.[^/.]+$/, extReplacement));
-                } catch (err) {
-                    data.append('comprovante_endereco', ceFile);
-                }
-            } else {
-                data.append('comprovante_endereco', ceFile);
-            }
-        }
+        };
+
+        await appendEditFile('edit_habilitacao', 'habilitacao');
+        await appendEditFile('edit_habilitacao_verso', 'habilitacao_verso');
+        await appendEditFile('edit_cbt', 'cbt');
+        await appendEditFile('edit_comprovante_endereco', 'comprovante_endereco');
         
         try {
             const response = await fetch(`/api/clientes/${id}`, { method: 'PUT', body: data });

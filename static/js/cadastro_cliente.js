@@ -34,35 +34,27 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         const extReplacement = isIOS ? '.jpg' : '.webp';
         
-        const habInput = document.getElementById('habilitacao');
-        if (habInput.files.length > 0) {
-            const file = habInput.files[0];
-            if (file.type.startsWith('image/')) {
-                try {
-                    const compressedFile = await imageCompression(file, compOptions);
-                    formData.append('habilitacao', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
-                } catch (err) {
-                    formData.append('habilitacao', file);
+        const appendFile = async (fieldId, formKey) => {
+            const input = document.getElementById(fieldId);
+            if (input && input.files.length > 0) {
+                const file = input.files[0];
+                if (file.type.startsWith('image/')) {
+                    try {
+                        const compressedFile = await imageCompression(file, compOptions);
+                        formData.append(formKey, compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
+                    } catch (err) {
+                        formData.append(formKey, file);
+                    }
+                } else {
+                    formData.append(formKey, file);
                 }
-            } else {
-                formData.append('habilitacao', file);
             }
-        }
-        
-        const compEndInput = document.getElementById('comprovante_endereco');
-        if (compEndInput && compEndInput.files.length > 0) {
-            const file = compEndInput.files[0];
-            if (file.type.startsWith('image/')) {
-                try {
-                    const compressedFile = await imageCompression(file, compOptions);
-                    formData.append('comprovante_endereco', compressedFile, file.name.replace(/\.[^/.]+$/, extReplacement));
-                } catch (err) {
-                    formData.append('comprovante_endereco', file);
-                }
-            } else {
-                formData.append('comprovante_endereco', file);
-            }
-        }
+        };
+
+        await appendFile('habilitacao', 'habilitacao');
+        await appendFile('habilitacao_verso', 'habilitacao_verso');
+        await appendFile('cbt', 'cbt');
+        await appendFile('comprovante_endereco', 'comprovante_endereco');
 
         try {
             const response = await fetch('/api/clientes', {

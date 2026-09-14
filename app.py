@@ -123,6 +123,8 @@ app.jinja_env.globals['csrf_token'] = generate_csrf_token
 
 @app.before_request
 def validate_csrf():
+    if app.config.get('TESTING') and not app.config.get('WTF_CSRF_ENABLED', True):
+        return
     if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
         if request.path.startswith('/static/') or request.endpoint == 'custom_static_uploads':
             return
@@ -159,6 +161,8 @@ def check_authentication():
     if request.endpoint in allowed_routes:
         return
     if request.path.startswith('/static/'):
+        return
+    if app.config.get('LOGIN_DISABLED'):
         return
 
     if not current_user.is_authenticated:
@@ -607,6 +611,8 @@ def criar_cliente():
         return jsonify({'error': 'Email already registered', 'erro': 'Email já cadastrado'}), 400
         
     url_hab = None
+    url_hab_verso = None
+    url_cbt = None
     url_comp_end = None
     
     if 'habilitacao' in request.files:
@@ -615,6 +621,20 @@ def criar_cliente():
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_hab = f"/static/uploads/{nome_salvo}"
+
+    if 'habilitacao_verso' in request.files:
+        f = request.files['habilitacao_verso']
+        if f.filename:
+            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_verso_{f.filename}")
+            nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+            url_hab_verso = f"/static/uploads/{nome_salvo}"
+
+    if 'cbt' in request.files:
+        f = request.files['cbt']
+        if f.filename:
+            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_cbt_{f.filename}")
+            nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+            url_cbt = f"/static/uploads/{nome_salvo}"
             
     if 'comprovante_endereco' in request.files:
         f = request.files['comprovante_endereco']
@@ -629,6 +649,8 @@ def criar_cliente():
         email=email,
         endereco=endereco,
         url_habilitacao=url_hab,
+        url_habilitacao_verso=url_hab_verso,
+        url_cbt=url_cbt,
         url_comprovante_endereco=url_comp_end
     )
     db.session.add(novo_cliente)
@@ -701,7 +723,10 @@ def listar_clientes():
     
     itens = [{
         'id': c.id, 'nome': c.nome, 'telefone': c.telefone, 'email': c.email, 'endereco': c.endereco,
-        'url_habilitacao': c.url_habilitacao, 'url_comprovante_endereco': c.url_comprovante_endereco
+        'url_habilitacao': c.url_habilitacao,
+        'url_habilitacao_verso': c.url_habilitacao_verso,
+        'url_cbt': c.url_cbt,
+        'url_comprovante_endereco': c.url_comprovante_endereco
     } for c in paginated.items]
     
     return jsonify({
@@ -741,6 +766,20 @@ def atualizar_cliente(id):
                 nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_habilitacao = f"/static/uploads/{nome_salvo}"
+
+        if 'habilitacao_verso' in request.files:
+            f = request.files['habilitacao_verso']
+            if f.filename:
+                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_verso_{f.filename}")
+                nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+                cliente.url_habilitacao_verso = f"/static/uploads/{nome_salvo}"
+
+        if 'cbt' in request.files:
+            f = request.files['cbt']
+            if f.filename:
+                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_cbt_{f.filename}")
+                nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
+                cliente.url_cbt = f"/static/uploads/{nome_salvo}"
                 
         if 'comprovante_endereco' in request.files:
             f = request.files['comprovante_endereco']
@@ -1103,6 +1142,8 @@ def detalhe_contrato(id):
         'email': cliente.email if cliente else '-',
         'endereco': cliente.endereco if cliente else None,
         'url_habilitacao': cliente.url_habilitacao if cliente else None,
+        'url_habilitacao_verso': cliente.url_habilitacao_verso if cliente else None,
+        'url_cbt': cliente.url_cbt if cliente else None,
         'url_comprovante_endereco': cliente.url_comprovante_endereco if cliente else None,
         'placa': c.placa,
         'modelo': moto.modelo if moto else '-',

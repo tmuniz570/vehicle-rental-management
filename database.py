@@ -86,6 +86,8 @@ class Client(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     endereco = db.Column(db.String(255), nullable=True)
     url_habilitacao = db.Column(db.String(255), nullable=True)
+    url_habilitacao_verso = db.Column(db.String(255), nullable=True)
+    url_cbt = db.Column(db.String(255), nullable=True)
     url_comprovante_endereco = db.Column(db.String(255), nullable=True)
     
     contratos = db.relationship('Contract', backref='cliente', lazy=True)
@@ -211,6 +213,16 @@ def init_db(app):
                     if 'vencimento_tax' not in cols_m:
                         conn.execute(db.text("ALTER TABLE motos ADD COLUMN vencimento_tax DATE"))
                         conn.commit()
+
+                # Clientes
+                if 'clientes' in existing_tables:
+                    cols_cl = [col['name'] for col in inspector.get_columns('clientes')]
+                    if 'url_habilitacao_verso' not in cols_cl:
+                        conn.execute(db.text("ALTER TABLE clientes ADD COLUMN url_habilitacao_verso VARCHAR(255)"))
+                        conn.commit()
+                    if 'url_cbt' not in cols_cl:
+                        conn.execute(db.text("ALTER TABLE clientes ADD COLUMN url_cbt VARCHAR(255)"))
+                        conn.commit()
         except Exception as e:
             print(f"[DB Auto-Migration] Info: {e}")
 
@@ -232,6 +244,8 @@ def delete_file_if_exists(filepath):
 @event.listens_for(Client, 'after_delete')
 def receive_after_delete_client(mapper, connection, target):
     delete_file_if_exists(target.url_habilitacao)
+    delete_file_if_exists(target.url_habilitacao_verso)
+    delete_file_if_exists(target.url_cbt)
     delete_file_if_exists(target.url_comprovante_endereco)
 
 @event.listens_for(Contract, 'after_delete')

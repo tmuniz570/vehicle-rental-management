@@ -38,8 +38,19 @@
 
         <div class="form-row">
             <div class="form-group half">
-                <label for="habilitacao">Driving Licence (Photo/PDF)</label>
+                <label for="habilitacao">Driving Licence - Front (Photo/PDF)</label>
                 <input type="file" id="habilitacao" name="habilitacao" accept="image/*,.pdf" style="padding-top: 10px;">
+            </div>
+            <div class="form-group half">
+                <label for="habilitacao_verso">Driving Licence - Back (Photo/PDF)</label>
+                <input type="file" id="habilitacao_verso" name="habilitacao_verso" accept="image/*,.pdf" style="padding-top: 10px;">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group half">
+                <label for="cbt">CBT Certificate (Photo/PDF) <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Optional / If applicable)</span></label>
+                <input type="file" id="cbt" name="cbt" accept="image/*,.pdf" style="padding-top: 10px;">
             </div>
             <div class="form-group half">
                 <label for="comprovante_endereco">Proof of Address (Photo/PDF)</label>
