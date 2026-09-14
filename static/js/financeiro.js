@@ -83,7 +83,7 @@ async function carregarFinanceiro() {
             } else if (isPending) {
                 statusBadge = '<span class="badge badge-warning">PENDING</span>';
             } else {
-                statusBadge = `<span class="badge">${t.status}</span>`;
+                statusBadge = `<span class="badge">${escapeHtml(t.status)}</span>`;
             }
 
             // Type Badges
@@ -94,7 +94,7 @@ async function carregarFinanceiro() {
             else if (tipoLower === 'fine' || tipoLower === 'multa') tipoBadge = '<span class="badge badge-danger">Fine</span>';
             else if (tipoLower === 'damage' || tipoLower === 'dano') tipoBadge = '<span class="badge badge-warning">Damage</span>';
             else if (tipoLower === 'deposit_refund' || tipoLower === 'devolucao_deposito') tipoBadge = '<span class="badge badge-success">Deposit Refund</span>';
-            else tipoBadge = `<span class="badge">${t.tipo}</span>`;
+            else tipoBadge = `<span class="badge">${escapeHtml(t.tipo)}</span>`;
             
             // Formatted Amount
             const valorFmt = formatoMoeda.format(t.valor);
@@ -145,8 +145,8 @@ async function carregarFinanceiro() {
                         Contract #${t.id_contrato} &rarr;
                     </a>
                 </td>
-                <td style="font-weight:500; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${t.cliente || ''}">${t.cliente || '-'}</td>
-                <td class="nowrap"><span class="badge-plate">${t.placa || '-'}</span></td>
+                <td style="font-weight:500; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(t.cliente || '')}">${escapeHtml(t.cliente || '-')}</td>
+                <td class="nowrap"><span class="badge-plate">${escapeHtml(t.placa || '-')}</span></td>
                 <td class="nowrap">${tipoBadge}</td>
                 <td class="nowrap" style="font-weight:700; font-size:1rem; color:var(--text-primary);">${valorFmt}</td>
                 <td class="nowrap">${celulaVencimento}</td>

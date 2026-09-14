@@ -1,6 +1,9 @@
 import os
 import secrets
 import hmac
+import time
+import threading
+from collections import defaultdict
 from datetime import datetime, timedelta
 from functools import wraps
 from dotenv import load_dotenv
@@ -14,8 +17,9 @@ from flask_login import (
 from database import (
     db, init_db, Contract, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
-    User, AuditLog
+    User, AuditLog, JobExecutionLock
 )
+from sqlalchemy.orm import joinedload
 import werkzeug.utils
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
@@ -35,8 +39,57 @@ else:
     db_uri = 'sqlite:///' + os.path.join(basedir, 'ffmotors.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# SQLite 30-second timeout to prevent database locks under concurrent load
+if "sqlite" in db_uri.lower():
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'connect_args': {'timeout': 30}
+    }
+
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER') or os.path.join(basedir, 'static', 'uploads')
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Strict Upload Security Whitelist
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp', 'pdf'}
+
+def is_allowed_file(filename):
+    if not filename or '.' not in filename:
+        return False
+    ext = filename.rsplit('.', 1)[1].lower()
+    return ext in ALLOWED_EXTENSIONS
+
+# London Timezone Operations
+LONDON_TZ = pytz.timezone('Europe/London')
+
+def get_london_now():
+    """Returns current timezone-aware datetime in Europe/London."""
+    return datetime.now(LONDON_TZ)
+
+def get_london_date():
+    """Returns today's date in Europe/London."""
+    return get_london_now().date()
+
+# Thread-safe Rate Limiting for Login (10 attempts per 15 min per IP)
+LOGIN_ATTEMPTS = defaultdict(list)
+LOGIN_LOCK = threading.Lock()
+MAX_LOGIN_ATTEMPTS = 10
+LOGIN_WINDOW_SECONDS = 15 * 60
+
+def is_ip_rate_limited(ip):
+    now = time.time()
+    with LOGIN_LOCK:
+        attempts = [t for t in LOGIN_ATTEMPTS[ip] if now - t < LOGIN_WINDOW_SECONDS]
+        LOGIN_ATTEMPTS[ip] = attempts
+        return len(attempts) >= MAX_LOGIN_ATTEMPTS
+
+def record_failed_login(ip):
+    now = time.time()
+    with LOGIN_LOCK:
+        LOGIN_ATTEMPTS[ip].append(now)
+
+def clear_failed_logins(ip):
+    with LOGIN_LOCK:
+        LOGIN_ATTEMPTS.pop(ip, None)
 
 # Configurações de Cookie de Sessão
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -52,7 +105,6 @@ mimetypes.add_type('application/pdf', '.pdf')
 mimetypes.add_type('image/jpeg', '.jpg')
 mimetypes.add_type('image/jpeg', '.jpeg')
 mimetypes.add_type('image/png', '.png')
-mimetypes.add_type('image/svg+xml', '.svg')
 
 # Configuração de Autenticação (Flask-Login)
 login_manager = LoginManager()
@@ -64,7 +116,7 @@ login_manager.login_message_category = 'warning'
 @login_manager.user_loader
 def load_user(user_id):
     try:
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
     except Exception:
         return None
 
@@ -152,12 +204,14 @@ def apply_security_headers(response):
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if request.is_secure or request.headers.get('X-Forwarded-Proto') == 'https':
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
     return response
 
 @app.before_request
 def check_authentication():
     # Endpoints públicos permitidos sem autenticação
-    allowed_routes = ['login', 'static', 'custom_static_uploads', 'favicon']
+    allowed_routes = ['login', 'logout', 'static', 'custom_static_uploads', 'favicon']
     if request.endpoint in allowed_routes:
         return
     if request.path.startswith('/static/'):
@@ -176,6 +230,11 @@ def login():
         return redirect(url_for('index'))
         
     if request.method == 'POST':
+        client_ip = request.remote_addr or 'unknown'
+        if is_ip_rate_limited(client_ip):
+            flash('Too many failed login attempts (maximum 10). For security, please wait 15 minutes before trying again.', 'danger')
+            return render_template('login.html', email=request.form.get('email', '')), 429
+
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
         remember = bool(request.form.get('remember'))
@@ -186,18 +245,20 @@ def login():
                 flash('Esta conta de acesso está inativa. Contate o administrador.', 'danger')
                 return render_template('login.html', email=email)
                 
+            clear_failed_logins(client_ip)
             login_user(user, remember=remember)
             next_page = request.args.get('next')
             if not next_page or not next_page.startswith('/'):
                 next_page = url_for('index')
             return redirect(next_page)
         else:
+            record_failed_login(client_ip)
             flash('Credenciais inválidas. Verifique seu e-mail e senha.', 'danger')
             return render_template('login.html', email=email)
             
     return render_template('login.html')
 
-@app.route('/logout')
+@app.route('/logout', methods=['GET', 'POST'])
 def logout():
     logout_user()
     flash('Você saiu do sistema com segurança.', 'info')
@@ -205,6 +266,9 @@ def logout():
 
 @app.route('/static/uploads/<path:filename>')
 def custom_static_uploads(filename):
+    if not is_allowed_file(filename):
+        return jsonify({'error': 'Access denied to this file type', 'erro': 'Acesso negado para este tipo de arquivo'}), 403
+
     uploads_dir = app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads'))
     ext = os.path.splitext(filename)[1].lower()
     mimetype = 'application/octet-stream'
@@ -216,16 +280,15 @@ def custom_static_uploads(filename):
         mimetype = 'image/jpeg'
     elif ext == '.png':
         mimetype = 'image/png'
-    elif ext == '.svg':
-        mimetype = 'image/svg+xml'
     else:
         guessed = mimetypes.guess_type(filename)[0]
-        if guessed:
+        if guessed and (guessed.startswith('image/') or guessed == 'application/pdf'):
             mimetype = guessed
             
     response = send_from_directory(uploads_dir, filename, mimetype=mimetype, as_attachment=False)
     response.headers['Content-Disposition'] = f'inline; filename="{filename}"'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     return response
 
 @app.route('/favicon.ico')
@@ -244,11 +307,30 @@ def add_inline_document_headers(response):
             response.headers['Content-Type'] = 'image/jpeg'
         elif ext == '.png':
             response.headers['Content-Type'] = 'image/png'
-        elif ext == '.svg':
-            response.headers['Content-Type'] = 'image/svg+xml'
         response.headers['Content-Disposition'] = 'inline'
         response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     return response
+
+# --- Global Error Handlers (JSON for APIs, HTML for Web) ---
+@app.errorhandler(404)
+def handle_not_found(e):
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Not Found', 'message': 'The requested resource was not found'}), 404
+    return render_template('404.html'), 404
+
+@app.errorhandler(500)
+def handle_server_error(e):
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Internal Server Error', 'message': 'An unexpected server error occurred'}), 500
+    return render_template('500.html'), 500
+
+@app.errorhandler(429)
+def handle_rate_limit(e):
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Too Many Requests', 'message': 'Too many requests. Please wait a few minutes before trying again.'}), 429
+    flash('Too many requests. Please wait a few minutes before trying again.', 'danger')
+    return render_template('login.html'), 429
 
 # Inicializa o banco de dados e cria admin padrão caso ainda não exista
 init_db(app)
@@ -274,18 +356,21 @@ seed_default_admin()
 
 def salvar_arquivo_otimizado(file_storage, nome_arquivo):
     """
-    Salva arquivo enviado. Se for imagem, auto-rotaciona via EXIF (corrige fotos de iPhone),
+    Salva arquivo enviado com whitelist estrita. Se for imagem, auto-rotaciona via EXIF,
     redimensiona para no máximo 1600px e comprime em WebP com qualidade 80 (~30-90 KB).
-    Se for PDF ou outro documento, salva diretamente.
-    Retorna o nome do arquivo final salvo.
+    Se for PDF, salva diretamente.
+    Rejeita estritamente tipos não autorizados (ex: SVG, HTML, executáveis).
     """
+    if not is_allowed_file(nome_arquivo):
+        raise ValueError("Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.")
+
     uploads_dir = app.config.get('UPLOAD_FOLDER', os.path.join(basedir, 'static', 'uploads'))
     os.makedirs(uploads_dir, exist_ok=True)
     
     ext = os.path.splitext(nome_arquivo)[1].lower()
     caminho_final = os.path.join(uploads_dir, nome_arquivo)
     
-    if ext not in ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic']:
+    if ext == '.pdf':
         file_storage.save(caminho_final)
         return nome_arquivo
         
@@ -369,16 +454,19 @@ def pagina_relatorios():
 
 @app.route('/relatorios/vencidos')
 def relatorio_vencidos():
-    transacoes = FinancialTransaction.query.filter(
+    agora_london = get_london_now()
+    transacoes = FinancialTransaction.query.options(
+        db.joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
+    ).filter(
         FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pendente']),
-        FinancialTransaction.data_vencimento < datetime.utcnow()
+        FinancialTransaction.data_vencimento < agora_london.replace(tzinfo=None)
     ).order_by(FinancialTransaction.data_vencimento.asc()).all()
     
     dados = []
     total = 0
     for t in transacoes:
-        c = Contract.query.get(t.id_contrato)
-        cliente = Client.query.get(c.id_cliente) if c else None
+        c = t.contrato
+        cliente = c.cliente if c else None
         
         dados.append({
             'contrato_id': c.id if c else '-',
@@ -390,8 +478,7 @@ def relatorio_vencidos():
         })
         total += float(t.valor)
         
-    tz = pytz.timezone('Europe/London')
-    agora = datetime.now(tz).strftime('%d/%m/%Y %H:%M:%S')
+    agora = agora_london.strftime('%d/%m/%Y %H:%M:%S')
     return render_template('relatorio_vencidos.html', dados=dados, total=total, agora=agora)
 
 @app.route('/contratos/<int:id>')
@@ -472,7 +559,9 @@ def criar_usuario():
 @app.route('/api/usuarios/<int:user_id>', methods=['PUT'])
 @admin_required
 def atualizar_usuario(user_id):
-    user = User.query.get_or_404(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
     data = request.get_json() or {}
     alteracoes = []
     
@@ -528,7 +617,9 @@ def atualizar_usuario(user_id):
 @app.route('/api/usuarios/<int:user_id>', methods=['DELETE'])
 @admin_required
 def deletar_usuario(user_id):
-    user = User.query.get_or_404(user_id)
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
     
     if user.id == current_user.id:
         return jsonify({'error': 'You cannot delete your own account'}), 400
@@ -627,6 +718,13 @@ def criar_cliente():
     if Client.query.filter_by(email=email).first():
         return jsonify({'error': 'Email already registered', 'erro': 'Email já cadastrado'}), 400
         
+    # Security: Validate upload file extensions
+    for campo_file in ['habilitacao', 'habilitacao_verso', 'cbt', 'comprovante_endereco']:
+        if campo_file in request.files:
+            f = request.files[campo_file]
+            if f and f.filename and not is_allowed_file(f.filename):
+                return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+
     url_hab = None
     url_hab_verso = None
     url_cbt = None
@@ -769,7 +867,7 @@ def listar_clientes():
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
 def atualizar_cliente(id):
-    cliente = Client.query.get(id)
+    cliente = db.session.get(Client, id)
     if not cliente:
         return jsonify({'error': 'Customer not found', 'erro': 'Cliente não encontrado'}), 404
         
@@ -783,6 +881,13 @@ def atualizar_cliente(id):
             cliente.email = dados['email']
         if 'endereco' in dados: cliente.endereco = dados['endereco']
     else:
+        # Security: Validate upload file extensions
+        for campo_file in ['habilitacao', 'habilitacao_verso', 'cbt', 'comprovante_endereco']:
+            if campo_file in request.files:
+                f = request.files[campo_file]
+                if f and f.filename and not is_allowed_file(f.filename):
+                    return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+
         if 'nome' in request.form: cliente.nome = request.form['nome']
         if 'telefone' in request.form: cliente.telefone = request.form['telefone']
         if 'endereco' in request.form: cliente.endereco = request.form['endereco']
@@ -879,7 +984,7 @@ def listar_motos():
 
 @app.route('/api/motos/<placa>', methods=['PUT'])
 def atualizar_moto(placa):
-    moto = Motorcycle.query.get(placa)
+    moto = db.session.get(Motorcycle, placa)
     if not moto:
         return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
         
@@ -934,7 +1039,16 @@ def criar_contrato():
     if 'seguro' not in request.files:
         return jsonify({'error': 'Insurance certificate document is required to open a contract', 'erro': 'O arquivo do Seguro é obrigatório para abrir um contrato'}), 400
         
-    moto = Motorcycle.query.get(placa)
+    # Security: Validate upload file extensions for photos and insurance
+    for f in fotos:
+        if f.filename and not is_allowed_file(f.filename):
+            return jsonify({'error': 'Invalid inspection photo format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de foto inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+            
+    arq_seguro_check = request.files['seguro']
+    if arq_seguro_check.filename and not is_allowed_file(arq_seguro_check.filename):
+        return jsonify({'error': 'Invalid insurance document format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de documento de seguro inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+
+    moto = db.session.get(Motorcycle, placa)
     if not moto or moto.status not in [MotoStatus.AVAILABLE.value, 'Disponível']:
         return jsonify({'error': 'Motorbike is not available for rental', 'erro': 'Moto não está disponível'}), 400
         
@@ -1036,13 +1150,15 @@ def criar_contrato():
 
 @app.route('/api/contratos/<int:id>/seguro', methods=['PUT'])
 def atualizar_seguro_contrato(id):
-    contrato = Contract.query.get(id)
+    contrato = db.session.get(Contract, id)
     if not contrato:
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
     if 'seguro' in request.files:
         f = request.files['seguro']
         if f.filename:
+            if not is_allowed_file(f.filename):
+                return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_seguro_upd_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             contrato.url_seguro = f"/static/uploads/{nome_salvo}"
@@ -1054,7 +1170,7 @@ def atualizar_seguro_contrato(id):
 @app.route('/api/contratos/<int:id>/verificar-seguro', methods=['POST'])
 @login_required
 def verificar_seguro_contrato(id):
-    contrato = Contract.query.get(id)
+    contrato = db.session.get(Contract, id)
     if not contrato:
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
@@ -1164,12 +1280,12 @@ def listar_contratos():
 
 @app.route('/api/contratos/<int:id>', methods=['GET'])
 def detalhe_contrato(id):
-    c = Contract.query.get(id)
+    c = db.session.get(Contract, id)
     if not c:
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
-    cliente = Client.query.get(c.id_cliente)
-    moto = Motorcycle.query.get(c.placa)
+    cliente = db.session.get(Client, c.id_cliente) if c.id_cliente else None
+    moto = db.session.get(Motorcycle, c.placa) if c.placa else None
     
     transacoes = FinancialTransaction.query.filter_by(id_contrato=id).all()
     vistorias = Inspection.query.filter_by(id_contrato=id).all()
@@ -1262,7 +1378,7 @@ def detalhe_contrato(id):
 
 @app.route('/api/contratos/<int:id>/cobrancas', methods=['POST'])
 def criar_cobranca(id):
-    c = Contract.query.get(id)
+    c = db.session.get(Contract, id)
     if not c:
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
@@ -1295,7 +1411,7 @@ def criar_cobranca(id):
 
 @app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT'])
 def pagar_cobranca(id):
-    t = FinancialTransaction.query.get(id)
+    t = db.session.get(FinancialTransaction, id)
     if not t:
         return jsonify({'error': 'Charge not found', 'erro': 'Cobrança não encontrada'}), 404
         
@@ -1326,6 +1442,11 @@ def criar_vistoria():
     if not fotos or fotos[0].filename == '':
         return jsonify({'error': 'No photos selected', 'erro': 'Nenhuma foto selecionada'}), 400
         
+    # Security: Validate upload file extensions
+    for foto in fotos:
+        if foto.filename and not is_allowed_file(foto.filename):
+            return jsonify({'error': 'Invalid inspection photo format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de foto inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+
     urls_fotos = []
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
     for i, foto in enumerate(fotos):
@@ -1348,11 +1469,11 @@ def criar_vistoria():
     db.session.add(nova_vistoria)
     
     if tipo in [InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']:
-        contrato = Contract.query.get(id_contrato)
+        contrato = db.session.get(Contract, id_contrato)
         if contrato:
             contrato.status = ContractStatus.DEPOSIT_HOLD.value
             contrato.data_devolucao = datetime.utcnow()
-            moto = Motorcycle.query.get(contrato.placa)
+            moto = db.session.get(Motorcycle, contrato.placa) if contrato.placa else None
             if moto:
                 moto.status = MotoStatus.MAINTENANCE.value
                 
@@ -1539,7 +1660,7 @@ def listar_financeiro():
 
 @app.route('/api/financeiro/pagar/<int:id>', methods=['POST', 'PUT'])
 def pagar_transacao(id):
-    t = FinancialTransaction.query.get(id)
+    t = db.session.get(FinancialTransaction, id)
     if not t:
         return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
         
@@ -1561,7 +1682,7 @@ def pagar_transacao(id):
 @app.route('/api/financeiro/<int:id>/reverter', methods=['POST', 'PUT'])
 @app.route('/api/cobrancas/<int:id>/reverter', methods=['POST', 'PUT'])
 def reverter_pagamento(id):
-    t = FinancialTransaction.query.get(id)
+    t = db.session.get(FinancialTransaction, id)
     if not t:
         return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
         
@@ -1594,14 +1715,16 @@ def reverter_pagamento(id):
 
 @app.route('/recibo/<int:id>')
 def pagina_recibo(id):
-    t = FinancialTransaction.query.get_or_404(id)
-    contrato = Contract.query.get(t.id_contrato) if t.id_contrato else None
-    cliente = Client.query.get(contrato.id_cliente) if (contrato and contrato.id_cliente) else None
+    t = db.session.get(FinancialTransaction, id)
+    if not t:
+        return render_template('404.html'), 404
+    contrato = db.session.get(Contract, t.id_contrato) if t.id_contrato else None
+    cliente = db.session.get(Client, contrato.id_cliente) if (contrato and contrato.id_cliente) else None
     return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente)
 
 @app.route('/api/financeiro/<int:id>', methods=['DELETE'])
 def excluir_transacao(id):
-    t = FinancialTransaction.query.get(id)
+    t = db.session.get(FinancialTransaction, id)
     if not t:
         return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
         
@@ -1619,21 +1742,28 @@ def get_dashboard():
     motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
     motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
     
-    # Detalhes das motos em manutenção
+    # Detalhes das motos em manutenção (otimizado com batch query de contratos)
     motos_manutencao_lista = []
     manutencao_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).all()
-    for m in manutencao_objs:
-        last_c = Contract.query.filter_by(placa=m.placa).order_by(Contract.id.desc()).first()
-        cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
-        contrato_id = last_c.id if last_c else None
-        motos_manutencao_lista.append({
-            'placa': m.placa,
-            'modelo': m.modelo,
-            'cor': m.cor or 'N/A',
-            'status': m.status,
-            'contrato_id': contrato_id,
-            'cliente_nome': cliente_nome
-        })
+    if manutencao_objs:
+        placas_manut = [m.placa for m in manutencao_objs]
+        latest_contracts = db.session.query(Contract).options(joinedload(Contract.cliente)).filter(Contract.placa.in_(placas_manut)).order_by(Contract.id.desc()).all()
+        last_c_by_plate = {}
+        for c in latest_contracts:
+            if c.placa not in last_c_by_plate:
+                last_c_by_plate[c.placa] = c
+        for m in manutencao_objs:
+            last_c = last_c_by_plate.get(m.placa)
+            cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
+            contrato_id = last_c.id if last_c else None
+            motos_manutencao_lista.append({
+                'placa': m.placa,
+                'modelo': m.modelo,
+                'cor': m.cor or 'N/A',
+                'status': m.status,
+                'contrato_id': contrato_id,
+                'cliente_nome': cliente_nome
+            })
         
     contratos_ativos_lista = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
     contratos_ativos = len(contratos_ativos_lista)
@@ -1641,21 +1771,30 @@ def get_dashboard():
     
     total_clientes = Client.query.count()
     
-    pendentes = FinancialTransaction.query.filter(
+    # Performance: Direct SQL sum for pending revenue
+    receita_pendente = float(db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+    ).filter(
         FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
         FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
-    ).all()
-    receita_pendente = sum(float(t.valor) for t in pendentes)
+    ).scalar() or 0.0)
     
-    agora = datetime.utcnow()
-    vencidas = FinancialTransaction.query.filter(
+    # Performance: Direct SQL sum and count for overdue charges using London Time
+    agora = get_london_now().replace(tzinfo=None)
+    vencidas_q = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
         FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
         FinancialTransaction.data_vencimento < agora
-    ).all()
-    receita_vencida = sum(float(t.valor) for t in vencidas)
-    total_vencidos = len(vencidas)
+    ).first()
+    receita_vencida = float(vencidas_q[0]) if vencidas_q else 0.0
+    total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
     
-    contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
+    # Performance: Pre-fetch transactions to prevent N+1 queries during deposit accounting
+    contratos_quarentena = db.session.query(Contract).options(joinedload(Contract.transacoes)).filter(
+        Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])
+    ).all()
     quarentenas_count = len(contratos_quarentena)
     quarentenas_valor = 0.0
     for cq in contratos_quarentena:
@@ -1669,9 +1808,11 @@ def get_dashboard():
                     deducoes += float(t.valor)
         quarentenas_valor += max(0.0, dep_pago - deducoes)
                 
-    # Últimas vistorias
+    # Últimas vistorias (eager-loaded)
     recent_inspections = []
-    inspecoes = Inspection.query.order_by(Inspection.id.desc()).limit(5).all()
+    inspecoes = db.session.query(Inspection).options(
+        joinedload(Inspection.contrato).joinedload(Contract.cliente)
+    ).order_by(Inspection.id.desc()).limit(5).all()
     for i in inspecoes:
         placa = i.contrato.placa if i.contrato else '-'
         cliente = i.contrato.cliente.nome if i.contrato and i.contrato.cliente else '-'
@@ -1687,9 +1828,11 @@ def get_dashboard():
             'observacoes': i.observacoes or ''
         })
         
-    # Últimos contratos
+    # Últimos contratos (eager-loaded)
     recent_contracts = []
-    contratos = Contract.query.order_by(Contract.id.desc()).limit(4).all()
+    contratos = db.session.query(Contract).options(
+        joinedload(Contract.cliente)
+    ).order_by(Contract.id.desc()).limit(4).all()
     for c in contratos:
         recent_contracts.append({
             'id': c.id,
@@ -1701,7 +1844,7 @@ def get_dashboard():
         })
     
     # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias)
-    hoje_date = datetime.utcnow().date()
+    hoje_date = get_london_date()
     todas_motos = Motorcycle.query.all()
     tax_mot_warnings = 0
     tax_warnings = 0
@@ -1742,7 +1885,9 @@ def get_dashboard():
                 tax_mot_expiring_soon += 1
                 
     # Compliance: Checagem Quinzenal de Seguro no askMID (15 em 15 dias)
-    contratos_ativos_objs = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+    contratos_ativos_objs = db.session.query(Contract).options(
+        joinedload(Contract.cliente)
+    ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
     seguros_pendentes_count = 0
     seguros_cancelados_count = 0
     contratos_seguro_alerta = []
@@ -1810,7 +1955,7 @@ def listar_alertas():
         if c.data_devolucao:
             dias_passados = (hoje - c.data_devolucao).days
             if dias_passados >= 14:
-                cliente = Client.query.get(c.id_cliente)
+                cliente = db.session.get(Client, c.id_cliente)
                 nome = cliente.nome if cliente else f"ID {c.id_cliente}"
                 alertas.append({
                     'tipo': 'deposit_hold_due',
@@ -1824,7 +1969,7 @@ def listar_alertas():
 
 @app.route('/api/contratos/<int:id>/finalizar-quarentena', methods=['POST'])
 def finalizar_quarentena(id):
-    contrato = Contract.query.get(id)
+    contrato = db.session.get(Contract, id)
     if not contrato or contrato.status not in [ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']:
         return jsonify({'error': 'Contract not found or not in deposit hold', 'erro': 'Contrato não encontrado ou não está em quarentena'}), 404
         
@@ -1832,6 +1977,8 @@ def finalizar_quarentena(id):
     if 'comprovante' in request.files:
         f = request.files['comprovante']
         if f.filename:
+            if not is_allowed_file(f.filename):
+                return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
             nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_comprovante = f"/static/uploads/{nome_salvo}"
@@ -1959,7 +2106,7 @@ def _processar_quarentenas_logic():
         
         contrato.status = ContractStatus.COMPLETED.value
         
-        moto = Motorcycle.query.get(contrato.placa)
+        moto = db.session.get(Motorcycle, contrato.placa) if contrato.placa else None
         if moto and moto.status in [MotoStatus.RENTED.value, 'Rented', 'Alugada']:
             moto.status = MotoStatus.AVAILABLE.value
             
@@ -1981,7 +2128,37 @@ def processar_quarentenas():
 
 def run_daily_jobs():
     with app.app_context():
-        print("[Cron] Starting daily background jobs (Birmingham UK timezone)...")
+        london_date_str = get_london_date().strftime('%Y-%m-%d')
+        job_name = "daily_rent_and_deposit_jobs"
+        
+        # Concurrency safety across multi-worker deployments (e.g. Gunicorn):
+        # Prevent multiple workers from executing the 1am job twice on the same day
+        try:
+            lock = JobExecutionLock.query.filter_by(job_name=job_name).first()
+            if lock and lock.last_run_date == london_date_str:
+                print(f"[Cron Lock] Daily jobs '{job_name}' already completed for date {london_date_str} by {lock.executed_by}. Skipping duplicate execution.")
+                return
+
+            worker_id = f"worker-pid-{os.getpid()}"
+            if not lock:
+                lock = JobExecutionLock(
+                    job_name=job_name,
+                    last_run_date=london_date_str,
+                    last_run_at=datetime.utcnow(),
+                    executed_by=worker_id
+                )
+                db.session.add(lock)
+            else:
+                lock.last_run_date = london_date_str
+                lock.last_run_at = datetime.utcnow()
+                lock.executed_by = worker_id
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"[Cron Lock] Worker lock acquired by another process or error for {london_date_str}: {e}")
+            return
+
+        print(f"[Cron] Starting daily background jobs for {london_date_str} (Europe/London 01:00 AM)...")
         t_cobrancas = _gerar_cobrancas_semanais_logic()
         t_quarentenas = _processar_quarentenas_logic()
         print(f"[Cron] Finished. {t_cobrancas} rent charges generated, {t_quarentenas} deposit holds processed.")
@@ -1990,7 +2167,7 @@ if __name__ == '__main__':
     uploads_dir = os.path.join(basedir, 'static', 'uploads')
     os.makedirs(uploads_dir, exist_ok=True)
     
-    # Start APScheduler with Europe/London timezone
+    # Start APScheduler with Europe/London timezone at 01:00 AM
     scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
     scheduler.add_job(func=run_daily_jobs, trigger="cron", hour=1, minute=0)
     scheduler.start()

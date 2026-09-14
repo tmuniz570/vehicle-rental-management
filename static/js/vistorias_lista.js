@@ -138,7 +138,7 @@ async function carregarVistorias() {
             } else if (tLower === 'incident' || tLower === 'ocorrência') {
                 tipoBadge = '<span class="badge badge-danger">Incident</span>';
             } else {
-                tipoBadge = `<span class="badge">${v.tipo}</span>`;
+                tipoBadge = `<span class="badge">${escapeHtml(v.tipo)}</span>`;
             }
             
             // Photos count
@@ -148,7 +148,7 @@ async function carregarVistorias() {
 
             // Observações snippet
             const obsSnippet = v.observacoes 
-                ? `<span title="${v.observacoes.replace(/"/g, '&quot;')}" style="display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary);">${v.observacoes}</span>`
+                ? `<span title="${escapeHtml(v.observacoes)}" style="display:inline-block; max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary);">${escapeHtml(v.observacoes)}</span>`
                 : '<span style="color:var(--text-secondary); opacity:0.5;">-</span>';
 
             const staffTag = v.realizado_por_nome ? `<small style="display:block; color:#c084fc; font-size:0.75rem; margin-top:2px;">👤 ${escapeHtml(v.realizado_por_nome)}</small>` : '';
@@ -160,8 +160,8 @@ async function carregarVistorias() {
                         Contract #${v.id_contrato} &rarr;
                     </a>
                 </td>
-                <td class="nowrap"><span class="badge-plate">${v.placa || '-'}</span></td>
-                <td style="font-weight: 500; white-space: nowrap;" title="${v.cliente || ''}">${v.cliente || '-'}</td>
+                <td class="nowrap"><span class="badge-plate">${escapeHtml(v.placa || '-')}</span></td>
+                <td style="font-weight: 500; white-space: nowrap;" title="${escapeHtml(v.cliente || '')}">${escapeHtml(v.cliente || '-')}</td>
                 <td>${tipoBadge}</td>
                 <td>${obsSnippet}</td>
                 <td style="text-align: right; white-space: nowrap;">

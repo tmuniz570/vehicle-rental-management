@@ -4,6 +4,53 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.3.0] — 2026-09-15 — *Security Hardening, Database Concurrency & Performance Suite*
+
+### 🛡️ Segurança Web Avançada & Proteção de Dados
+* **Whitelist Estrita de Uploads de Arquivos:**
+  - Permitidos exclusivamente arquivos de imagem e documentos seguros: `.jpg`, `.jpeg`, `.png`, `.webp`, `.pdf`.
+  - Bloqueio e rejeição estrita (HTTP 400) em todos os endpoints de upload (`clientes`, `contratos`, `vistorias`, `quarentena`) para extensões perigosas como `.svg`, `.html`, `.htm`, `.exe`, `.sh`, `.php`.
+  - Proteção na rota de entrega estática `/static/uploads/...` aplicando `Content-Security-Policy: default-src 'none'; sandbox` e cabeçalho `X-Content-Type-Options: nosniff`.
+* **Neutralização Completa de Cross-Site Scripting (XSS):**
+  - Implementada sanitização com `escapeHtml()` em todas as interpolações dinâmicas de tabelas e modais nos arquivos JavaScript (`clientes.js`, `contratos.js`, `financeiro.js`, `detalhe_contrato.js`, `motos.js`, `vistorias_lista.js`).
+* **Rate Limiting de Login (10 Tentativas Máximas):**
+  - Limitador em memória thread-safe (`threading.Lock`) que restringe tentativas falhas de login por IP.
+  - Permite até 10 tentativas incorretas dentro de uma janela de 15 minutos; a 11ª tentativa é bloqueada com HTTP `429 Too Many Requests`.
+  - Login bem-sucedido zera imediatamente o histórico de tentativas do IP.
+* **Logout Seguro via POST com CSRF:**
+  - Rota `/logout` atualizada para aceitar requisições `POST` validadas por token CSRF, mantendo compatibilidade com `GET`.
+  - Formulários de logout atualizados no cabeçalho mobile e barra lateral desktop em `layout.html`.
+  - Rota `logout` adicionada à lista de rotas públicas para evitar loops de redirecionamento.
+
+### ⚡ Performance & Otimização de Consultas (Zero N+1)
+* **Eliminação de Consultas N+1 no Dashboard:**
+  - O cálculo de receita pendente e vencida foi transferido para agregações SQL diretas (`db.func.sum(FinancialTransaction.valor)` e `db.func.count`), eliminando o carregamento de milhares de objetos em memória.
+  - Eager loading implementado via `joinedload` para carregar simultaneamente contratos, clientes e veículos em vistorias e motos em manutenção.
+* **Indexação Completa do Banco de Dados:**
+  - Criação de 15 índices estratégicos em `database.py` cobrindo chaves estrangeiras e colunas de busca/filtro (`id_cliente`, `placa`, `status`, `data_vencimento`, `vencimento_mot`, `vencimento_tax`, `nome`, `telefone`).
+  - Auto-criação de índices na inicialização (`init_db`) sem risco de perda de dados.
+
+### 🗄️ Concorrência no SQLite & Modernização de Código
+* **Ativação do Modo WAL (Write-Ahead Logging) no SQLite:**
+  - Conexões configuradas com `PRAGMA journal_mode = WAL;` e `PRAGMA synchronous = NORMAL;`, permitindo leituras concorrentes simultâneas durante gravações e reduzindo travamentos de disco.
+  - Ativação obrigatória de integridade relacional com `PRAGMA foreign_keys = ON;`.
+  - Timeout de conexão estendido para 30 segundos (`connect_args={'timeout': 30}`).
+* **Modernização SQLAlchemy 2.0:**
+  - Substituição de todas as 23 ocorrências legadas de `Model.query.get(id)` e `Model.query.get_or_404(id)` por `db.session.get(Model, id)`.
+
+### 🕒 Confiabilidade de Jobs em Background & Fuso Horário de Londres
+* **Lock de Execução Multi-Worker (`JobExecutionLock`):**
+  - Criada tabela no banco para travar a execução do job diário de cobrança semanal e processamento de quarentenas.
+  - Impede que múltiplos workers de servidores WSGI (como Gunicorn) executem cobranças duplicadas para os clientes na mesma data.
+* **Padronização no Horário de Londres (`Europe/London`):**
+  - Unificação de todas as verificações de data sob o fuso britânico através dos helpers `get_london_now()` e `get_london_date()`.
+  - Agendador APScheduler configurado exatamente para disparar às **01:00 AM Europe/London**.
+
+### 🎨 Tratamento Global de Erros (404, 500, 429)
+* **Respostas Híbridas Inteligentes:**
+  - Requisições para `/api/...` retornam respostas JSON estruturadas.
+  - Navegação web renderiza páginas de erro modernas e responsivas no tema escuro: `templates/404.html` e `templates/500.html`.
+
 ---
 
 ## [1.2.0] — 2026-09-14 — *Production Readiness, Web Security & Fleet Operations Suite*

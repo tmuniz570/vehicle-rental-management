@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+
+{% block title %}500 - Internal Server Error{% endblock %}
+
+{% block content %}
+<div style="min-height: 65vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 2rem;">
+    <div style="width: 80px; height: 80px; border-radius: 24px; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; margin-bottom: 1.5rem;">
+        ⚠️
+    </div>
+    <h1 style="font-size: 3rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem; letter-spacing: -1px;">
+        500
+    </h1>
+    <h2 style="font-size: 1.25rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 1rem;">
+        Server Error &bull; Erro Interno do Servidor
+    </h2>
+    <p style="max-width: 480px; color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 2rem; line-height: 1.6;">
+        An unexpected server error occurred while processing your request. The transaction has been rolled back safely. Please refresh or contact support if the issue persists.
+    </p>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+        <button onclick="window.location.reload()" class="btn-secondary" style="padding: 0.75rem 1.5rem; font-size: 0.9rem; cursor: pointer;">
+            🔄 Retry Page
+        </button>
+        <a href="/" class="btn-primary" style="padding: 0.75rem 1.75rem; font-size: 0.9rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+            <span>Return to Dashboard</span> &rarr;
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -4,6 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
+![Version](https://img.shields.io/badge/Version-1.3.0--Hardened-success?style=for-the-badge)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red?style=for-the-badge)
@@ -36,7 +37,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
 
 ### 👥 3. Customer Relationship Management
-* **Driver Records:** Full tracking of client contact info, residential address, driving license (DVLA), and utility proof uploads.
+* **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
 * **1-Tap WhatsApp Integration:** Automatic normalization and international formatting of UK phone numbers (`+447...`) allowing instant WhatsApp chat links from any contract or customer card.
 
 ### 📋 4. Contract & Security Deposit Accounting
@@ -54,25 +55,30 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Payment Cancellation & Reversal:** Operational ability to cancel a completed payment, revert transaction to pending, and automatically record the action in the employee audit log.
 * **Overdue Report:** Dedicated centralized page (`/relatorio-vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions.
 * **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, and PDF-friendly styling.
-* **Automated Rent Generation:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices on designated weekly payment days.
+* **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
 
 ### 📱 7. Mobile-First & PWA Experience
 * **Native-Style Bottom Navigation:** High-usability bottom navigation bar enabled exclusively on mobile viewports (`<= 768px`) with iOS Safe Area Insets support.
 * **Installable App:** Manifest configuration (`manifest.json`) and app icons allowing home screen installation on iOS (Safari) and Android (Chrome).
 
-### 🔐 8. Authentication, User Management & Internal Audit Trail
-* **Secure Session Auth:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`).
-* **CSRF Web Security & HTTP Headers:** Universal CSRF protection intercepting all state-altering requests (`POST`, `PUT`, `DELETE`, `PATCH`), accompanied by strict HTTP security headers (`X-Frame-Options`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`).
-* **Branded Login Experience:** Modern glassmorphism dark-mode login interface with flash message feedback and "Remember Me" session persistence.
+### 🔐 8. Authentication, User Management, Web Hardening & Audit Trail
+* **Secure Session Auth & Brute-Force Rate Limiting:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`). Built-in thread-safe IP rate limiter restricting failed login attempts to a maximum of 10 within 15 minutes (HTTP 429 on abuse).
+* **CSRF Protection & Secure POST Logout:** Universal CSRF protection intercepting all state-altering requests (`POST`, `PUT`, `DELETE`, `PATCH`). Logout upgraded to CSRF-protected `POST` with public route isolation to prevent redirect loops.
+* **Strict Upload Whitelist & Sandboxed Delivery:** File uploads strictly limited to safe image and document extensions (`.jpg`, `.jpeg`, `.png`, `.webp`, `.pdf`). Static file delivery `/static/uploads/...` enforces `Content-Security-Policy: default-src 'none'; sandbox` and `X-Content-Type-Options: nosniff`.
+* **Complete XSS Neutralization:** Dynamic table rendering and modal DOM construction across all frontend modules implement HTML entity escaping (`escapeHtml`).
 * **Staff & Operator Management:** Full administrative panel (`/usuarios`) to create, edit, suspend, and reset passwords for team operators.
 * **Internal Accountability & Audit Trail:** Automatic tracking of which staff member created contracts, marked payments as received, cancelled transactions, or conducted vehicle inspections. Live activity stream with filters for complete company oversight.
 * **Client Privacy Guarantee:** Customer-facing documents strictly remain 100% corporate under FF Motors branding with zero exposure of internal employee records.
 
-### 🛡️ 9. Production WSGI Architecture, Database Agnosticism & Backup Suite
-* **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (Render, Railway, AWS, DigitalOcean).
-* **Universal Database Compatibility:** Fully agnostic architecture supporting both local development on `SQLite` and enterprise production on `PostgreSQL` via SQLAlchemy 2.0 and `psycopg2-binary`.
-* **Point-in-Time Backups:** Automated script (`backup.py`) packaging database snapshots and asset files into compressed zip archives.
-* **Disaster Recovery:** Dedicated restore script (`restore.py`) and development sanitation utility (`reset_data.py`).
+### 🛡️ 9. Production WSGI Architecture, Concurrency & High Performance
+* **Zero N+1 Query Architecture:** Dashboard metrics and financial aggregations execute via direct SQL aggregates (`func.sum`, `func.count`) and strategic `joinedload` eager-loading for blazing fast response times.
+* **SQLite WAL Mode & Concurrency:** Database connection configured with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, 30s busy timeout, and enforced relational integrity (`foreign_keys = ON`) for lock-free concurrent reads during background writes.
+* **15 Strategic Database Indexes:** Foreign keys and frequent filter columns (`id_cliente`, `placa`, `status`, `data_vencimento`, `vencimento_mot`, `vencimento_tax`, etc.) are pre-indexed for high scalability.
+* **Multi-Worker Job Concurrency Lock (`JobExecutionLock`):** Database-backed atomic lock ensuring background billing executes exactly once per day across multiple WSGI workers at **01:00 AM London Time**.
+* **Modern SQLAlchemy 2.0:** All queries modernized to `db.session.get(Model, id)`.
+* **Hybrid Global Error Handling:** Custom 404, 500, and 429 handlers delivering structured JSON for `/api/...` requests and elegant dark-themed HTML error pages (`404.html`, `500.html`) for browser navigation.
+* **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (GCP, AWS, Render, Railway).
+* **Point-in-Time Backups & Disaster Recovery:** Automated utilities for snapshot archives (`backup.py`), database restore (`restore.py`), and demo data seeding (`seed_data.py`).
 
 ---
 
@@ -215,7 +221,9 @@ FF Motors APP/
     ├── relatorio_vencidos.html# Fleet-wide overdue receivables & collection hub
     ├── motos.html             # Fleet inventory & maintenance board
     ├── vistorias_lista.html   # Vehicle inspection records & photo history
-    └── recibo.html            # Branded payment receipt printable template
+    ├── recibo.html            # Branded payment receipt printable template
+    ├── 404.html               # Modern dark-mode 404 Page Not Found template
+    └── 500.html               # Modern dark-mode 500 Internal Error template
 ```
 
 ---

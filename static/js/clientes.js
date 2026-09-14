@@ -41,19 +41,19 @@ async function carregarClientes() {
             if(c.url_comprovante_endereco) docs.push(`<a href="${c.url_comprovante_endereco}" target="_blank" style="color:#c084fc; text-decoration:none;" title="Proof of Address">🏠 Address</a>`);
             const docsHtml = docs.length > 0 ? docs.join('<br>') : '-';
             
-            const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${c.nome}" data-tel="${c.telefone}" data-email="${c.email}" data-endereco="${c.endereco || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
+            const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${escapeHtml(c.nome)}" data-tel="${escapeHtml(c.telefone)}" data-email="${escapeHtml(c.email)}" data-endereco="${escapeHtml(c.endereco || '')}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             const waNum = formatWhatsAppNumber(c.telefone);
             const telHtml = waNum 
-                ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Chat with ${c.nome} on WhatsApp">💬 ${c.telefone}</a>`
-                : (c.telefone || '-');
+                ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp">💬 ${escapeHtml(c.telefone)}</a>`
+                : escapeHtml(c.telefone || '-');
             
             tr.innerHTML = `
                 <td class="nowrap"><span style="font-weight:700; color:var(--accent); background:rgba(217,119,6,0.12); border:1px solid rgba(217,119,6,0.25); padding:3px 8px; border-radius:6px; font-size:0.85rem;">#${c.id}</span></td>
-                <td><strong>${c.nome}</strong></td>
+                <td><strong>${escapeHtml(c.nome)}</strong></td>
                 <td class="nowrap">${telHtml}</td>
-                <td>${c.email}</td>
-                <td class="cell-wrap">${c.endereco || '-'}</td>
+                <td>${escapeHtml(c.email)}</td>
+                <td class="cell-wrap">${escapeHtml(c.endereco) || '-'}</td>
                 <td>${docsHtml || '-'}</td>
                 <td>${btnEdit}</td>
             `;

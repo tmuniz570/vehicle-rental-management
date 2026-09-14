@@ -45,15 +45,16 @@ async function carregarContratos() {
             } else if (c.status === 'Completed' || c.status === 'Finalizado') {
                 statusBadge = '<span class="badge">Completed</span>';
             } else {
-                statusBadge = `<span class="badge">${c.status}</span>`;
+                statusBadge = `<span class="badge">${escapeHtml(c.status)}</span>`;
             }
             
-            const nomeCliente = c.cliente_nome || '-';
+            const nomeCliente = escapeHtml(c.cliente_nome || '-');
+            const placa = escapeHtml(c.placa || '-');
             
             tr.innerHTML = `
                 <td>#${c.id}</td>
                 <td style="font-weight:600; white-space: nowrap;" title="${nomeCliente}">${nomeCliente}</td>
-                <td class="nowrap"><span class="badge-plate">${c.placa}</span></td>
+                <td class="nowrap"><span class="badge-plate">${placa}</span></td>
                 <td>${dataRetirada}</td>
                 <td>${diaVenc}</td>
                 <td>${valorFmt}</td>

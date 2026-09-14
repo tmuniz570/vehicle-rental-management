@@ -57,8 +57,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (elTel) {
             if (data.telefone) {
                 elTel.innerHTML = `
-                    <a href="tel:${data.telefone}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${data.telefone}">
-                        <span>📞</span> <span style="text-decoration:underline;">${data.telefone}</span>
+                    <a href="tel:${encodeURIComponent(data.telefone)}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${escapeHtml(data.telefone)}">
+                        <span>📞</span> <span style="text-decoration:underline;">${escapeHtml(data.telefone)}</span>
                     </a>
                 `;
             } else {
@@ -70,8 +70,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (elEmail) {
             if (data.email) {
                 elEmail.innerHTML = `
-                    <a href="mailto:${data.email}" style="color:#60a5fa; text-decoration:underline; word-break:break-all; display:inline-flex; align-items:center; gap:6px;" title="Send email to ${data.email}">
-                        <span>✉️</span> <span>${data.email}</span>
+                    <a href="mailto:${encodeURIComponent(data.email)}" style="color:#60a5fa; text-decoration:underline; word-break:break-all; display:inline-flex; align-items:center; gap:6px;" title="Send email to ${escapeHtml(data.email)}">
+                        <span>✉️</span> <span>${escapeHtml(data.email)}</span>
                     </a>
                 `;
             } else {
@@ -749,7 +749,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
                     const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
                     const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.7rem; color:#c084fc; margin-top:2px;">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
-                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${formaLabel}</small>${staffHtml}</span>`;
+                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${escapeHtml(formaLabel)}</small>${staffHtml}</span>`;
                 }
 
                 let celulaVencimento = `<span>${dataVenc}</span>`;
@@ -903,10 +903,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                             ${v.realizado_por_nome ? `<span style="font-size: 0.75rem; color: #c084fc;">&bull; 👤 ${escapeHtml(v.realizado_por_nome)}</span>` : ''}
                         </div>
                         <div style="font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">
-                            ${v.observacoes || '<em style="opacity:0.5;">No notes</em>'}
+                            ${escapeHtml(v.observacoes) || '<em style="opacity:0.5;">No notes</em>'}
                         </div>
                     </div>
-                    <button class="btn-action btn-ver-foto" data-tipo="${v.tipo}" data-data="${dataVist}" data-foto="${v.foto_url || ''}" data-obs="${v.observacoes || 'No notes.'}" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
+                    <button class="btn-action btn-ver-foto" data-tipo="${escapeHtml(v.tipo)}" data-data="${dataVist}" data-foto="${v.foto_url || ''}" data-obs="${escapeHtml(v.observacoes || 'No notes.')}" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
                         ${fotosLabel}
                     </button>
                 `;

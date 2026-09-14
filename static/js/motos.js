@@ -48,17 +48,17 @@ async function carregarMotos() {
             if (st === 'available' || st === 'disponível') statusBadge = '<span class="badge badge-success">Available</span>';
             else if (st === 'maintenance' || st === 'manutenção') statusBadge = '<span class="badge badge-warning">Maintenance</span>';
             else if (st === 'rented' || st === 'alugada') statusBadge = '<span class="badge badge-info">Rented</span>';
-            else statusBadge = `<span class="badge badge-danger">${m.status}</span>`;
+            else statusBadge = `<span class="badge badge-danger">${escapeHtml(m.status)}</span>`;
             
-            const btnEdit = `<button class="btn-edit" data-placa="${m.placa}" data-modelo="${m.modelo}" data-cor="${m.cor}" data-status="${m.status}" data-mot="${m.vencimento_mot || ''}" data-tax="${m.vencimento_tax || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
+            const btnEdit = `<button class="btn-edit" data-placa="${escapeHtml(m.placa)}" data-modelo="${escapeHtml(m.modelo)}" data-cor="${escapeHtml(m.cor)}" data-status="${escapeHtml(m.status)}" data-mot="${m.vencimento_mot || ''}" data-tax="${m.vencimento_tax || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             const motBadge = formatExpiryBadge(m.vencimento_mot);
             const taxBadge = formatExpiryBadge(m.vencimento_tax);
 
             tr.innerHTML = `
-                <td class="nowrap"><span class="badge-plate">${m.placa}</span></td>
-                <td>${m.modelo}</td>
-                <td>${m.cor}</td>
+                <td class="nowrap"><span class="badge-plate">${escapeHtml(m.placa)}</span></td>
+                <td>${escapeHtml(m.modelo)}</td>
+                <td>${escapeHtml(m.cor)}</td>
                 <td data-sort="${m.vencimento_tax || ''}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${m.vencimento_mot || ''}" class="nowrap">${motBadge}</td>
                 <td>${statusBadge}</td>

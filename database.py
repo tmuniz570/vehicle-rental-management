@@ -4,8 +4,23 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from enum import Enum
 import os
+import sqlite3
 from sqlalchemy import event, inspect
+from sqlalchemy.engine import Engine
+
 db = SQLAlchemy()
+
+# Enable WAL mode, fast synchronization, and enforce foreign keys on SQLite
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if isinstance(dbapi_connection, sqlite3.Connection):
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode = WAL;")
+            cursor.execute("PRAGMA synchronous = NORMAL;")
+            cursor.execute("PRAGMA foreign_keys = ON;")
+        finally:
+            cursor.close()
 
 class User(db.Model, UserMixin):
     __tablename__ = 'usuarios'
@@ -81,8 +96,8 @@ class Client(db.Model):
     __tablename__ = 'clientes'
     
     id = db.Column(db.Integer, primary_key=True)
-    nome = db.Column(db.String(100), nullable=False)
-    telefone = db.Column(db.String(20), nullable=False)
+    nome = db.Column(db.String(100), nullable=False, index=True)
+    telefone = db.Column(db.String(20), nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     endereco = db.Column(db.String(255), nullable=True)
     url_habilitacao = db.Column(db.String(255), nullable=True)
@@ -98,9 +113,9 @@ class Motorcycle(db.Model):
     placa = db.Column(db.String(10), primary_key=True)
     modelo = db.Column(db.String(100), nullable=False)
     cor = db.Column(db.String(50), nullable=True)
-    status = db.Column(db.String(20), default=MotoStatus.DISPONIVEL.value, nullable=False)
-    vencimento_mot = db.Column(db.Date, nullable=True)
-    vencimento_tax = db.Column(db.Date, nullable=True)
+    status = db.Column(db.String(20), default=MotoStatus.DISPONIVEL.value, nullable=False, index=True)
+    vencimento_mot = db.Column(db.Date, nullable=True, index=True)
+    vencimento_tax = db.Column(db.Date, nullable=True, index=True)
     
     contratos = db.relationship('Contract', backref='moto', lazy=True)
 
@@ -108,14 +123,14 @@ class Contract(db.Model):
     __tablename__ = 'contratos'
     
     id = db.Column(db.Integer, primary_key=True)
-    id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
-    placa = db.Column(db.String(10), db.ForeignKey('motos.placa'), nullable=False)
+    id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False, index=True)
+    placa = db.Column(db.String(10), db.ForeignKey('motos.placa'), nullable=False, index=True)
     
     data_retirada = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     dia_pagamento_semanal = db.Column(db.Integer, nullable=False) # 0-6 (Segunda-Domingo)
     valor_aluguel_semanal = db.Column(db.Float, nullable=False, default=250.00)
     data_devolucao = db.Column(db.DateTime, nullable=True)
-    status = db.Column(db.String(20), default=ContractStatus.ATIVO.value, nullable=False)
+    status = db.Column(db.String(20), default=ContractStatus.ATIVO.value, nullable=False, index=True)
     url_seguro = db.Column(db.String(255), nullable=True)
     url_comprovante_deposito = db.Column(db.String(255), nullable=True)
     criado_por_nome = db.Column(db.String(100), nullable=True)
@@ -132,9 +147,9 @@ class Inspection(db.Model):
     __tablename__ = 'vistorias'
     
     id = db.Column(db.Integer, primary_key=True)
-    id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id'), nullable=False)
-    tipo = db.Column(db.String(20), nullable=False) # Saída ou Entrada
-    data = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id'), nullable=False, index=True)
+    tipo = db.Column(db.String(20), nullable=False, index=True) # Saída ou Entrada
+    data = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     observacoes = db.Column(db.Text, nullable=True)
     url_fotos = db.Column(db.String(255), nullable=True) # Pode ser JSON array se forem várias fotos
     realizado_por_nome = db.Column(db.String(100), nullable=True)
@@ -143,12 +158,12 @@ class FinancialTransaction(db.Model):
     __tablename__ = 'financeiro_transacoes'
     
     id = db.Column(db.Integer, primary_key=True)
-    id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id'), nullable=False)
-    tipo = db.Column(db.String(20), nullable=False) # Aluguel, Deposito, Multa, Dano, Devolucao_Deposito
-    data_vencimento = db.Column(db.DateTime, nullable=False)
-    data_pagamento = db.Column(db.DateTime, nullable=True)
+    id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id'), nullable=False, index=True)
+    tipo = db.Column(db.String(20), nullable=False, index=True) # Aluguel, Deposito, Multa, Dano, Devolucao_Deposito
+    data_vencimento = db.Column(db.DateTime, nullable=False, index=True)
+    data_pagamento = db.Column(db.DateTime, nullable=True, index=True)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
-    status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False)
+    status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False, index=True)
     forma_pagamento = db.Column(db.String(50), nullable=True)
     registrado_por_nome = db.Column(db.String(100), nullable=True)
 
@@ -164,6 +179,15 @@ class AuditLog(db.Model):
     entidade_id = db.Column(db.String(50), nullable=True)
     descricao = db.Column(db.Text, nullable=False)
     ip_origem = db.Column(db.String(50), nullable=True)
+
+class JobExecutionLock(db.Model):
+    __tablename__ = 'job_locks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    job_name = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    last_run_date = db.Column(db.String(10), nullable=False) # Format YYYY-MM-DD
+    last_run_at = db.Column(db.DateTime, nullable=False)
+    executed_by = db.Column(db.String(100), nullable=True)
 
 def init_db(app):
     if 'sqlalchemy' not in app.extensions:
@@ -223,23 +247,50 @@ def init_db(app):
                     if 'url_cbt' not in cols_cl:
                         conn.execute(db.text("ALTER TABLE clientes ADD COLUMN url_cbt VARCHAR(255)"))
                         conn.commit()
+
+                # Performance: Auto-create essential indexes on existing database
+                indexes_to_create = [
+                    ("idx_contratos_cliente", "contratos", "id_cliente"),
+                    ("idx_contratos_placa", "contratos", "placa"),
+                    ("idx_contratos_status", "contratos", "status"),
+                    ("idx_transacoes_contrato", "financeiro_transacoes", "id_contrato"),
+                    ("idx_transacoes_status", "financeiro_transacoes", "status"),
+                    ("idx_transacoes_vencimento", "financeiro_transacoes", "data_vencimento"),
+                    ("idx_transacoes_pagamento", "financeiro_transacoes", "data_pagamento"),
+                    ("idx_transacoes_tipo", "financeiro_transacoes", "tipo"),
+                    ("idx_vistorias_contrato", "vistorias", "id_contrato"),
+                    ("idx_vistorias_data", "vistorias", "data"),
+                    ("idx_motos_status", "motos", "status"),
+                    ("idx_motos_mot", "motos", "vencimento_mot"),
+                    ("idx_motos_tax", "motos", "vencimento_tax"),
+                    ("idx_clientes_nome", "clientes", "nome"),
+                    ("idx_clientes_telefone", "clientes", "telefone"),
+                ]
+                for idx_name, tbl, col in indexes_to_create:
+                    if tbl in existing_tables:
+                        try:
+                            conn.execute(db.text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {tbl} ({col});"))
+                        except Exception:
+                            pass
+                conn.commit()
+
         except Exception as e:
             print(f"[DB Auto-Migration] Info: {e}")
 
 # --- Garbage Collector (File Cleanup) ---
 def delete_file_if_exists(filepath):
     if not filepath: return
-    # filepath is like "/static/uploads/file.png"
-    if filepath.startswith('/'):
-        filepath = filepath.lstrip('/')
+    filename = os.path.basename(filepath)
+    uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
     
-    # Try to delete from the filesystem relative to the app root
-    full_path = os.path.join(os.getcwd(), filepath)
-    if os.path.exists(full_path):
-        try:
-            os.remove(full_path)
-        except Exception as e:
-            print(f"Error removing file {full_path}: {e}")
+    for base in [uploads_dir, os.path.join(os.getcwd(), 'static', 'uploads'), os.getcwd()]:
+        full_path = os.path.join(base, filename)
+        if os.path.exists(full_path) and os.path.isfile(full_path):
+            try:
+                os.remove(full_path)
+                break
+            except Exception as e:
+                print(f"Error removing file {full_path}: {e}")
 
 @event.listens_for(Client, 'after_delete')
 def receive_after_delete_client(mapper, connection, target):
