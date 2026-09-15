@@ -28,6 +28,9 @@
             </a>
             <div style="display: flex; align-items: center; gap: 8px;">
                 {% if current_user.is_authenticated %}
+                <button type="button" id="btnOpenPerfilModalMobile" title="Minha Senha / Perfil" style="color: var(--text-primary); display: flex; align-items: center; padding: 6px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border-color); cursor: pointer;">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                </button>
                 <form method="POST" action="/logout" style="margin: 0; display: inline-flex;">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" title="Sign Out" style="color: #f87171; text-decoration: none; display: flex; align-items: center; padding: 6px; border-radius: 8px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); cursor: pointer;">
@@ -92,13 +95,19 @@
                         </div>
                     </div>
                 </div>
-                <form method="POST" action="/logout" style="margin: 0; width: 100%;">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 0.5rem; color: #f87171; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.08); cursor: pointer; display: flex; align-items: center; gap: 6px;">
-                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                        Sign Out
+                <div style="display: flex; gap: 0.5rem; width: 100%;">
+                    <button type="button" id="btnOpenPerfilModal" class="btn-secondary" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.5rem 0.6rem; color: var(--text-primary); border-color: var(--border-color); background: rgba(255,255,255,0.04); cursor: pointer; display: flex; align-items: center; gap: 6px;" title="Alterar Minha Senha">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                        Senha
                     </button>
-                </form>
+                    <form method="POST" action="/logout" style="margin: 0; flex: 1;">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn-secondary" style="width: 100%; justify-content: center; font-size: 0.8rem; padding: 0.5rem 0.6rem; color: #f87171; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.08); cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                            Sair
+                        </button>
+                    </form>
+                </div>
                 {% endif %}
             </div>
         </aside>
@@ -154,6 +163,83 @@
     
     <script src="/static/js/app_shared.js?v=1"></script>
     {% block scripts %}{% endblock %}
+    {% if current_user.is_authenticated %}
+    <!-- Modal: Alterar Minha Senha / Minha Conta -->
+    <div id="perfilModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="perfilModalTitle">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(234, 88, 12, 0.15); border: 1px solid rgba(234, 88, 12, 0.3); display: flex; align-items: center; justify-content: center; color: var(--accent);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                    </div>
+                    <div>
+                        <h3 id="perfilModalTitle" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">Alterar Minha Senha</h3>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">Credenciais da conta de operador</div>
+                    </div>
+                </div>
+                <button type="button" id="closePerfilModal" class="modal-close" title="Fechar" aria-label="Fechar">&times;</button>
+            </div>
+            
+            <div class="modal-body" style="padding: 1.5rem;">
+                <!-- Cartão Resumo do Usuário -->
+                <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 12px; padding: 0.875rem 1rem; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 1rem; flex-shrink: 0;">
+                        {{ current_user.nome[0] if current_user.nome else 'U' }}
+                    </div>
+                    <div style="min-width: 0; flex: 1;">
+                        <div style="font-weight: 700; font-size: 0.9rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ current_user.nome }}
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {{ current_user.email }}
+                        </div>
+                    </div>
+                    <span class="badge" style="background: {% if current_user.role == 'admin' %}rgba(168, 85, 247, 0.2){% else %}rgba(59, 130, 246, 0.2){% endif %}; color: {% if current_user.role == 'admin' %}#c084fc{% else %}#60a5fa{% endif %}; border: 1px solid {% if current_user.role == 'admin' %}rgba(168, 85, 247, 0.3){% else %}rgba(59, 130, 246, 0.3){% endif %}; text-transform: uppercase; font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+                        {{ current_user.role or 'Staff' }}
+                    </span>
+                </div>
+
+                <!-- Box de Mensagens/Feedback -->
+                <div id="perfilModalAlert" style="display: none; padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 1.25rem; font-size: 0.85rem;"></div>
+
+                <!-- Formulário -->
+                <form id="formAlterarSenha" onsubmit="handleAlterarSenha(event)">
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="senhaAtualInput" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Senha Atual</label>
+                        <div style="position: relative;">
+                            <input type="password" id="senhaAtualInput" required placeholder="Digite sua senha atual" autocomplete="current-password" style="width: 100%; padding: 0.75rem 2.5rem 0.75rem 0.875rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.6); color: var(--text-primary); font-size: 0.9rem;">
+                            <button type="button" onclick="toggleSenhaInput('senhaAtualInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1rem;">
+                        <label for="novaSenhaInput" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Nova Senha <span style="font-weight: 400; font-size: 0.75rem;">(mínimo 6 caracteres)</span></label>
+                        <div style="position: relative;">
+                            <input type="password" id="novaSenhaInput" required minlength="6" placeholder="Digite a nova senha" autocomplete="new-password" style="width: 100%; padding: 0.75rem 2.5rem 0.75rem 0.875rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.6); color: var(--text-primary); font-size: 0.9rem;">
+                            <button type="button" onclick="toggleSenhaInput('novaSenhaInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar">👁️</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <label for="confirmarSenhaInput" style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Confirmar Nova Senha</label>
+                        <div style="position: relative;">
+                            <input type="password" id="confirmarSenhaInput" required minlength="6" placeholder="Repita a nova senha" autocomplete="new-password" style="width: 100%; padding: 0.75rem 2.5rem 0.75rem 0.875rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.6); color: var(--text-primary); font-size: 0.9rem;">
+                            <button type="button" onclick="toggleSenhaInput('confirmarSenhaInput')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem;" title="Mostrar/Ocultar">👁️</button>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                        <button type="button" id="btnCancelPerfilModal" class="btn-secondary" style="padding: 0.75rem 1.25rem;">Cancelar</button>
+                        <button type="submit" id="btnSalvarNovaSenha" class="btn-primary" style="padding: 0.75rem 1.25rem; font-weight: 600;">
+                            <span>Salvar Nova Senha</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <script>
         const mobileMenuBtn = document.getElementById('mobileMenuBtn');
         const sidebar = document.getElementById('sidebar');
@@ -173,6 +259,137 @@
         }
         if (sidebarBackdrop) {
             sidebarBackdrop.addEventListener('click', toggleSidebar);
+        }
+
+        // --- Perfil & Troca de Senha Modal ---
+        function toggleSenhaInput(id) {
+            const input = document.getElementById(id);
+            if (input) {
+                input.type = input.type === 'password' ? 'text' : 'password';
+            }
+        }
+
+        const perfilModal = document.getElementById('perfilModal');
+        const btnOpenPerfilModal = document.getElementById('btnOpenPerfilModal');
+        const btnOpenPerfilModalMobile = document.getElementById('btnOpenPerfilModalMobile');
+        const closePerfilModal = document.getElementById('closePerfilModal');
+        const btnCancelPerfilModal = document.getElementById('btnCancelPerfilModal');
+        const formAlterarSenha = document.getElementById('formAlterarSenha');
+        const perfilModalAlert = document.getElementById('perfilModalAlert');
+        const btnSalvarNovaSenha = document.getElementById('btnSalvarNovaSenha');
+
+        function openPerfilModalFunc() {
+            if (perfilModal) {
+                perfilModal.classList.add('active');
+                if (perfilModalAlert) {
+                    perfilModalAlert.style.display = 'none';
+                    perfilModalAlert.textContent = '';
+                }
+                if (formAlterarSenha) formAlterarSenha.reset();
+                setTimeout(() => {
+                    const el = document.getElementById('senhaAtualInput');
+                    if (el) el.focus();
+                }, 100);
+            }
+        }
+
+        function closePerfilModalFunc() {
+            if (perfilModal) {
+                perfilModal.classList.remove('active');
+                if (formAlterarSenha) formAlterarSenha.reset();
+                if (perfilModalAlert) {
+                    perfilModalAlert.style.display = 'none';
+                    perfilModalAlert.textContent = '';
+                }
+            }
+        }
+
+        if (btnOpenPerfilModal) btnOpenPerfilModal.addEventListener('click', openPerfilModalFunc);
+        if (btnOpenPerfilModalMobile) btnOpenPerfilModalMobile.addEventListener('click', openPerfilModalFunc);
+        if (closePerfilModal) closePerfilModal.addEventListener('click', closePerfilModalFunc);
+        if (btnCancelPerfilModal) btnCancelPerfilModal.addEventListener('click', closePerfilModalFunc);
+        if (perfilModal) {
+            perfilModal.addEventListener('click', (e) => {
+                if (e.target === perfilModal) closePerfilModalFunc();
+            });
+        }
+
+        async function handleAlterarSenha(e) {
+            e.preventDefault();
+            const senhaAtual = document.getElementById('senhaAtualInput').value;
+            const novaSenha = document.getElementById('novaSenhaInput').value;
+            const confirmarSenha = document.getElementById('confirmarSenhaInput').value;
+
+            if (!senhaAtual || !novaSenha || !confirmarSenha) {
+                showPerfilAlert('Preencha todos os campos.', 'error');
+                return;
+            }
+            if (novaSenha.length < 6) {
+                showPerfilAlert('A nova senha deve ter no mínimo 6 caracteres.', 'error');
+                return;
+            }
+            if (novaSenha !== confirmarSenha) {
+                showPerfilAlert('A confirmação não confere com a nova senha.', 'error');
+                return;
+            }
+            if (senhaAtual === novaSenha) {
+                showPerfilAlert('A nova senha deve ser diferente da atual.', 'error');
+                return;
+            }
+
+            if (btnSalvarNovaSenha) {
+                btnSalvarNovaSenha.disabled = true;
+                btnSalvarNovaSenha.innerHTML = '<span>Salvando...</span>';
+            }
+
+            try {
+                const csrfToken = '{{ csrf_token() }}';
+                const resp = await fetch('/api/perfil/alterar-senha', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        senha_atual: senhaAtual,
+                        nova_senha: novaSenha,
+                        confirmar_senha: confirmarSenha
+                    })
+                });
+
+                const data = await resp.json();
+                if (resp.ok && data.success) {
+                    showPerfilAlert('✅ ' + (data.message || 'Senha alterada com sucesso!'), 'success');
+                    if (formAlterarSenha) formAlterarSenha.reset();
+                    setTimeout(() => {
+                        closePerfilModalFunc();
+                    }, 1500);
+                } else {
+                    showPerfilAlert(data.error || 'Erro ao alterar senha.', 'error');
+                }
+            } catch (err) {
+                showPerfilAlert('Erro de conexão com o servidor. Tente novamente.', 'error');
+            } finally {
+                if (btnSalvarNovaSenha) {
+                    btnSalvarNovaSenha.disabled = false;
+                    btnSalvarNovaSenha.innerHTML = '<span>Salvar Nova Senha</span>';
+                }
+            }
+        }
+
+        function showPerfilAlert(msg, type) {
+            if (!perfilModalAlert) return;
+            perfilModalAlert.style.display = 'block';
+            if (type === 'success') {
+                perfilModalAlert.style.background = 'rgba(16, 185, 129, 0.15)';
+                perfilModalAlert.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                perfilModalAlert.style.color = '#34d399';
+            } else {
+                perfilModalAlert.style.background = 'rgba(239, 68, 68, 0.15)';
+                perfilModalAlert.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                perfilModalAlert.style.color = '#f87171';
+            }
+            perfilModalAlert.textContent = msg;
         }
     </script>
 </body>

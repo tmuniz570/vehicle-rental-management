@@ -97,6 +97,11 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 if os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or (os.environ.get('FLASK_ENV') == 'production' and os.environ.get('HTTPS') == 'on'):
     app.config['SESSION_COOKIE_SECURE'] = True
 
+# Segurança de Sessão: Expiração por Inatividade (padrão 60 min) e Duração Máxima
+SESSION_IDLE_TIMEOUT_SECONDS = int(os.environ.get('SESSION_IDLE_TIMEOUT_SECONDS', 3600))  # 60 minutos
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(hours=12)
+
 # Garante tipos MIME corretos no Windows para que imagens e documentos abram em nova aba e não façam download
 import mimetypes
 mimetypes.add_type('image/webp', '.webp')
@@ -219,6 +224,27 @@ def check_authentication():
     if app.config.get('LOGIN_DISABLED'):
         return
 
+    # Verificação de sessão ativa e timeout de inatividade (60 minutos)
+    if current_user.is_authenticated:
+        now = time.time()
+        last_activity = session.get('last_activity')
+
+        # Se não há registro de atividade recente ou ultrapassou o tempo limite de inatividade
+        if last_activity is None or (now - float(last_activity)) > SESSION_IDLE_TIMEOUT_SECONDS:
+            logout_user()
+            session.pop('last_activity', None)
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    "error": "SessionExpired",
+                    "message": "Sua sessão expirou por inatividade (60 minutos). Faça login novamente."
+                }), 401
+            flash('Sua sessão expirou por inatividade após 60 minutos. Por segurança, faça login novamente.', 'warning')
+            return redirect(url_for('login', next=request.path))
+
+        # Atualiza o timestamp da última atividade do usuário
+        session['last_activity'] = now
+        return
+
     if not current_user.is_authenticated:
         if request.path.startswith('/api/'):
             return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
@@ -246,7 +272,9 @@ def login():
                 return render_template('login.html', email=email)
                 
             clear_failed_logins(client_ip)
+            session.permanent = True
             login_user(user, remember=remember)
+            session['last_activity'] = time.time()
             next_page = request.args.get('next')
             if not next_page or not next_page.startswith('/'):
                 next_page = url_for('index')
@@ -260,6 +288,7 @@ def login():
 
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
+    session.pop('last_activity', None)
     logout_user()
     flash('Você saiu do sistema com segurança.', 'info')
     return redirect(url_for('login'))
@@ -638,6 +667,38 @@ def deletar_usuario(user_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Failed to delete user: {str(e)}'}), 500
+
+@app.route('/api/perfil/alterar-senha', methods=['POST'])
+@login_required
+def alterar_propria_senha():
+    data = request.get_json() or {}
+    senha_atual = (data.get('senha_atual') or '').strip()
+    nova_senha = data.get('nova_senha') or ''
+    confirmar_senha = data.get('confirmar_senha') or ''
+
+    if not senha_atual or not nova_senha or not confirmar_senha:
+        return jsonify({'error': 'Todos os campos de senha são obrigatórios.'}), 400
+
+    if not current_user.check_password(senha_atual):
+        return jsonify({'error': 'A senha atual informada está incorreta.'}), 400
+
+    if len(nova_senha) < 6:
+        return jsonify({'error': 'A nova senha deve ter no mínimo 6 caracteres.'}), 400
+
+    if nova_senha != confirmar_senha:
+        return jsonify({'error': 'A confirmação de senha não confere com a nova senha.'}), 400
+
+    if senha_atual == nova_senha:
+        return jsonify({'error': 'A nova senha deve ser diferente da senha atual.'}), 400
+
+    try:
+        current_user.set_password(nova_senha)
+        db.session.commit()
+        registrar_log('PASSWORD_CHANGE', 'User', current_user.id, f"Usuário {current_user.nome} alterou a própria senha")
+        return jsonify({'success': True, 'message': 'Sua senha foi alterada com sucesso!'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Erro ao salvar nova senha: {str(e)}'}), 500
 
 @app.route('/api/auditoria', methods=['GET'])
 @admin_required

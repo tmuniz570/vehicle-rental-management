@@ -80,6 +80,11 @@
             border: 1px solid rgba(239, 68, 68, 0.3);
             color: #f87171;
         }
+        .alert-warning {
+            background: rgba(245, 158, 11, 0.15);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
         .alert-info {
             background: rgba(59, 130, 246, 0.15);
             border: 1px solid rgba(59, 130, 246, 0.3);
@@ -121,8 +126,8 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert-box {% if category == 'error' %}alert-error{% else %}alert-info{% endif %}">
-                        <span>{% if category == 'error' %}⚠️{% else %}ℹ️{% endif %}</span>
+                    <div class="alert-box {% if category in ['error', 'danger'] %}alert-error{% elif category == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+                        <span>{% if category in ['error', 'danger'] %}⚠️{% elif category == 'warning' %}⏳{% else %}ℹ️{% endif %}</span>
                         <span>{{ message }}</span>
                     </div>
                 {% endfor %}
@@ -145,7 +150,7 @@
 
             <div class="login-options">
                 <label class="remember-me">
-                    <input type="checkbox" name="remember" value="true" checked>
+                    <input type="checkbox" name="remember" value="true">
                     <span>Keep me signed in</span>
                 </label>
             </div>
