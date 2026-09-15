@@ -22,7 +22,10 @@ backups/
 .env
 *.env
 
-# SQLite temporary/journal files
+# SQLite databases & temporary/journal files
+*.db
+*.sqlite
+*.sqlite3
 *.db-journal
 *.db-wal
 *.db-shm
