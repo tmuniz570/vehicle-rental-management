@@ -4,6 +4,44 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.4.0] — 2026-09-16 — *Claims & Storage Module, Modular Permissions & Server-side Tables*
+
+### 📁 Módulo de Claims & Storage (McAms / ALS / 365)
+* **Gestão de Sinistros e Parcerias de Acidentes:**
+  - Módulo completo (`/claims`) para controle de processos terceirizados com as seguradoras parceiras (**McAms**, **ALS** e **365**).
+  - Controle automático do **prazo de indicação (14 dias)** a partir da data de aprovação do sinistro, com avisos de atraso e registro de quitação.
+  - Controle de permanência da moto no **pátio/storage (limite de 28 dias)**, com alertas preventivos de liberação.
+  - Cálculo automático de faturamento de storage `(Dias no pátio × £15.00/dia)` e geração de faturas timbradas.
+* **Invoice de Storage Timbrado e Profissional:**
+  - Página dedicada (`/claims/invoice/<id>`) para visualização e impressão de faturas de storage com os endereços oficiais e dados corporativos no Reino Unido das empresas McAms, ALS e 365.
+* **Tabela de Alta Performance:**
+  - Paginação server-side (20 registros/página) com controles de navegação e contador de processos.
+  - Ordenação por qualquer coluna da tabela (número do processo, status, cliente, indicação, dias de storage, total de invoice).
+  - Filtro avançado de período por datas (Acidente, Aprovação, Entrada no Pátio, Liberação, Envio do Invoice ou Cadastro).
+  - Cards de KPI globais e estáveis no topo da tela com métrica focada em **Processos Abertos**.
+
+### 🔐 Permissões Modulares Granulares (Substituição de Role Único)
+* **Arquitetura Limpa de Permissões no Usuário:**
+  - Campo booleano `perm_alugueis`: libera ou restringe acesso total a motos, clientes, contratos, vistorias e financeiro.
+  - Campo booleano `perm_claims`: libera acesso ao módulo de Claims e Storage.
+  - Campo booleano `is_admin`: controle administrativo total (criação e exclusão de contas, redefinição de senhas e auditoria).
+* **Isolamento Completo no Dashboard e Rotas:**
+  - Bloqueio em nível de rota e API (`@alugueis_required`, `@claims_required`, `@admin_required`) com retorno estruturado `403 Forbidden` ou redirecionamento defensivo.
+  - Menu lateral dinâmico que esconde seções para as quais o operador não possui permissão.
+  - Dashboard adaptativo que oculta os cards de frota e financeiro para operadores com acesso exclusivo a claims.
+* **Gestão de Usuários Reformulada:**
+  - Modais em `/usuarios` com toggles claros para cada módulo.
+  - Correção na exclusão de contas com cabeçalhos de proteção CSRF automáticos.
+
+### 🗄️ Banco de Dados & Deploy com Zero Downtime
+* **Auto-migração no SQLite:**
+  - Criação automática da tabela `claims` e dos índices `idx_claims_number`, `idx_claims_placa`, `idx_claims_status` e `idx_claims_empresa`.
+  - Migração retrocompatível das colunas modulares da tabela `usuarios`.
+* **Documentação Oficial:**
+  - Criação do manual [DEPLOY_E_BANCO_DE_DADOS.md](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/docs/DEPLOY_E_BANCO_DE_DADOS.md) e do plano de arquitetura [plano_claims_modular.md](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/docs/plano_claims_modular.md).
+
+---
+
 ## [1.3.0] — 2026-09-15 — *Security Hardening, Database Concurrency & Performance Suite*
 
 ### 🛡️ Segurança Web Avançada & Proteção de Dados

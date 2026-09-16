@@ -40,43 +40,51 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
 * **1-Tap WhatsApp Integration:** Automatic normalization and international formatting of UK phone numbers (`+447...`) allowing instant WhatsApp chat links from any contract or customer card.
 
-### 📋 4. Contract & Security Deposit Accounting
+### 📁 4. Claims & Storage Management (McAms / ALS / 365)
+* **Accident Claim Lifecycle:** Comprehensive tracking of insurance claims referred to partner companies (**McAms**, **ALS**, **365**), from approval date to payout.
+* **Referral Fee Deadlines (14 Days):** Automatic calculation of the 14-day referral commission deadline following claim approval, with overdue alerts and settlement logging.
+* **Yard Storage Limits (28 Days):** Automated monitoring of bikes stored on the yard awaiting insurer inspection, with 28-day release threshold alerts.
+* **Storage Invoicing (14 Days):** Instant calculation of storage duration `(Days × £15/day)` upon bike release, dedicated printable and branded Storage Invoices, and 14-day insurer payment due dates.
+* **Server-Side Pagination, Sorting & Date Period Filters:** Fast pagination (20 items/page), multi-column sorting, and multi-field date range filtering (Accident, Approval, Storage In, Release, Invoice Sent, Created).
+
+### 📋 5. Contract & Security Deposit Accounting
 * **Automated Initial Billing:** Creating a contract instantly provisions Week 1 rent (due upon collection) and Week 2 recurring rent (scheduled for the client's chosen weekday payment cycle).
 * **Deposit Lifecycle Management:** Security deposit holding, balance calculation, and automated deductions when damages or fines occur.
 * **Contract Completion Workflow:** Return inspection mandatory review, deposit refund processing, and proof of bank transfer attachment.
 
-### 🔍 5. Digital Mobile Inspections & Incident Logging
+### 🔍 6. Digital Mobile Inspections & Incident Logging
 * **Multi-Angle Camera Capture:** Tailored for yard operators using smartphones to snap vehicle photos at check-out, return check-in, or road incidents.
 * **Client-Side Image Compression:** Automatic compression via `browser-image-compression` converting high-res smartphone captures to lightweight WebP formats before upload, saving bandwidth and cloud storage.
 * **High-Definition Gallery:** Inspection modals with zoomable image grids and timestamped condition logs.
 
-### 💳 6. Financial Statements, Overdue Reports & Receipts
+### 💳 7. Financial Statements, Overdue Reports & Receipts
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
 * **Payment Cancellation & Reversal:** Operational ability to cancel a completed payment, revert transaction to pending, and automatically record the action in the employee audit log.
-* **Overdue Report:** Dedicated centralized page (`/relatorio-vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions.
+* **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions.
 * **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, and PDF-friendly styling.
 * **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
 
-### 📱 7. Mobile-First & PWA Experience
+### 📱 8. Mobile-First & PWA Experience
 * **Native-Style Bottom Navigation:** High-usability bottom navigation bar enabled exclusively on mobile viewports (`<= 768px`) with iOS Safe Area Insets support.
 * **Installable App:** Manifest configuration (`manifest.json`) and app icons allowing home screen installation on iOS (Safari) and Android (Chrome).
 
-### 🔐 8. Authentication, User Management, Web Hardening & Audit Trail
+### 🔐 9. Authentication, Modular Permissions, Web Hardening & Audit Trail
+* **Granular Modular Access Control:** True role separation allowing individual per-user permission toggles:
+  - **Rental Module (`perm_alugueis`):** Access to fleet, customers, contracts, inspections, financial transactions, and overdue reports. Non-rental users are strictly blocked at route and API levels.
+  - **Claims Module (`perm_claims`):** Access to accident claims, yard storage monitoring, referral fees, and storage invoices.
+  - **Administrator (`is_admin`):** Full privileges to manage accounts, audit logs, and system operations.
 * **Secure Session Auth, Idle Timeout & Brute-Force Rate Limiting:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`). Configured with a 60-minute idle inactivity timeout (`check_authentication` hook), 12-hour session lifetime cap, and opt-in "Keep me signed in" checkbox. Built-in thread-safe IP rate limiter restricting failed login attempts to a maximum of 10 within 15 minutes (HTTP 429 on abuse).
 * **CSRF Protection & Secure POST Logout:** Universal CSRF protection intercepting all state-altering requests (`POST`, `PUT`, `DELETE`, `PATCH`). Logout upgraded to CSRF-protected `POST` with public route isolation to prevent redirect loops.
 * **Strict Upload Whitelist & Sandboxed Delivery:** File uploads strictly limited to safe image and document extensions (`.jpg`, `.jpeg`, `.png`, `.webp`, `.pdf`). Static file delivery `/static/uploads/...` enforces `Content-Security-Policy: default-src 'none'; sandbox` and `X-Content-Type-Options: nosniff`.
 * **Complete XSS Neutralization:** Dynamic table rendering and modal DOM construction across all frontend modules implement HTML entity escaping (`escapeHtml`).
-* **Staff & Operator Management with Self-Service Password Change:** Full administrative panel (`/usuarios`) for administrators to manage accounts and credentials. In addition, all authenticated operators (staff and admins) have direct access to a dedicated self-service "Change Password" modal (`/api/perfil/alterar-senha`) directly from the sidebar and mobile header, requiring verification of their current password and logging the change in audit history.
-* **Internal Accountability & Audit Trail:** Automatic tracking of which staff member created contracts, marked payments as received, cancelled transactions, or conducted vehicle inspections. Live activity stream with filters for complete company oversight.
-* **Client Privacy Guarantee:** Customer-facing documents strictly remain 100% corporate under FF Motors branding with zero exposure of internal employee records.
+* **Staff & Operator Management with Self-Service Password Change:** Full administrative panel (`/usuarios`) for administrators to manage accounts and credentials. In addition, all authenticated operators have direct access to a dedicated self-service "Change Password" modal (`/api/perfil/alterar-senha`) directly from the sidebar and mobile header.
+* **Internal Accountability & Audit Trail:** Automatic tracking of which staff member created contracts, marked payments as received, cancelled transactions, conducted vehicle inspections, or deleted user accounts.
 
-### 🛡️ 9. Production WSGI Architecture, Concurrency & High Performance
+### 🛡️ 10. Production WSGI Architecture, Concurrency & High Performance
 * **Zero N+1 Query Architecture:** Dashboard metrics and financial aggregations execute via direct SQL aggregates (`func.sum`, `func.count`) and strategic `joinedload` eager-loading for blazing fast response times.
 * **SQLite WAL Mode & Concurrency:** Database connection configured with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, 30s busy timeout, and enforced relational integrity (`foreign_keys = ON`) for lock-free concurrent reads during background writes.
-* **15 Strategic Database Indexes:** Foreign keys and frequent filter columns (`id_cliente`, `placa`, `status`, `data_vencimento`, `vencimento_mot`, `vencimento_tax`, etc.) are pre-indexed for high scalability.
+* **Strategic Database Indexes:** Foreign keys, filter columns (`id_cliente`, `placa`, `status`, `data_vencimento`, `vencimento_mot`, `vencimento_tax`), and claim indexes (`claim_number`, `empresa_parceira`, `placa`) are pre-indexed for high scalability.
 * **Multi-Worker Job Concurrency Lock (`JobExecutionLock`):** Database-backed atomic lock ensuring background billing executes exactly once per day across multiple WSGI workers at **01:00 AM London Time**.
-* **Modern SQLAlchemy 2.0:** All queries modernized to `db.session.get(Model, id)`.
-* **Hybrid Global Error Handling:** Custom 404, 500, and 429 handlers delivering structured JSON for `/api/...` requests and elegant dark-themed HTML error pages (`404.html`, `500.html`) for browser navigation.
 * **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (GCP, AWS, Render, Railway).
 * **Point-in-Time Backups & Disaster Recovery:** Automated utilities for snapshot archives (`backup.py`), database restore (`restore.py`), and demo data seeding (`seed_data.py`).
 
@@ -189,7 +197,7 @@ FF Motors APP/
 ├── wsgi.py                    # Production WSGI server runner (Waitress / Multi-threaded)
 ├── gunicorn_config.py         # Production Gunicorn server config for Linux cloud deployment
 ├── Procfile                   # Cloud PaaS entrypoint (Render, Railway, Heroku)
-├── database.py                # Database models (User, Clients, Motos, Contracts, Inspections, Transactions)
+├── database.py                # Database models (User, Clients, Motos, Contracts, Inspections, Claims, Transactions)
 ├── backup.py                  # Automated database & asset backup utility
 ├── restore.py                 # Restoration utility for backup archives
 ├── reset_data.py              # Development data wipe utility
@@ -197,24 +205,30 @@ FF Motors APP/
 ├── requirements.txt           # Production Python dependencies
 ├── .env.example               # Template environment configuration
 ├── CHANGELOG.md               # Detailed history of releases and changes
+├── docs/                      # Architectural and operational documentation
+│   ├── DEPLOY_E_BANCO_DE_DADOS.md # Zero-downtime deploy & database migration manual
+│   └── plano_claims_modular.md   # Claims module architecture and permissions design
 ├── static/
 │   ├── css/
 │   │   └── styles.css         # Glassmorphism design system & responsive rules
 │   ├── js/
-│   │   ├── app_shared.js      # Global layout & universal CSRF fetch interceptor
+│   │   ├── app_shared.js      # Global layout, sorting & universal CSRF fetch interceptor
+│   │   ├── claims.js          # Claims lifecycle, sorting, pagination & period filter logic
 │   │   ├── detalhe_contrato.js# Contract ledger, modal accounting & inspection handling
 │   │   ├── financeiro.js      # Financial transactions filtering & payment modals
 │   │   ├── motos.js           # Fleet management logic & maintenance triggers
-│   │   ├── usuarios.js        # User accounts & audit log timeline scripts
+│   │   ├── usuarios.js        # Modular permissions, accounts & audit log timeline scripts
 │   │   └── vistorias_lista.js # Inspection gallery & photo previews
 │   ├── images/                # Brand assets (logo, icons)
 │   ├── uploads/               # Stored inspection photos & client documents (.gitkeep)
 │   └── manifest.json          # PWA progressive web app configuration
 └── templates/
-    ├── layout.html            # Base master layout with mobile bottom navigation
+    ├── layout.html            # Base master layout with modular permissions sidebar
     ├── login.html             # Glassmorphism dark authentication screen
+    ├── index.html             # Executive operational dashboard (filtered by module access)
+    ├── claims.html            # Claims & Storage management (McAms/ALS/365)
+    ├── claim_invoice.html     # Dedicated printable Storage Invoice template
     ├── usuarios.html          # User management & audit log dashboard
-    ├── index.html             # Executive operational dashboard
     ├── contratos.html         # Contracts list & status filtering
     ├── detalhe_contrato.html  # Comprehensive agreement view & financial statement
     ├── financeiro.html        # Central finance statement & transaction ledger
