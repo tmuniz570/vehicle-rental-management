@@ -430,14 +430,24 @@ async function toggleStatusUsuario(userId, novoStatus) {
     }
 }
 
+async function confirmarExclusaoUsuario(userId, nome) {
+    return deletarUsuario(userId, nome);
+}
+
 async function deletarUsuario(userId, nome) {
     if (!confirm(`CAUTION: Are you sure you want to permanently delete user "${nome}"? This action cannot be undone.`)) {
         return;
     }
 
     try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
         const response = await fetch(`/api/usuarios/${userId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'X-CSRF-Token': csrfToken,
+                'Content-Type': 'application/json'
+            }
         });
 
         const res = await response.json();
@@ -449,8 +459,8 @@ async function deletarUsuario(userId, nome) {
         await carregarUsuarios();
         alert('User account deleted.');
     } catch (error) {
-        console.error('Error:', error);
-        alert('Error deleting user');
+        console.error('Error deleting user:', error);
+        alert('Error deleting user. Please check server logs.');
     }
 }
 
