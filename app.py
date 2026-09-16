@@ -17,7 +17,7 @@ from flask_login import (
 from database import (
     db, init_db, Contract, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
-    User, AuditLog, JobExecutionLock
+    User, AuditLog, JobExecutionLock, Claim
 )
 from sqlalchemy.orm import joinedload
 import werkzeug.utils
@@ -134,10 +134,40 @@ def unauthorized_callback():
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or getattr(current_user, 'role', '') != 'admin':
+        if not current_user.is_authenticated or not getattr(current_user, 'is_admin', False):
             if request.path.startswith('/api/'):
                 return jsonify({"error": "Forbidden", "message": "Admin privileges required"}), 403
             flash('Acesso restrito a administradores.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def alugueis_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
+            return redirect(url_for('login', next=request.path))
+        if not current_user.pode_alugueis():
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Forbidden", "message": "Acesso restrito ao módulo de aluguéis"}), 403
+            flash('Você não tem permissão para acessar o módulo de aluguéis.', 'warning')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def claims_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
+            return redirect(url_for('login', next=request.path))
+        if not current_user.pode_claims():
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Forbidden", "message": "Acesso restrito ao módulo de claims & storage"}), 403
+            flash('Você não tem permissão para acessar o módulo de Claims & Storage.', 'warning')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -180,7 +210,7 @@ app.jinja_env.globals['csrf_token'] = generate_csrf_token
 
 @app.before_request
 def validate_csrf():
-    if app.config.get('TESTING') and not app.config.get('WTF_CSRF_ENABLED', True):
+    if (app.config.get('TESTING') or os.environ.get('FLASK_ENV') == 'testing') and not app.config.get('WTF_CSRF_ENABLED', True):
         return
     if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
         if request.path.startswith('/static/') or request.endpoint == 'custom_static_uploads':
@@ -372,6 +402,9 @@ def seed_default_admin():
                     nome="Thiago Brandão",
                     email="tmuniz570@gmail.com",
                     role="admin",
+                    is_admin=True,
+                    perm_alugueis=True,
+                    perm_claims=True,
                     ativo=True
                 )
                 admin.set_password("Admin123!")
@@ -442,46 +475,57 @@ def index():
     return render_template('index.html')
 
 @app.route('/clientes/novo')
+@alugueis_required
 def pagina_cadastro_cliente():
     return render_template('cadastro_cliente.html')
 
 @app.route('/clientes')
+@alugueis_required
 def pagina_clientes():
     return render_template('clientes.html')
 
 @app.route('/motos')
+@alugueis_required
 def pagina_motos():
     return render_template('motos.html')
 
 @app.route('/motos/nova')
+@alugueis_required
 def pagina_cadastro_moto():
     return render_template('cadastro_moto.html')
 
 @app.route('/contratos')
+@alugueis_required
 def pagina_contratos():
     return render_template('contratos.html')
 
 @app.route('/contratos/novo')
+@alugueis_required
 def pagina_novo_contrato():
     return render_template('novo_contrato.html')
 
 @app.route('/vistorias/nova')
+@alugueis_required
 def pagina_nova_vistoria():
     return render_template('vistoria.html')
 
 @app.route('/financeiro')
+@alugueis_required
 def pagina_financeiro():
     return render_template('financeiro.html')
 
 @app.route('/vistorias')
+@alugueis_required
 def pagina_vistorias_lista():
     return render_template('vistorias_lista.html')
 
 @app.route('/relatorios')
+@alugueis_required
 def pagina_relatorios():
     return redirect('/financeiro')
 
 @app.route('/relatorios/vencidos')
+@alugueis_required
 def relatorio_vencidos():
     agora_london = get_london_now()
     transacoes = FinancialTransaction.query.options(
@@ -511,6 +555,7 @@ def relatorio_vencidos():
     return render_template('relatorio_vencidos.html', dados=dados, total=total, agora=agora)
 
 @app.route('/contratos/<int:id>')
+@alugueis_required
 def pagina_detalhes_contrato(id):
     return render_template('detalhe_contrato.html', contrato_id=id)
 
@@ -518,6 +563,436 @@ def pagina_detalhes_contrato(id):
 @admin_required
 def pagina_usuarios():
     return render_template('usuarios.html')
+
+# --- CLAIMS & STORAGE ROUTES ---
+
+@app.route('/claims')
+@claims_required
+def pagina_claims():
+    return render_template('claims.html')
+
+@app.route('/claims/invoice/<int:id>')
+@claims_required
+def pagina_claim_invoice(id):
+    claim = db.session.get(Claim, id)
+    if not claim:
+        return render_template('404.html'), 404
+    return render_template('claim_invoice.html', claim=claim)
+
+@app.route('/api/claims', methods=['GET'])
+@claims_required
+def listar_claims():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    search = request.args.get('search', '').strip()
+    empresa = request.args.get('empresa', '').strip()
+    status_filtro = request.args.get('status', '').strip()
+    campo_data = request.args.get('campo_data', 'acidente').strip()
+    data_inicio = request.args.get('data_inicio', '').strip()
+    data_fim = request.args.get('data_fim', '').strip()
+    sort_by = request.args.get('sort_by', 'id').strip().lower()
+    sort_order = request.args.get('sort_order', 'desc').strip().lower()
+    hoje = get_london_date()
+
+    query = Claim.query
+    if search:
+        search_clean = search.replace(' ', '')
+        term = f"%{search}%"
+        term_clean = f"%{search_clean}%"
+        query = query.filter(db.or_(
+            Claim.claim_number.ilike(term),
+            Claim.cliente_nome.ilike(term),
+            Claim.placa.ilike(term_clean),
+            Claim.placa.ilike(term),
+            Claim.modelo_moto.ilike(term)
+        ))
+    if empresa:
+        query = query.filter(Claim.empresa_parceira == empresa)
+    if status_filtro:
+        query = query.filter(Claim.status == status_filtro)
+
+    # Filtro de Período de Datas
+    col_data_map = {
+        'acidente': Claim.data_acidente,
+        'aprovacao': Claim.data_aprovacao,
+        'storage_entrada': Claim.data_entrada_storage,
+        'storage_liberacao': Claim.data_liberacao_storage,
+        'invoice': Claim.data_envio_invoice,
+        'criacao': Claim.data_criacao
+    }
+    target_data_col = col_data_map.get(campo_data, Claim.data_acidente)
+
+    if data_inicio:
+        try:
+            d_ini = datetime.strptime(data_inicio, '%Y-%m-%d').date()
+            if campo_data == 'criacao':
+                query = query.filter(target_data_col >= datetime.combine(d_ini, datetime.min.time()))
+            else:
+                query = query.filter(target_data_col >= d_ini)
+        except Exception:
+            pass
+
+    if data_fim:
+        try:
+            d_fim = datetime.strptime(data_fim, '%Y-%m-%d').date()
+            if campo_data == 'criacao':
+                query = query.filter(target_data_col <= datetime.combine(d_fim, datetime.max.time()))
+            else:
+                query = query.filter(target_data_col <= d_fim)
+        except Exception:
+            pass
+
+    # KPIs Globais do Módulo (visão geral permanente e estável, independente dos filtros da tabela)
+    all_claims_global = Claim.query.all()
+    total_indicacao_pendente = 0.0
+    total_storage_pendente = 0.0
+    motos_no_storage = 0
+    alertas_indicacao_atrasada = 0
+    alertas_storage_28d = 0
+    alertas_invoice_atrasado = 0
+    processos_abertos = 0
+
+    for c in all_claims_global:
+        if c.status == 'Em Aberto':
+            processos_abertos += 1
+
+        dias_para_liberacao = (c.prazo_liberacao_storage - hoje).days if (c.prazo_liberacao_storage and c.status_storage == 'No Pátio') else None
+        indicacao_atrasada = bool(c.prazo_indicacao and c.prazo_indicacao < hoje and c.status_indicacao != 'Pago')
+        storage_vencendo_28d = bool(c.prazo_liberacao_storage and c.status_storage == 'No Pátio' and (c.prazo_liberacao_storage <= hoje or (dias_para_liberacao is not None and dias_para_liberacao <= 7)))
+        invoice_atrasado = bool(c.prazo_pagamento_invoice and c.prazo_pagamento_invoice < hoje and c.status_pagamento_storage != 'Pago')
+
+        if c.status_indicacao != 'Pago':
+            total_indicacao_pendente += float(c.valor_indicacao or 0.0)
+            if indicacao_atrasada:
+                alertas_indicacao_atrasada += 1
+
+        if c.status_storage == 'No Pátio':
+            motos_no_storage += 1
+            if storage_vencendo_28d:
+                alertas_storage_28d += 1
+
+        if c.status_pagamento_storage != 'Pago' and float(c.valor_total_storage or 0.0) > 0:
+            total_storage_pendente += float(c.valor_total_storage or 0.0)
+            if invoice_atrasado:
+                alertas_invoice_atrasado += 1
+
+    # Ordenação
+    sort_map = {
+        'id': Claim.id,
+        'claim_number': Claim.claim_number,
+        'processo': Claim.claim_number,
+        'empresa': Claim.empresa_parceira,
+        'empresa_parceira': Claim.empresa_parceira,
+        'status': Claim.status,
+        'cliente': Claim.cliente_nome,
+        'cliente_nome': Claim.cliente_nome,
+        'placa': Claim.placa,
+        'indicacao': Claim.valor_indicacao,
+        'valor_indicacao': Claim.valor_indicacao,
+        'prazo_indicacao': Claim.prazo_indicacao,
+        'storage': Claim.dias_storage,
+        'prazo_storage': Claim.prazo_liberacao_storage,
+        'invoice': Claim.valor_total_storage,
+        'valor_total_storage': Claim.valor_total_storage,
+        'data_criacao': Claim.data_criacao
+    }
+    target_sort_col = sort_map.get(sort_by, Claim.id)
+    order_func = target_sort_col.desc() if sort_order == 'desc' else target_sort_col.asc()
+    
+    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+
+    dados = []
+    for c in paginated.items:
+        # Prazos calculados
+        dias_para_indicacao = (c.prazo_indicacao - hoje).days if (c.prazo_indicacao and c.status_indicacao != 'Pago') else None
+        dias_para_liberacao = (c.prazo_liberacao_storage - hoje).days if (c.prazo_liberacao_storage and c.status_storage == 'No Pátio') else None
+        dias_para_pagamento_invoice = (c.prazo_pagamento_invoice - hoje).days if (c.prazo_pagamento_invoice and c.status_pagamento_storage != 'Pago') else None
+
+        indicacao_atrasada = bool(c.prazo_indicacao and c.prazo_indicacao < hoje and c.status_indicacao != 'Pago')
+        storage_vencendo_28d = bool(c.prazo_liberacao_storage and c.status_storage == 'No Pátio' and (c.prazo_liberacao_storage <= hoje or (dias_para_liberacao is not None and dias_para_liberacao <= 7)))
+        invoice_atrasado = bool(c.prazo_pagamento_invoice and c.prazo_pagamento_invoice < hoje and c.status_pagamento_storage != 'Pago')
+
+        dados.append({
+            'id': c.id,
+            'claim_number': c.claim_number,
+            'empresa_parceira': c.empresa_parceira,
+            'cliente_nome': c.cliente_nome,
+            'cliente_telefone': c.cliente_telefone or '',
+            'placa': c.placa,
+            'modelo_moto': c.modelo_moto or '',
+            'status': c.status,
+            'data_acidente': c.data_acidente.strftime('%Y-%m-%d') if c.data_acidente else None,
+            'data_aprovacao': c.data_aprovacao.strftime('%Y-%m-%d') if c.data_aprovacao else None,
+            'valor_indicacao': float(c.valor_indicacao or 0.0),
+            'prazo_indicacao': c.prazo_indicacao.strftime('%Y-%m-%d') if c.prazo_indicacao else None,
+            'status_indicacao': c.status_indicacao,
+            'data_pagamento_indicacao': c.data_pagamento_indicacao.strftime('%Y-%m-%d') if c.data_pagamento_indicacao else None,
+            'dias_para_indicacao': dias_para_indicacao,
+            'indicacao_atrasada': indicacao_atrasada,
+            'data_entrada_storage': c.data_entrada_storage.strftime('%Y-%m-%d') if c.data_entrada_storage else None,
+            'prazo_liberacao_storage': c.prazo_liberacao_storage.strftime('%Y-%m-%d') if c.prazo_liberacao_storage else None,
+            'data_liberacao_storage': c.data_liberacao_storage.strftime('%Y-%m-%d') if c.data_liberacao_storage else None,
+            'status_storage': c.status_storage,
+            'valor_diaria_storage': float(c.valor_diaria_storage or 15.0),
+            'dias_storage': int(c.dias_storage or 0),
+            'valor_total_storage': float(c.valor_total_storage or 0.0),
+            'dias_para_liberacao': dias_para_liberacao,
+            'storage_vencendo_28d': storage_vencendo_28d,
+            'data_envio_invoice': c.data_envio_invoice.strftime('%Y-%m-%d') if c.data_envio_invoice else None,
+            'prazo_pagamento_invoice': c.prazo_pagamento_invoice.strftime('%Y-%m-%d') if c.prazo_pagamento_invoice else None,
+            'status_pagamento_storage': c.status_pagamento_storage,
+            'data_pagamento_storage': c.data_pagamento_storage.strftime('%Y-%m-%d') if c.data_pagamento_storage else None,
+            'dias_para_pagamento_invoice': dias_para_pagamento_invoice,
+            'invoice_atrasado': invoice_atrasado,
+            'observacoes': c.observacoes or '',
+            'criado_por_nome': c.criado_por_nome or 'System',
+            'data_criacao': c.data_criacao.strftime('%Y-%m-%d %H:%M:%S') if c.data_criacao else None
+        })
+
+    return jsonify({
+        'claims': dados,
+        'itens': dados,
+        'total': paginated.total,
+        'paginas': paginated.pages,
+        'pagina_atual': paginated.page,
+        'resumo': {
+            'total_claims': len(all_claims_global),
+            'processos_abertos': processos_abertos,
+            'total_indicacao_pendente': total_indicacao_pendente,
+            'total_storage_pendente': total_storage_pendente,
+            'motos_no_storage': motos_no_storage,
+            'alertas_indicacao_atrasada': alertas_indicacao_atrasada,
+            'alertas_storage_28d': alertas_storage_28d,
+            'alertas_invoice_atrasado': alertas_invoice_atrasado
+        }
+    }), 200
+
+@app.route('/api/claims', methods=['POST'])
+@claims_required
+def criar_claim():
+    data = request.get_json() or {}
+    claim_number = (data.get('claim_number') or '').strip()
+    empresa_parceira = (data.get('empresa_parceira') or '').strip()
+    cliente_nome = (data.get('cliente_nome') or '').strip()
+    placa = (data.get('placa') or '').strip().upper().replace(' ', '')
+
+    if not claim_number or not empresa_parceira or not cliente_nome or not placa:
+        return jsonify({'error': 'Claim number, empresa parceira, cliente e placa são obrigatórios.'}), 400
+
+    # Validação de unicidade do Claim Number
+    existente = Claim.query.filter(db.func.lower(Claim.claim_number) == claim_number.lower()).first()
+    if existente:
+        return jsonify({'error': f'O número de processo "{claim_number}" já está cadastrado no sistema (Processo #{existente.id} - {existente.cliente_nome}).'}), 400
+
+    def parse_date(val):
+        if not val: return None
+        try:
+            return datetime.strptime(val.strip(), '%Y-%m-%d').date()
+        except Exception:
+            return None
+
+    data_acidente = parse_date(data.get('data_acidente'))
+    data_aprovacao = parse_date(data.get('data_aprovacao'))
+    data_entrada_storage = parse_date(data.get('data_entrada_storage'))
+    data_liberacao_storage = parse_date(data.get('data_liberacao_storage'))
+    data_envio_invoice = parse_date(data.get('data_envio_invoice'))
+    
+    valor_indicacao = float(data.get('valor_indicacao') or 0.0)
+    valor_diaria_storage = float(data.get('valor_diaria_storage') or 15.00)
+
+    # Auto-cálculo de prazos:
+    # 1. Indicação: data_aprovacao + 14 dias
+    prazo_indicacao = (data_aprovacao + timedelta(days=14)) if data_aprovacao else None
+    
+    # 2. Storage liberação: data_aprovacao + 28 dias
+    prazo_liberacao_storage = (data_aprovacao + timedelta(days=28)) if data_aprovacao else None
+
+    # 3. Cálculo de dias e valor de storage
+    dias_storage = 0
+    valor_total_storage = 0.0
+    if data_entrada_storage:
+        fim_storage = data_liberacao_storage or get_london_date()
+        if fim_storage >= data_entrada_storage:
+            dias_storage = (fim_storage - data_entrada_storage).days
+            if dias_storage == 0: dias_storage = 1 # Mínimo 1 diária se entrou hoje
+            valor_total_storage = round(dias_storage * valor_diaria_storage, 2)
+
+    # 4. Prazo do Invoice: data_envio_invoice + 14 dias
+    prazo_pagamento_invoice = (data_envio_invoice + timedelta(days=14)) if data_envio_invoice else None
+
+    # Status automáticos
+    status_storage = 'No Pátio'
+    if data_liberacao_storage:
+        status_storage = 'Liberado'
+        if data_envio_invoice:
+            status_storage = 'Invoice Enviado'
+
+    criador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+
+    claim = Claim(
+        claim_number=claim_number,
+        empresa_parceira=empresa_parceira,
+        cliente_nome=cliente_nome,
+        cliente_telefone=(data.get('cliente_telefone') or '').strip(),
+        placa=placa,
+        modelo_moto=(data.get('modelo_moto') or '').strip(),
+        status='Em Aberto',
+        data_acidente=data_acidente,
+        data_aprovacao=data_aprovacao,
+        valor_indicacao=valor_indicacao,
+        prazo_indicacao=prazo_indicacao,
+        status_indicacao='Pendente',
+        data_entrada_storage=data_entrada_storage,
+        prazo_liberacao_storage=prazo_liberacao_storage,
+        data_liberacao_storage=data_liberacao_storage,
+        status_storage=status_storage,
+        valor_diaria_storage=valor_diaria_storage,
+        dias_storage=dias_storage,
+        valor_total_storage=valor_total_storage,
+        data_envio_invoice=data_envio_invoice,
+        prazo_pagamento_invoice=prazo_pagamento_invoice,
+        status_pagamento_storage='Pendente',
+        observacoes=(data.get('observacoes') or '').strip(),
+        criado_por_nome=criador
+    )
+    db.session.add(claim)
+    db.session.commit()
+
+    registrar_log('CLAIM_CREATE', 'Claim', claim.id, f"Novo claim #{claim.claim_number} ({claim.empresa_parceira}) cadastrado para {claim.cliente_nome} (Placa: {claim.placa}) por {criador}")
+
+    return jsonify({'success': True, 'message': 'Claim registrado com sucesso!', 'id': claim.id}), 201
+
+@app.route('/api/claims/<int:id>', methods=['PUT'])
+@claims_required
+def atualizar_claim(id):
+    claim = db.session.get(Claim, id)
+    if not claim:
+        return jsonify({'error': 'Claim não encontrado.'}), 404
+
+    data = request.get_json() or {}
+
+    def parse_date(val):
+        if val is None: return None
+        val_str = str(val).strip()
+        if not val_str: return None
+        try:
+            return datetime.strptime(val_str, '%Y-%m-%d').date()
+        except Exception:
+            return None
+
+    if 'claim_number' in data and data['claim_number'].strip():
+        novo_num = data['claim_number'].strip()
+        duplicado = Claim.query.filter(
+            db.func.lower(Claim.claim_number) == novo_num.lower(),
+            Claim.id != claim.id
+        ).first()
+        if duplicado:
+            return jsonify({'error': f'O número de processo "{novo_num}" já pertence a outro Claim (ID #{duplicado.id} - {duplicado.cliente_nome}).'}), 400
+        claim.claim_number = novo_num
+    if 'empresa_parceira' in data and data['empresa_parceira'].strip():
+        claim.empresa_parceira = data['empresa_parceira'].strip()
+    if 'cliente_nome' in data and data['cliente_nome'].strip():
+        claim.cliente_nome = data['cliente_nome'].strip()
+    if 'cliente_telefone' in data:
+        claim.cliente_telefone = data['cliente_telefone'].strip()
+    if 'placa' in data and data['placa'].strip():
+        claim.placa = data['placa'].strip().upper().replace(' ', '')
+    if 'modelo_moto' in data:
+        claim.modelo_moto = data['modelo_moto'].strip()
+    if 'status' in data and data['status'].strip():
+        claim.status = data['status'].strip()
+    if 'observacoes' in data:
+        claim.observacoes = data['observacoes'].strip()
+
+    # Datas e Prazos
+    if 'data_acidente' in data:
+        claim.data_acidente = parse_date(data['data_acidente'])
+    if 'data_aprovacao' in data:
+        claim.data_aprovacao = parse_date(data['data_aprovacao'])
+        if claim.data_aprovacao:
+            claim.prazo_indicacao = claim.data_aprovacao + timedelta(days=14)
+            claim.prazo_liberacao_storage = claim.data_aprovacao + timedelta(days=28)
+        else:
+            claim.prazo_indicacao = None
+            claim.prazo_liberacao_storage = None
+
+    if 'valor_indicacao' in data:
+        claim.valor_indicacao = float(data['valor_indicacao'] or 0.0)
+
+    if 'status_indicacao' in data and data['status_indicacao'].strip():
+        claim.status_indicacao = data['status_indicacao'].strip()
+        if claim.status_indicacao == 'Pago' and not claim.data_pagamento_indicacao:
+            claim.data_pagamento_indicacao = get_london_date()
+
+    if 'data_pagamento_indicacao' in data:
+        claim.data_pagamento_indicacao = parse_date(data['data_pagamento_indicacao'])
+        if claim.data_pagamento_indicacao:
+            claim.status_indicacao = 'Pago'
+
+    # Storage
+    if 'data_entrada_storage' in data:
+        claim.data_entrada_storage = parse_date(data['data_entrada_storage'])
+    if 'data_liberacao_storage' in data:
+        claim.data_liberacao_storage = parse_date(data['data_liberacao_storage'])
+        if claim.data_liberacao_storage and claim.status_storage == 'No Pátio':
+            claim.status_storage = 'Liberado'
+
+    if 'valor_diaria_storage' in data:
+        claim.valor_diaria_storage = float(data['valor_diaria_storage'] or 15.0)
+
+    # Recalcular storage
+    if claim.data_entrada_storage:
+        fim_storage = claim.data_liberacao_storage or get_london_date()
+        if fim_storage >= claim.data_entrada_storage:
+            claim.dias_storage = (fim_storage - claim.data_entrada_storage).days
+            if claim.dias_storage == 0: claim.dias_storage = 1
+            claim.valor_total_storage = round(claim.dias_storage * float(claim.valor_diaria_storage or 15.0), 2)
+
+    # Invoices
+    if 'data_envio_invoice' in data:
+        claim.data_envio_invoice = parse_date(data['data_envio_invoice'])
+        if claim.data_envio_invoice:
+            claim.prazo_pagamento_invoice = claim.data_envio_invoice + timedelta(days=14)
+            if claim.status_storage in ['No Pátio', 'Liberado']:
+                claim.status_storage = 'Invoice Enviado'
+        else:
+            claim.prazo_pagamento_invoice = None
+
+    if 'status_pagamento_storage' in data and data['status_pagamento_storage'].strip():
+        claim.status_pagamento_storage = data['status_pagamento_storage'].strip()
+        if claim.status_pagamento_storage == 'Pago':
+            claim.status_storage = 'Pago'
+            if not claim.data_pagamento_storage:
+                claim.data_pagamento_storage = get_london_date()
+
+    if 'data_pagamento_storage' in data:
+        claim.data_pagamento_storage = parse_date(data['data_pagamento_storage'])
+        if claim.data_pagamento_storage:
+            claim.status_pagamento_storage = 'Pago'
+            claim.status_storage = 'Pago'
+
+    db.session.commit()
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('CLAIM_UPDATE', 'Claim', claim.id, f"Claim #{claim.claim_number} ({claim.empresa_parceira}) atualizado por {operador}")
+
+    return jsonify({'success': True, 'message': 'Claim atualizado com sucesso!'}), 200
+
+@app.route('/api/claims/<int:id>', methods=['DELETE'])
+@claims_required
+def deletar_claim(id):
+    claim = db.session.get(Claim, id)
+    if not claim:
+        return jsonify({'error': 'Claim não encontrado.'}), 404
+
+    num = claim.claim_number
+    emp = claim.empresa_parceira
+    db.session.delete(claim)
+    db.session.commit()
+
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('CLAIM_DELETE', 'Claim', id, f"Claim #{num} ({emp}) excluído por {operador}")
+
+    return jsonify({'success': True, 'message': 'Claim excluído com sucesso.'}), 200
 
 # --- USER MANAGEMENT API ROUTES ---
 
@@ -532,6 +1007,9 @@ def listar_usuarios():
             'nome': u.nome,
             'email': u.email,
             'role': u.role,
+            'is_admin': bool(u.is_admin),
+            'perm_alugueis': bool(u.perm_alugueis),
+            'perm_claims': bool(u.perm_claims),
             'ativo': u.ativo,
             'data_criacao': u.data_criacao.strftime('%Y-%m-%d %H:%M:%S') if u.data_criacao else None
         })
@@ -546,8 +1024,10 @@ def criar_usuario():
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
     email = data.get('email', '').strip().lower()
-    role = data.get('role', 'staff').strip().lower()
     password = data.get('password', '')
+    is_admin = bool(data.get('is_admin', False))
+    perm_alugueis = bool(data.get('perm_alugueis', True))
+    perm_claims = bool(data.get('perm_claims', False))
     
     if not nome or not email or not password:
         return jsonify({'error': 'Name, email, and password are required'}), 400
@@ -558,13 +1038,16 @@ def criar_usuario():
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'An account with this email address already exists'}), 400
         
-    if role not in ['admin', 'staff']:
-        role = 'staff'
-        
+    # Definir role descritiva
+    role_desc = 'admin' if is_admin else 'staff'
+    
     novo_user = User(
         nome=nome,
         email=email,
-        role=role,
+        role=role_desc,
+        is_admin=is_admin,
+        perm_alugueis=perm_alugueis,
+        perm_claims=perm_claims,
         ativo=True
     )
     novo_user.set_password(password)
@@ -572,7 +1055,11 @@ def criar_usuario():
     db.session.add(novo_user)
     db.session.commit()
     
-    registrar_log('USER_CREATE', 'User', novo_user.id, f"Novo usuário cadastrado: {novo_user.nome} ({novo_user.email}) com perfil {novo_user.role}")
+    perm_textos = []
+    if is_admin: perm_textos.append('Admin')
+    if perm_alugueis: perm_textos.append('Aluguéis')
+    if perm_claims: perm_textos.append('Claims')
+    registrar_log('USER_CREATE', 'User', novo_user.id, f"Novo usuário cadastrado: {novo_user.nome} ({novo_user.email}) com permissões: {', '.join(perm_textos)}")
 
     return jsonify({
         'message': 'User created successfully',
@@ -581,6 +1068,9 @@ def criar_usuario():
             'nome': novo_user.nome,
             'email': novo_user.email,
             'role': novo_user.role,
+            'is_admin': novo_user.is_admin,
+            'perm_alugueis': novo_user.perm_alugueis,
+            'perm_claims': novo_user.perm_claims,
             'ativo': novo_user.ativo
         }
     }), 201
@@ -600,15 +1090,27 @@ def atualizar_usuario(user_id):
             alteracoes.append(f"nome de '{user.nome}' para '{data['nome'].strip()}'")
             user.nome = data['nome'].strip()
         
-    # Check if modifying role
-    if 'role' in data:
-        nova_role = data['role'].strip().lower()
-        if nova_role in ['admin', 'staff']:
-            if user.id == current_user.id and nova_role != 'admin':
-                return jsonify({'error': 'You cannot remove your own administrator privileges'}), 400
-            if user.role != nova_role:
-                alteracoes.append(f"perfil para '{nova_role}'")
-                user.role = nova_role
+    # Check if modifying permissions
+    if 'is_admin' in data:
+        novo_admin = bool(data['is_admin'])
+        if user.id == current_user.id and not novo_admin:
+            return jsonify({'error': 'You cannot remove your own administrator privileges'}), 400
+        if user.is_admin != novo_admin:
+            alteracoes.append(f"admin={'Ativado' if novo_admin else 'Desativado'}")
+            user.is_admin = novo_admin
+            user.role = 'admin' if novo_admin else 'staff'
+
+    if 'perm_alugueis' in data:
+        nova_perm_alug = bool(data['perm_alugueis'])
+        if user.perm_alugueis != nova_perm_alug:
+            alteracoes.append(f"modulo_alugueis={'Ativado' if nova_perm_alug else 'Desativado'}")
+            user.perm_alugueis = nova_perm_alug
+
+    if 'perm_claims' in data:
+        nova_perm_claims = bool(data['perm_claims'])
+        if user.perm_claims != nova_perm_claims:
+            alteracoes.append(f"modulo_claims={'Ativado' if nova_perm_claims else 'Desativado'}")
+            user.perm_claims = nova_perm_claims
             
     # Check if modifying status (ativo)
     if 'ativo' in data:
@@ -639,6 +1141,9 @@ def atualizar_usuario(user_id):
             'nome': user.nome,
             'email': user.email,
             'role': user.role,
+            'is_admin': user.is_admin,
+            'perm_alugueis': user.perm_alugueis,
+            'perm_claims': user.perm_claims,
             'ativo': user.ativo
         }
     }), 200
@@ -773,6 +1278,7 @@ def listar_auditoria():
 # --- CRUD ROUTES ---
 
 @app.route('/api/clientes', methods=['POST'])
+@alugueis_required
 def criar_cliente():
     nome = request.form.get('nome')
     telefone = request.form.get('telefone')
@@ -845,6 +1351,7 @@ def criar_cliente():
     return jsonify({'message': 'Customer registered successfully', 'mensagem': 'Cliente cadastrado com sucesso', 'id': novo_cliente.id}), 201
 
 @app.route('/api/motos', methods=['POST'])
+@alugueis_required
 def criar_moto():
     dados = request.get_json()
     if not dados or not all(k in dados for k in ('placa', 'modelo', 'cor')):
@@ -888,6 +1395,7 @@ def criar_moto():
     return jsonify({'message': 'Motorbike registered successfully', 'mensagem': 'Moto cadastrada com sucesso', 'placa': nova_moto.placa}), 201
 
 @app.route('/api/clientes', methods=['GET'])
+@alugueis_required
 def listar_clientes():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
@@ -934,6 +1442,7 @@ def listar_clientes():
     })
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
+@alugueis_required
 def atualizar_cliente(id):
     cliente = db.session.get(Client, id)
     if not cliente:
@@ -996,6 +1505,7 @@ def atualizar_cliente(id):
     return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'})
 
 @app.route('/api/motos', methods=['GET'])
+@alugueis_required
 def listar_motos():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
@@ -1051,6 +1561,7 @@ def listar_motos():
     })
 
 @app.route('/api/motos/<placa>', methods=['PUT'])
+@alugueis_required
 def atualizar_moto(placa):
     moto = db.session.get(Motorcycle, placa)
     if not moto:
@@ -1089,6 +1600,7 @@ def atualizar_moto(placa):
     return jsonify({'message': 'Motorbike updated successfully', 'mensagem': 'Moto atualizada com sucesso'})
 
 @app.route('/api/contratos', methods=['POST'])
+@alugueis_required
 def criar_contrato():
     id_cliente = request.form.get('id_cliente')
     placa = request.form.get('placa')
@@ -1217,6 +1729,7 @@ def criar_contrato():
     return jsonify({'message': 'Contract and initial inspection created successfully', 'mensagem': 'Contrato e vistoria criados com sucesso', 'id': novo_contrato.id}), 201
 
 @app.route('/api/contratos/<int:id>/seguro', methods=['PUT'])
+@alugueis_required
 def atualizar_seguro_contrato(id):
     contrato = db.session.get(Contract, id)
     if not contrato:
@@ -1236,7 +1749,7 @@ def atualizar_seguro_contrato(id):
     return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
 
 @app.route('/api/contratos/<int:id>/verificar-seguro', methods=['POST'])
-@login_required
+@alugueis_required
 def verificar_seguro_contrato(id):
     contrato = db.session.get(Contract, id)
     if not contrato:
@@ -1257,7 +1770,7 @@ def verificar_seguro_contrato(id):
     
     if novo_status == 'Valid':
         registrar_log('INSURANCE_VERIFIED', 'Contract', contrato.id, f"Seguro da moto {contrato.placa} verificado como VÁLIDO no askMID por {operador} no Contrato #{contrato.id} (Próxima checagem em 15 dias)")
-        msg = "Insurance verified as VALID on askMID. Next check scheduled in 15 days."
+        msg = "Insurance verified as VALID on askMID. Next check scheduled in 15 dias."
     else:
         registrar_log('INSURANCE_CANCELLED', 'Contract', contrato.id, f"ALERTA: Seguro da moto {contrato.placa} reportado CANCELADO/INVÁLIDO no askMID por {operador} no Contrato #{contrato.id}")
         msg = "ALARM: Insurance flagged as CANCELLED/INVALID on askMID."
@@ -1270,6 +1783,7 @@ def verificar_seguro_contrato(id):
     })
 
 @app.route('/api/contratos', methods=['GET'])
+@alugueis_required
 def listar_contratos():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
@@ -1347,6 +1861,7 @@ def listar_contratos():
     })
 
 @app.route('/api/contratos/<int:id>', methods=['GET'])
+@alugueis_required
 def detalhe_contrato(id):
     c = db.session.get(Contract, id)
     if not c:
@@ -1445,6 +1960,7 @@ def detalhe_contrato(id):
     })
 
 @app.route('/api/contratos/<int:id>/cobrancas', methods=['POST'])
+@alugueis_required
 def criar_cobranca(id):
     c = db.session.get(Contract, id)
     if not c:
@@ -1478,6 +1994,7 @@ def criar_cobranca(id):
     return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
 
 @app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT'])
+@alugueis_required
 def pagar_cobranca(id):
     t = db.session.get(FinancialTransaction, id)
     if not t:
@@ -1498,6 +2015,7 @@ def pagar_cobranca(id):
     return jsonify({'message': 'Payment marked successfully', 'mensagem': 'Baixa realizada com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
 
 @app.route('/api/vistorias', methods=['POST'])
+@alugueis_required
 def criar_vistoria():
     id_contrato = request.form.get('id_contrato')
     tipo = request.form.get('tipo')
@@ -1554,6 +2072,7 @@ def criar_vistoria():
     return jsonify({'message': 'Inspection recorded successfully', 'mensagem': 'Vistoria registrada com sucesso', 'id': nova_vistoria.id, 'url': url_foto_str}), 201
 
 @app.route('/api/vistorias', methods=['GET'])
+@alugueis_required
 def listar_vistorias():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
@@ -1627,6 +2146,7 @@ def listar_vistorias():
 # --- DASHBOARD & JOBS ---
 
 @app.route('/api/financeiro', methods=['GET'])
+@alugueis_required
 def listar_financeiro():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
@@ -1727,6 +2247,7 @@ def listar_financeiro():
     })
 
 @app.route('/api/financeiro/pagar/<int:id>', methods=['POST', 'PUT'])
+@alugueis_required
 def pagar_transacao(id):
     t = db.session.get(FinancialTransaction, id)
     if not t:
@@ -1749,6 +2270,7 @@ def pagar_transacao(id):
 
 @app.route('/api/financeiro/<int:id>/reverter', methods=['POST', 'PUT'])
 @app.route('/api/cobrancas/<int:id>/reverter', methods=['POST', 'PUT'])
+@alugueis_required
 def reverter_pagamento(id):
     t = db.session.get(FinancialTransaction, id)
     if not t:
@@ -1782,6 +2304,7 @@ def reverter_pagamento(id):
     }), 200
 
 @app.route('/recibo/<int:id>')
+@alugueis_required
 def pagina_recibo(id):
     t = db.session.get(FinancialTransaction, id)
     if not t:
@@ -1791,6 +2314,7 @@ def pagina_recibo(id):
     return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente)
 
 @app.route('/api/financeiro/<int:id>', methods=['DELETE'])
+@alugueis_required
 def excluir_transacao(id):
     t = db.session.get(FinancialTransaction, id)
     if not t:
@@ -1805,214 +2329,252 @@ def excluir_transacao(id):
 
 @app.route('/api/dashboard', methods=['GET'])
 def get_dashboard():
-    total_motos = Motorcycle.query.count()
-    motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
-    motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
-    motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
-    
-    # Detalhes das motos em manutenção (otimizado com batch query de contratos)
-    motos_manutencao_lista = []
-    manutencao_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).all()
-    if manutencao_objs:
-        placas_manut = [m.placa for m in manutencao_objs]
-        latest_contracts = db.session.query(Contract).options(joinedload(Contract.cliente)).filter(Contract.placa.in_(placas_manut)).order_by(Contract.id.desc()).all()
-        last_c_by_plate = {}
-        for c in latest_contracts:
-            if c.placa not in last_c_by_plate:
-                last_c_by_plate[c.placa] = c
-        for m in manutencao_objs:
-            last_c = last_c_by_plate.get(m.placa)
-            cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
-            contrato_id = last_c.id if last_c else None
-            motos_manutencao_lista.append({
-                'placa': m.placa,
-                'modelo': m.modelo,
-                'cor': m.cor or 'N/A',
-                'status': m.status,
-                'contrato_id': contrato_id,
-                'cliente_nome': cliente_nome
+    resp_data = {}
+
+    # Dados do módulo de aluguéis: SOMENTE para quem possui permissão de aluguéis
+    pode_alugueis = current_user.is_authenticated and current_user.pode_alugueis()
+
+    if pode_alugueis:
+        total_motos = Motorcycle.query.count()
+        motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
+        motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
+        motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
+        
+        # Detalhes das motos em manutenção (otimizado com batch query de contratos)
+        motos_manutencao_lista = []
+        manutencao_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).all()
+        if manutencao_objs:
+            placas_manut = [m.placa for m in manutencao_objs]
+            latest_contracts = db.session.query(Contract).options(joinedload(Contract.cliente)).filter(Contract.placa.in_(placas_manut)).order_by(Contract.id.desc()).all()
+            last_c_by_plate = {}
+            for c in latest_contracts:
+                if c.placa not in last_c_by_plate:
+                    last_c_by_plate[c.placa] = c
+            for m in manutencao_objs:
+                last_c = last_c_by_plate.get(m.placa)
+                cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
+                contrato_id = last_c.id if last_c else None
+                motos_manutencao_lista.append({
+                    'placa': m.placa,
+                    'modelo': m.modelo,
+                    'cor': m.cor or 'N/A',
+                    'status': m.status,
+                    'contrato_id': contrato_id,
+                    'cliente_nome': cliente_nome
+                })
+            
+        contratos_ativos_lista = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+        contratos_ativos = len(contratos_ativos_lista)
+        receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_lista)
+        
+        total_clientes = Client.query.count()
+        
+        # Performance: Direct SQL sum for pending revenue
+        receita_pendente = float(db.session.query(
+            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+        ).filter(
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+            FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
+        ).scalar() or 0.0)
+        
+        # Performance: Direct SQL sum and count for overdue charges using London Time
+        agora = get_london_now().replace(tzinfo=None)
+        vencidas_q = db.session.query(
+            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+            db.func.count(FinancialTransaction.id)
+        ).filter(
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+            FinancialTransaction.data_vencimento < agora
+        ).first()
+        receita_vencida = float(vencidas_q[0]) if vencidas_q else 0.0
+        total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
+        
+        # Performance: Pre-fetch transactions to prevent N+1 queries during deposit accounting
+        contratos_quarentena = db.session.query(Contract).options(joinedload(Contract.transacoes)).filter(
+            Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])
+        ).all()
+        quarentenas_count = len(contratos_quarentena)
+        quarentenas_valor = 0.0
+        for cq in contratos_quarentena:
+            dep_pago = 0.0
+            deducoes = 0.0
+            for t in cq.transacoes:
+                if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                    if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
+                        dep_pago += float(t.valor)
+                    elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
+                        deducoes += float(t.valor)
+            quarentenas_valor += max(0.0, dep_pago - deducoes)
+                    
+        # Últimas vistorias (eager-loaded)
+        recent_inspections = []
+        inspecoes = db.session.query(Inspection).options(
+            joinedload(Inspection.contrato).joinedload(Contract.cliente)
+        ).order_by(Inspection.id.desc()).limit(5).all()
+        for i in inspecoes:
+            placa = i.contrato.placa if i.contrato else '-'
+            cliente = i.contrato.cliente.nome if i.contrato and i.contrato.cliente else '-'
+            foto_count = len([f for f in (i.url_fotos or '').split(',') if f.strip()])
+            recent_inspections.append({
+                'id': i.id,
+                'contrato_id': i.id_contrato,
+                'placa': placa,
+                'cliente': cliente,
+                'tipo': i.tipo,
+                'data': i.data.strftime('%d/%m/%Y %H:%M') if i.data else '-',
+                'foto_count': foto_count,
+                'observacoes': i.observacoes or ''
+            })
+            
+        # Últimos contratos (eager-loaded)
+        recent_contracts = []
+        contratos = db.session.query(Contract).options(
+            joinedload(Contract.cliente)
+        ).order_by(Contract.id.desc()).limit(4).all()
+        for c in contratos:
+            recent_contracts.append({
+                'id': c.id,
+                'cliente': c.cliente.nome if c.cliente else 'N/A',
+                'placa': c.placa,
+                'status': c.status,
+                'valor_semanal': float(c.valor_aluguel_semanal),
+                'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
             })
         
-    contratos_ativos_lista = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
-    contratos_ativos = len(contratos_ativos_lista)
-    receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_lista)
-    
-    total_clientes = Client.query.count()
-    
-    # Performance: Direct SQL sum for pending revenue
-    receita_pendente = float(db.session.query(
-        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
-    ).filter(
-        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-        FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
-    ).scalar() or 0.0)
-    
-    # Performance: Direct SQL sum and count for overdue charges using London Time
-    agora = get_london_now().replace(tzinfo=None)
-    vencidas_q = db.session.query(
-        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
-        db.func.count(FinancialTransaction.id)
-    ).filter(
-        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-        FinancialTransaction.data_vencimento < agora
-    ).first()
-    receita_vencida = float(vencidas_q[0]) if vencidas_q else 0.0
-    total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
-    
-    # Performance: Pre-fetch transactions to prevent N+1 queries during deposit accounting
-    contratos_quarentena = db.session.query(Contract).options(joinedload(Contract.transacoes)).filter(
-        Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])
-    ).all()
-    quarentenas_count = len(contratos_quarentena)
-    quarentenas_valor = 0.0
-    for cq in contratos_quarentena:
-        dep_pago = 0.0
-        deducoes = 0.0
-        for t in cq.transacoes:
-            if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
-                if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
-                    dep_pago += float(t.valor)
-                elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
-                    deducoes += float(t.valor)
-        quarentenas_valor += max(0.0, dep_pago - deducoes)
-                
-    # Últimas vistorias (eager-loaded)
-    recent_inspections = []
-    inspecoes = db.session.query(Inspection).options(
-        joinedload(Inspection.contrato).joinedload(Contract.cliente)
-    ).order_by(Inspection.id.desc()).limit(5).all()
-    for i in inspecoes:
-        placa = i.contrato.placa if i.contrato else '-'
-        cliente = i.contrato.cliente.nome if i.contrato and i.contrato.cliente else '-'
-        foto_count = len([f for f in (i.url_fotos or '').split(',') if f.strip()])
-        recent_inspections.append({
-            'id': i.id,
-            'contrato_id': i.id_contrato,
-            'placa': placa,
-            'cliente': cliente,
-            'tipo': i.tipo,
-            'data': i.data.strftime('%d/%m/%Y %H:%M') if i.data else '-',
-            'foto_count': foto_count,
-            'observacoes': i.observacoes or ''
+        # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias)
+        hoje_date = get_london_date()
+        todas_motos = Motorcycle.query.all()
+        tax_mot_warnings = 0
+        tax_warnings = 0
+        mot_warnings = 0
+        tax_mot_expired = 0
+        tax_mot_expiring_soon = 0
+        
+        for m in todas_motos:
+            has_tax_w = False
+            has_mot_w = False
+            is_m_expired = False
+            
+            if m.vencimento_tax:
+                diff_t = (m.vencimento_tax - hoje_date).days
+                if diff_t < 0:
+                    has_tax_w = True
+                    is_m_expired = True
+                elif diff_t <= 30:
+                    has_tax_w = True
+                    
+            if m.vencimento_mot:
+                diff_m = (m.vencimento_mot - hoje_date).days
+                if diff_m < 0:
+                    has_mot_w = True
+                    is_m_expired = True
+                elif diff_m <= 30:
+                    has_mot_w = True
+                    
+            if has_tax_w:
+                tax_warnings += 1
+            if has_mot_w:
+                mot_warnings += 1
+            if has_tax_w or has_mot_w:
+                tax_mot_warnings += 1
+                if is_m_expired:
+                    tax_mot_expired += 1
+                else:
+                    tax_mot_expiring_soon += 1
+                    
+        # Compliance: Checagem Quinzenal de Seguro no askMID (15 em 15 dias)
+        contratos_ativos_objs = db.session.query(Contract).options(
+            joinedload(Contract.cliente)
+        ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+        seguros_pendentes_count = 0
+        seguros_cancelados_count = 0
+        contratos_seguro_alerta = []
+        
+        for ca in contratos_ativos_objs:
+            u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
+            dias_check = (hoje_date - u_check).days
+            cli_nome = ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}"
+            
+            if ca.status_seguro == 'Cancelled':
+                seguros_cancelados_count += 1
+                contratos_seguro_alerta.append({
+                    'id': ca.id,
+                    'placa': ca.placa,
+                    'cliente': cli_nome,
+                    'dias': dias_check,
+                    'status_seguro': 'Cancelled',
+                    'mensagem': f"ALARM: Vehicle {ca.placa} insurance was flagged CANCELLED/INVALID on askMID!"
+                })
+            elif dias_check >= 15:
+                seguros_pendentes_count += 1
+                contratos_seguro_alerta.append({
+                    'id': ca.id,
+                    'placa': ca.placa,
+                    'cliente': cli_nome,
+                    'dias': dias_check,
+                    'status_seguro': 'Check_Due',
+                    'mensagem': f"Contract #{ca.id} ({ca.placa} - {cli_nome}) due for 15-day askMID insurance check (last checked {dias_check} days ago)."
+                })
+        
+        resp_data.update({
+            'total_motos': total_motos,
+            'motos_disponiveis': motos_disponiveis,
+            'motos_alugadas': motos_alugadas,
+            'motos_manutencao': motos_manutencao,
+            'motos_manutencao_lista': motos_manutencao_lista,
+            'tax_mot_warnings': tax_mot_warnings,
+            'tax_mot_expired': tax_mot_expired,
+            'tax_mot_expiring_soon': tax_mot_expiring_soon,
+            'tax_warnings': tax_warnings,
+            'mot_warnings': mot_warnings,
+            'seguros_pendentes_count': seguros_pendentes_count,
+            'seguros_cancelados_count': seguros_cancelados_count,
+            'contratos_seguro_alerta': contratos_seguro_alerta,
+            'contratos_ativos': contratos_ativos,
+            'total_clientes': total_clientes,
+            'receita_pendente': receita_pendente,
+            'receita_semanal': receita_semanal,
+            'receita_vencida': receita_vencida,
+            'total_vencidos': total_vencidos,
+            'quarentenas_count': quarentenas_count,
+            'quarentenas_valor': quarentenas_valor,
+            'recent_inspections': recent_inspections,
+            'recent_contracts': recent_contracts
         })
-        
-    # Últimos contratos (eager-loaded)
-    recent_contracts = []
-    contratos = db.session.query(Contract).options(
-        joinedload(Contract.cliente)
-    ).order_by(Contract.id.desc()).limit(4).all()
-    for c in contratos:
-        recent_contracts.append({
-            'id': c.id,
-            'cliente': c.cliente.nome if c.cliente else 'N/A',
-            'placa': c.placa,
-            'status': c.status,
-            'valor_semanal': float(c.valor_aluguel_semanal),
-            'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
-        })
-    
-    # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias)
-    hoje_date = get_london_date()
-    todas_motos = Motorcycle.query.all()
-    tax_mot_warnings = 0
-    tax_warnings = 0
-    mot_warnings = 0
-    tax_mot_expired = 0
-    tax_mot_expiring_soon = 0
-    
-    for m in todas_motos:
-        has_tax_w = False
-        has_mot_w = False
-        is_m_expired = False
-        
-        if m.vencimento_tax:
-            diff_t = (m.vencimento_tax - hoje_date).days
-            if diff_t < 0:
-                has_tax_w = True
-                is_m_expired = True
-            elif diff_t <= 30:
-                has_tax_w = True
-                
-        if m.vencimento_mot:
-            diff_m = (m.vencimento_mot - hoje_date).days
-            if diff_m < 0:
-                has_mot_w = True
-                is_m_expired = True
-            elif diff_m <= 30:
-                has_mot_w = True
-                
-        if has_tax_w:
-            tax_warnings += 1
-        if has_mot_w:
-            mot_warnings += 1
-        if has_tax_w or has_mot_w:
-            tax_mot_warnings += 1
-            if is_m_expired:
-                tax_mot_expired += 1
-            else:
-                tax_mot_expiring_soon += 1
-                
-    # Compliance: Checagem Quinzenal de Seguro no askMID (15 em 15 dias)
-    contratos_ativos_objs = db.session.query(Contract).options(
-        joinedload(Contract.cliente)
-    ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
-    seguros_pendentes_count = 0
-    seguros_cancelados_count = 0
-    contratos_seguro_alerta = []
-    
-    for ca in contratos_ativos_objs:
-        u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
-        dias_check = (hoje_date - u_check).days
-        cli_nome = ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}"
-        
-        if ca.status_seguro == 'Cancelled':
-            seguros_cancelados_count += 1
-            contratos_seguro_alerta.append({
-                'id': ca.id,
-                'placa': ca.placa,
-                'cliente': cli_nome,
-                'dias': dias_check,
-                'status_seguro': 'Cancelled',
-                'mensagem': f"ALARM: Vehicle {ca.placa} insurance was flagged CANCELLED/INVALID on askMID!"
-            })
-        elif dias_check >= 15:
-            seguros_pendentes_count += 1
-            contratos_seguro_alerta.append({
-                'id': ca.id,
-                'placa': ca.placa,
-                'cliente': cli_nome,
-                'dias': dias_check,
-                'status_seguro': 'Check_Due',
-                'mensagem': f"Contract #{ca.id} ({ca.placa} - {cli_nome}) due for 15-day askMID insurance check (last checked {dias_check} days ago)."
-            })
-    
-    return jsonify({
-        'total_motos': total_motos,
-        'motos_disponiveis': motos_disponiveis,
-        'motos_alugadas': motos_alugadas,
-        'motos_manutencao': motos_manutencao,
-        'motos_manutencao_lista': motos_manutencao_lista,
-        'tax_mot_warnings': tax_mot_warnings,
-        'tax_mot_expired': tax_mot_expired,
-        'tax_mot_expiring_soon': tax_mot_expiring_soon,
-        'tax_warnings': tax_warnings,
-        'mot_warnings': mot_warnings,
-        'seguros_pendentes_count': seguros_pendentes_count,
-        'seguros_cancelados_count': seguros_cancelados_count,
-        'contratos_seguro_alerta': contratos_seguro_alerta,
-        'contratos_ativos': contratos_ativos,
-        'total_clientes': total_clientes,
-        'receita_pendente': receita_pendente,
-        'receita_semanal': receita_semanal,
-        'receita_vencida': receita_vencida,
-        'total_vencidos': total_vencidos,
-        'quarentenas_count': quarentenas_count,
-        'quarentenas_valor': quarentenas_valor,
-        'recent_inspections': recent_inspections,
-        'recent_contracts': recent_contracts
-    })
+
+    # Cautela e Isolamento Total: Alertas de Claims somente para quem tem permissão
+    if current_user.is_authenticated and current_user.pode_claims():
+        hoje_claim = get_london_date()
+        todos_claims = Claim.query.filter(Claim.status == 'Em Aberto').all()
+        ind_vencidas = 0
+        stor_28d = 0
+        inv_vencidos = 0
+        inv_pendentes_envio = 0
+
+        for cl in todos_claims:
+            if cl.prazo_indicacao and cl.status_indicacao != 'Pago' and cl.prazo_indicacao < hoje_claim:
+                ind_vencidas += 1
+            if cl.prazo_liberacao_storage and cl.status_storage == 'No Pátio':
+                diff_d = (cl.prazo_liberacao_storage - hoje_claim).days
+                if diff_d <= 7: # Vence em 7 dias ou já venceu os 28 dias
+                    stor_28d += 1
+            if cl.status_storage == 'Liberado' and not cl.data_envio_invoice:
+                inv_pendentes_envio += 1
+            if cl.prazo_pagamento_invoice and cl.status_pagamento_storage != 'Pago' and cl.prazo_pagamento_invoice < hoje_claim:
+                inv_vencidos += 1
+
+        resp_data['claims_alerts'] = {
+            'indicacoes_vencidas': ind_vencidas,
+            'storage_28d_vencendo': stor_28d,
+            'invoices_vencidos': inv_vencidos,
+            'invoices_pendentes_envio': inv_pendentes_envio,
+            'total_alertas': ind_vencidas + stor_28d + inv_vencidos + inv_pendentes_envio
+        }
+
+    return jsonify(resp_data)
 
 @app.route('/api/alertas', methods=['GET'])
+@alugueis_required
 def listar_alertas():
     alertas = []
     hoje = datetime.utcnow()
@@ -2036,6 +2598,7 @@ def listar_alertas():
     return jsonify(alertas)
 
 @app.route('/api/contratos/<int:id>/finalizar-quarentena', methods=['POST'])
+@alugueis_required
 def finalizar_quarentena(id):
     contrato = db.session.get(Contract, id)
     if not contrato or contrato.status not in [ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']:
@@ -2057,6 +2620,7 @@ def finalizar_quarentena(id):
     return jsonify({'message': 'Deposit hold finalized successfully', 'mensagem': 'Quarentena finalizada com sucesso'})
 
 @app.route('/api/relatorios/resumo', methods=['GET'])
+@alugueis_required
 def get_relatorios_resumo():
     transacoes = FinancialTransaction.query.all()
     faturamento = {'Paid': 0, 'Pending': 0, 'Pago': 0, 'Pendente': 0}
@@ -2132,8 +2696,20 @@ def _gerar_cobrancas_semanais_logic():
         
     return transacoes_geradas
 
+def check_cron_auth():
+    """Verifica se a chamada ao cron veio com token secreto ou de um administrador autenticado."""
+    secret_key = os.environ.get('CRON_SECRET_KEY', 'ffmotors-internal-cron-key-2026')
+    header_key = request.headers.get('X-Cron-Key') or request.args.get('cron_key')
+    if header_key and hmac.compare_digest(str(header_key), str(secret_key)):
+        return True
+    if current_user.is_authenticated and current_user.pode_admin():
+        return True
+    return False
+
 @app.route('/api/jobs/gerar-cobrancas-semanais', methods=['POST'])
 def gerar_cobrancas_semanais():
+    if not check_cron_auth():
+        return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
     transacoes = _gerar_cobrancas_semanais_logic()
     return jsonify({
         "message": "Weekly rent charges processed successfully",
@@ -2187,6 +2763,8 @@ def _processar_quarentenas_logic():
 
 @app.route('/api/jobs/processar-quarentenas', methods=['POST'])
 def processar_quarentenas():
+    if not check_cron_auth():
+        return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
     processados = _processar_quarentenas_logic()
     return jsonify({
         "message": "Deposit holds processed successfully",

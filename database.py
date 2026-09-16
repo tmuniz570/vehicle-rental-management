@@ -29,7 +29,10 @@ class User(db.Model, UserMixin):
     nome = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default='admin', nullable=False)
+    role = db.Column(db.String(20), default='staff', nullable=False) # Mantido para compatibilidade descritiva
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    perm_alugueis = db.Column(db.Boolean, default=True, nullable=False)
+    perm_claims = db.Column(db.Boolean, default=False, nullable=False)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
@@ -42,6 +45,15 @@ class User(db.Model, UserMixin):
     @property
     def is_active(self):
         return self.ativo
+
+    def pode_alugueis(self):
+        return bool(self.is_admin or self.perm_alugueis)
+
+    def pode_claims(self):
+        return bool(self.is_admin or self.perm_claims)
+
+    def pode_admin(self):
+        return bool(self.is_admin)
 
 class MotoStatus(str, Enum):
     AVAILABLE = "Available"
@@ -180,6 +192,50 @@ class AuditLog(db.Model):
     descricao = db.Column(db.Text, nullable=False)
     ip_origem = db.Column(db.String(50), nullable=True)
 
+class Claim(db.Model):
+    __tablename__ = 'claims'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    claim_number = db.Column(db.String(50), nullable=False, index=True) # Ref seguradora / claim company
+    empresa_parceira = db.Column(db.String(50), nullable=False, index=True) # McAms, ALS, 365, etc.
+    
+    # Informações do Cliente e Moto
+    cliente_nome = db.Column(db.String(100), nullable=False, index=True)
+    cliente_telefone = db.Column(db.String(30), nullable=True)
+    placa = db.Column(db.String(20), nullable=False, index=True)
+    modelo_moto = db.Column(db.String(100), nullable=True)
+    
+    # Status Geral do Processo: Em Aberto, Concluido, Cancelado
+    status = db.Column(db.String(30), default='Em Aberto', nullable=False, index=True)
+    
+    # Ciclo 1: Aprovação e Indicação (Prazo: 14 dias a partir da aprovação)
+    data_acidente = db.Column(db.Date, nullable=True)
+    data_aprovacao = db.Column(db.Date, nullable=True, index=True)
+    valor_indicacao = db.Column(db.Numeric(10, 2), default=0.0, nullable=False)
+    prazo_indicacao = db.Column(db.Date, nullable=True, index=True) # data_aprovacao + 14 dias
+    status_indicacao = db.Column(db.String(20), default='Pendente', nullable=False, index=True) # Pendente, Pago, Atrasado
+    data_pagamento_indicacao = db.Column(db.Date, nullable=True)
+    
+    # Ciclo 2: Pátio / Storage (Prazo: 28 dias a partir da aprovação para liberação)
+    data_entrada_storage = db.Column(db.Date, nullable=True)
+    prazo_liberacao_storage = db.Column(db.Date, nullable=True, index=True) # data_aprovacao + 28 dias
+    data_liberacao_storage = db.Column(db.Date, nullable=True) # Data em que a moto saiu do pátio
+    status_storage = db.Column(db.String(30), default='No Pátio', nullable=False, index=True) # No Pátio, Liberado, Invoice Enviado, Pago
+    valor_diaria_storage = db.Column(db.Numeric(10, 2), default=15.00, nullable=False)
+    dias_storage = db.Column(db.Integer, default=0, nullable=False)
+    valor_total_storage = db.Column(db.Numeric(10, 2), default=0.0, nullable=False)
+    
+    # Ciclo 3: Faturamento do Storage (Prazo: 14 dias a partir do invoice)
+    data_envio_invoice = db.Column(db.Date, nullable=True, index=True)
+    prazo_pagamento_invoice = db.Column(db.Date, nullable=True, index=True) # data_envio_invoice + 14 dias
+    status_pagamento_storage = db.Column(db.String(20), default='Pendente', nullable=False, index=True) # Pendente, Pago, Atrasado
+    data_pagamento_storage = db.Column(db.Date, nullable=True)
+    
+    # Observações e Auditoria
+    observacoes = db.Column(db.Text, nullable=True)
+    criado_por_nome = db.Column(db.String(100), nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
 class JobExecutionLock(db.Model):
     __tablename__ = 'job_locks'
     
@@ -248,6 +304,25 @@ def init_db(app):
                         conn.execute(db.text("ALTER TABLE clientes ADD COLUMN url_cbt VARCHAR(255)"))
                         conn.commit()
 
+                # Usuarios: Permissões Modulares Limpas
+                if 'usuarios' in existing_tables:
+                    cols_u = [col['name'] for col in inspector.get_columns('usuarios')]
+                    if 'is_admin' not in cols_u:
+                        conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN is_admin BOOLEAN DEFAULT 0"))
+                        conn.commit()
+                        conn.execute(db.text("UPDATE usuarios SET is_admin = 1 WHERE role = 'admin'"))
+                        conn.commit()
+                    if 'perm_alugueis' not in cols_u:
+                        conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN perm_alugueis BOOLEAN DEFAULT 1"))
+                        conn.commit()
+                        conn.execute(db.text("UPDATE usuarios SET perm_alugueis = 1"))
+                        conn.commit()
+                    if 'perm_claims' not in cols_u:
+                        conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN perm_claims BOOLEAN DEFAULT 0"))
+                        conn.commit()
+                        conn.execute(db.text("UPDATE usuarios SET perm_claims = 1 WHERE role = 'admin'"))
+                        conn.commit()
+
                 # Performance: Auto-create essential indexes on existing database
                 indexes_to_create = [
                     ("idx_contratos_cliente", "contratos", "id_cliente"),
@@ -265,6 +340,10 @@ def init_db(app):
                     ("idx_motos_tax", "motos", "vencimento_tax"),
                     ("idx_clientes_nome", "clientes", "nome"),
                     ("idx_clientes_telefone", "clientes", "telefone"),
+                    ("idx_claims_number", "claims", "claim_number"),
+                    ("idx_claims_placa", "claims", "placa"),
+                    ("idx_claims_status", "claims", "status"),
+                    ("idx_claims_empresa", "claims", "empresa_parceira"),
                 ]
                 for idx_name, tbl, col in indexes_to_create:
                     if tbl in existing_tables:

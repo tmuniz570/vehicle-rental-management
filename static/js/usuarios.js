@@ -214,12 +214,16 @@ function renderizarTabela(usuarios) {
         const inicial = user.nome ? user.nome.charAt(0).toUpperCase() : 'U';
         const isCurrent = user.id === usuarioLogadoId;
 
-        // Role badge
+        // Role & Permissions badge
         let roleBadge = '';
-        if (user.role === 'admin') {
+        if (user.is_admin) {
             roleBadge = '<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3);">Administrator</span>';
         } else {
-            roleBadge = '<span class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">Yard Staff</span>';
+            const perms = [];
+            if (user.perm_alugueis) perms.push('Aluguéis');
+            if (user.perm_claims) perms.push('Claims');
+            const permText = perms.length > 0 ? perms.join(' + ') : 'Sem Acesso';
+            roleBadge = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">${escapeHtml(permText)}</span>`;
         }
 
         // Status badge
@@ -233,7 +237,7 @@ function renderizarTabela(usuarios) {
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: ${user.role === 'admin' ? 'var(--accent-gradient)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)'}; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 0.95rem; flex-shrink: 0;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: ${user.is_admin ? 'var(--accent-gradient)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)'}; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 0.95rem; flex-shrink: 0;">
                         ${inicial}
                     </div>
                     <div>
@@ -254,22 +258,16 @@ function renderizarTabela(usuarios) {
             <td>${statusBadge}</td>
             <td style="color: var(--text-secondary); font-size: 0.85rem;">${dataFormatada}</td>
             <td style="text-align: right;">
-                <div style="display: inline-flex; align-items: center; gap: 8px;">
-                    <button type="button" class="btn-secondary" onclick="abrirModalEditUsuario(${user.id})" title="Edit User or Password" style="padding: 6px 12px; font-size: 0.8rem; width: auto;">
-                        ✏️ Edit / Password
-                    </button>
-                    ${!isCurrent ? `
-                    <button type="button" class="btn-secondary" onclick="toggleStatusUsuario(${user.id}, ${!user.ativo})" title="${user.ativo ? 'Suspend User' : 'Activate User'}" style="padding: 6px 10px; font-size: 0.8rem; width: auto; color: ${user.ativo ? '#f87171' : '#10b981'}; border-color: ${user.ativo ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)'};">
-                        ${user.ativo ? 'Suspend' : 'Activate'}
-                    </button>
-                    <button type="button" class="btn-secondary" onclick="deletarUsuario(${user.id}, '${escapeHtml(user.nome)}')" title="Delete Account" style="padding: 6px 10px; font-size: 0.8rem; width: auto; color: #f87171; border-color: rgba(239,68,68,0.3);">
-                        🗑️
-                    </button>
-                    ` : ''}
-                </div>
+                <button class="btn-secondary" onclick="abrirModalEditUsuario(${user.id})" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 6px;">
+                    Edit
+                </button>
+                ${!isCurrent ? `
+                <button class="btn-secondary" onclick="confirmarExclusaoUsuario(${user.id}, '${escapeHtml(user.nome)}')" style="padding: 6px 12px; font-size: 0.8rem; color: #f87171; border-color: rgba(239, 68, 68, 0.2);">
+                    Delete
+                </button>
+                ` : ''}
             </td>
         `;
-
         tbody.appendChild(tr);
     });
 
@@ -278,10 +276,12 @@ function renderizarTabela(usuarios) {
     }
 }
 
-// --- Modal Handlers ---
+// --- Modals ---
 function abrirModalNovoUsuario() {
-    const form = document.getElementById('formNovoUsuario');
-    if (form) form.reset();
+    document.getElementById('formNovoUsuario').reset();
+    document.getElementById('novo_perm_alugueis').checked = true;
+    document.getElementById('novo_perm_claims').checked = false;
+    document.getElementById('novo_is_admin').checked = false;
     const modal = document.getElementById('modalNewUser');
     if (modal) modal.style.display = 'flex';
 }
@@ -298,23 +298,25 @@ function abrirModalEditUsuario(userId) {
     document.getElementById('edit_user_id').value = user.id;
     document.getElementById('edit_nome').value = user.nome || '';
     document.getElementById('edit_email').value = user.email || '';
-    document.getElementById('edit_role').value = user.role || 'staff';
+    document.getElementById('edit_perm_alugueis').checked = !!user.perm_alugueis;
+    document.getElementById('edit_perm_claims').checked = !!user.perm_claims;
+    document.getElementById('edit_is_admin').checked = !!user.is_admin;
     document.getElementById('edit_ativo').value = user.ativo ? 'true' : 'false';
     document.getElementById('edit_password').value = '';
 
     const isCurrent = user.id === usuarioLogadoId;
     const selectAtivo = document.getElementById('edit_ativo');
-    const selectRole = document.getElementById('edit_role');
+    const chkAdmin = document.getElementById('edit_is_admin');
     
     // Prevent self-lockout
     if (isCurrent) {
         selectAtivo.disabled = true;
-        selectRole.disabled = true;
-        document.getElementById('editUserSubtitle').textContent = 'Editing your own profile. (Status & Role locked to prevent lockout)';
+        chkAdmin.disabled = true;
+        document.getElementById('editUserSubtitle').textContent = 'Editing your own profile. (Status & Admin locked to prevent lockout)';
     } else {
         selectAtivo.disabled = false;
-        selectRole.disabled = false;
-        document.getElementById('editUserSubtitle').textContent = 'Modify permissions, role, and credentials.';
+        chkAdmin.disabled = false;
+        document.getElementById('editUserSubtitle').textContent = 'Modify permissions, modules, and credentials.';
     }
 
     const modal = document.getElementById('modalEditUser');
@@ -335,7 +337,9 @@ async function handleNovoUsuarioSubmit(e) {
     const payload = {
         nome: document.getElementById('novo_nome').value.trim(),
         email: document.getElementById('novo_email').value.trim().toLowerCase(),
-        role: document.getElementById('novo_role').value,
+        perm_alugueis: document.getElementById('novo_perm_alugueis').checked,
+        perm_claims: document.getElementById('novo_perm_claims').checked,
+        is_admin: document.getElementById('novo_is_admin').checked,
         password: document.getElementById('novo_password').value
     };
 
@@ -371,7 +375,9 @@ async function handleEditUsuarioSubmit(e) {
     const userId = document.getElementById('edit_user_id').value;
     const payload = {
         nome: document.getElementById('edit_nome').value.trim(),
-        role: document.getElementById('edit_role').value,
+        perm_alugueis: document.getElementById('edit_perm_alugueis').checked,
+        perm_claims: document.getElementById('edit_perm_claims').checked,
+        is_admin: document.getElementById('edit_is_admin').checked,
         ativo: document.getElementById('edit_ativo').value === 'true',
         password: document.getElementById('edit_password').value
     };

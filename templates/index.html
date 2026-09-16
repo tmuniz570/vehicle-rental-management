@@ -8,11 +8,16 @@
     <div>
         <h1 style="margin: 0; font-weight: 700; letter-spacing: -0.02em;">Overview</h1>
         <p style="color: var(--text-secondary); margin: 0.35rem 0 0 0; font-size: 0.95rem;">
+            {% if current_user.is_authenticated and current_user.pode_alugueis() %}
             Real-time control of fleet status, contracts, maintenance, and revenue.
+            {% else %}
+            Painel operacional e visão geral dos seus módulos habilitados.
+            {% endif %}
         </p>
     </div>
     
     <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+        {% if current_user.is_authenticated and current_user.pode_alugueis() %}
         <a href="/contratos/novo" class="btn-primary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
             <span>+</span> New Contract
         </a>
@@ -25,9 +30,11 @@
         <a href="/relatorios/vencidos" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; color: #f87171; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 6px;">
             <span>⚠️</span> Overdue Report
         </a>
+        {% endif %}
     </div>
 </div>
 
+{% if current_user.is_authenticated and current_user.pode_alugueis() %}
 <!-- Row 1: Fleet & Contract Status -->
 <div class="dashboard-grid" style="margin-bottom: 1.5rem;">
     <!-- Total Motorbikes -->
@@ -113,7 +120,31 @@
         <div class="stat-desc" id="quarentenas_valor">Total Held: £0.00</div>
     </a>
 </div>
+{% endif %}
 
+{% if current_user.is_authenticated and current_user.pode_claims() %}
+<!-- Row Claims & Storage: Alertas Exclusivos para quem tem Permissão -->
+<div id="sectionClaimsDashboard" class="glass-card" style="display: none; padding: 1.25rem; margin-bottom: 1.75rem; border-left: 4px solid #f59e0b; background: rgba(245, 158, 11, 0.03);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.3rem;">📋</span>
+            <div>
+                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #f59e0b;">Claims & Storage (McAms / ALS / 365)</h4>
+                <p style="margin: 2px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Acompanhamento de prazos de indicação e liberação de pátio</p>
+            </div>
+        </div>
+        <a href="/claims" class="btn-secondary" style="font-size: 0.8rem; padding: 6px 12px; text-decoration: none;">
+            Ver Todos os Claims &rarr;
+        </a>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;" id="claimsAlertsContainer">
+        <!-- Injetado dinamicamente via JS se houver alertas -->
+    </div>
+</div>
+{% endif %}
+
+{% if current_user.is_authenticated and current_user.pode_alugueis() %}
 <!-- Fleet Allocation Bar -->
 <div class="fleet-bar-card">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
@@ -211,10 +242,21 @@
             </div>
         </div>
 
-        </div>
-
     </div>
 </div>
+{% else %}
+<!-- Visão dedicada para quem possui apenas acesso a Claims -->
+<div class="glass-card" style="padding: 2.5rem; text-align: center; margin-top: 1.5rem;">
+    <div style="font-size: 3rem; margin-bottom: 1rem;">🏍️</div>
+    <h2 style="font-weight: 800; margin-bottom: 0.5rem;">Módulo de Claims & Storage</h2>
+    <p style="color: var(--text-secondary); max-width: 540px; margin: 0 auto 1.5rem; font-size: 0.95rem;">
+        Seu usuário possui acesso exclusivo à gestão de Claims e Storage (McAms, ALS e 365). Acesse o módulo para consultar processos, prazos e faturamento.
+    </p>
+    <a href="/claims" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 0.85rem 1.75rem; text-decoration: none; font-size: 0.95rem;">
+        <span>📋</span> Ir para Claims & Storage &rarr;
+    </a>
+</div>
+{% endif %}
 
 {% endblock %}
 
@@ -231,11 +273,15 @@
             const res = await fetch('/api/dashboard');
             const data = await res.json();
             
-            // 1. Stat cards
-            document.getElementById('total_motos').textContent = data.total_motos || 0;
-            document.getElementById('motos_disponiveis').textContent = data.motos_disponiveis || 0;
-            document.getElementById('motos_alugadas').textContent = data.motos_alugadas || 0;
-            document.getElementById('motos_manutencao').textContent = data.motos_manutencao || 0;
+            // 1. Stat cards (apenas se existirem no DOM)
+            const elTotalMotos = document.getElementById('total_motos');
+            if (elTotalMotos) elTotalMotos.textContent = data.total_motos || 0;
+            const elMotosDisp = document.getElementById('motos_disponiveis');
+            if (elMotosDisp) elMotosDisp.textContent = data.motos_disponiveis || 0;
+            const elMotosAlug = document.getElementById('motos_alugadas');
+            if (elMotosAlug) elMotosAlug.textContent = data.motos_alugadas || 0;
+            const elMotosManut = document.getElementById('motos_manutencao');
+            if (elMotosManut) elMotosManut.textContent = data.motos_manutencao || 0;
             
             // TAX & MOT Warnings Stat Card
             const elTaxMot = document.getElementById('tax_mot_warnings');
@@ -246,45 +292,42 @@
             
             if (elTaxMot) elTaxMot.textContent = totalWarnings;
             
-            if (totalWarnings > 0) {
-                if (data.tax_mot_expired > 0) {
-                    if (elTaxMot) elTaxMot.style.color = '#f87171';
-                    if (elTaxMotIcon) elTaxMotIcon.textContent = '🚨';
-                    if (cardTaxMot) {
+            if (cardTaxMot) {
+                if (totalWarnings > 0) {
+                    if (data.tax_mot_expired > 0) {
+                        if (elTaxMot) elTaxMot.style.color = '#f87171';
+                        if (elTaxMotIcon) elTaxMotIcon.textContent = '🚨';
                         cardTaxMot.style.borderColor = 'rgba(239, 68, 68, 0.4)';
                         cardTaxMot.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.12)';
-                    }
-                    if (elTaxMotDesc) {
-                        elTaxMotDesc.innerHTML = `<strong style="color: #fca5a5;">${data.tax_mot_expired} expired</strong>${data.tax_mot_expiring_soon > 0 ? ` • ${data.tax_mot_expiring_soon} soon` : ''}`;
-                    }
-                } else {
-                    if (elTaxMot) elTaxMot.style.color = '#f59e0b';
-                    if (elTaxMotIcon) elTaxMotIcon.textContent = '⏳';
-                    if (cardTaxMot) {
+                        if (elTaxMotDesc) {
+                            elTaxMotDesc.innerHTML = `<strong style="color: #fca5a5;">${data.tax_mot_expired} expired</strong>${data.tax_mot_expiring_soon > 0 ? ` • ${data.tax_mot_expiring_soon} soon` : ''}`;
+                        }
+                    } else {
+                        if (elTaxMot) elTaxMot.style.color = '#f59e0b';
+                        if (elTaxMotIcon) elTaxMotIcon.textContent = '⏳';
                         cardTaxMot.style.borderColor = 'rgba(245, 158, 11, 0.4)';
                         cardTaxMot.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.12)';
+                        if (elTaxMotDesc) {
+                            elTaxMotDesc.innerHTML = `<span style="color: #fcd34d;">${totalWarnings} expiring in &le; 30 days</span>`;
+                        }
                     }
-                    if (elTaxMotDesc) {
-                        elTaxMotDesc.innerHTML = `<span style="color: #fcd34d;">${totalWarnings} expiring in &le; 30 days</span>`;
-                    }
-                }
-            } else {
-                if (elTaxMot) elTaxMot.style.color = 'var(--success)';
-                if (elTaxMotIcon) elTaxMotIcon.textContent = '✅';
-                if (cardTaxMot) {
+                } else {
+                    if (elTaxMot) elTaxMot.style.color = 'var(--success)';
+                    if (elTaxMotIcon) elTaxMotIcon.textContent = '✅';
                     cardTaxMot.style.borderColor = 'var(--border-color)';
                     cardTaxMot.style.boxShadow = 'none';
-                }
-                if (elTaxMotDesc) {
-                    elTaxMotDesc.textContent = 'All fleet Tax & MOT up to date';
-                    elTaxMotDesc.style.color = 'var(--text-secondary)';
+                    if (elTaxMotDesc) {
+                        elTaxMotDesc.textContent = 'All fleet Tax & MOT up to date';
+                        elTaxMotDesc.style.color = 'var(--text-secondary)';
+                    }
                 }
             }
             
             const elTotalClientes = document.getElementById('total_clientes');
             if (elTotalClientes) elTotalClientes.textContent = data.total_clientes || 0;
             
-            document.getElementById('receita_semanal').textContent = formatoMoeda.format(data.receita_semanal || 0);
+            const elReceitaSemanal = document.getElementById('receita_semanal');
+            if (elReceitaSemanal) elReceitaSemanal.textContent = formatoMoeda.format(data.receita_semanal || 0);
             
             const elReceitaVencida = document.getElementById('receita_vencida');
             if (elReceitaVencida) elReceitaVencida.textContent = formatoMoeda.format(data.receita_vencida || 0);
@@ -294,53 +337,123 @@
                 elVencidosDesc.textContent = tv === 1 ? '1 overdue payment' : `${tv} overdue payments`;
             }
             
-            document.getElementById('quarentenas_count').textContent = data.quarentenas_count || 0;
-            document.getElementById('quarentenas_valor').textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor || 0)}`;
+            const elQuarCount = document.getElementById('quarentenas_count');
+            if (elQuarCount) elQuarCount.textContent = data.quarentenas_count || 0;
+            const elQuarValor = document.getElementById('quarentenas_valor');
+            if (elQuarValor) elQuarValor.textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor || 0)}`;
+
+            // 1.1 Claims Alerts (Se usuário tiver permissão, data.claims_alerts virá preenchido)
+            const sectionClaims = document.getElementById('sectionClaimsDashboard');
+            const containerClaims = document.getElementById('claimsAlertsContainer');
+            if (sectionClaims && containerClaims && data.claims_alerts) {
+                const ca = data.claims_alerts;
+                if (ca.total_alertas > 0) {
+                    sectionClaims.style.display = 'block';
+                    let cardsHtml = '';
+                    if (ca.indicacoes_vencidas > 0) {
+                        cardsHtml += `
+                            <div style="padding: 0.75rem 1rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px;">
+                                <div style="font-size: 0.75rem; color: #fca5a5; font-weight: 600;">INDICAÇÃO (14D)</div>
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #f87171;">${ca.indicacoes_vencidas} atrasada(s)</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Cobrar comissão de parceiro</div>
+                            </div>
+                        `;
+                    }
+                    if (ca.storage_28d_vencendo > 0) {
+                        cardsHtml += `
+                            <div style="padding: 0.75rem 1rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px;">
+                                <div style="font-size: 0.75rem; color: #fcd34d; font-weight: 600;">LIBERAÇÃO PÁTIO (28D)</div>
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #f59e0b;">${ca.storage_28d_vencendo} moto(s)</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Atingindo ou estourando prazo</div>
+                            </div>
+                        `;
+                    }
+                    if (ca.invoices_pendentes_envio > 0) {
+                        cardsHtml += `
+                            <div style="padding: 0.75rem 1rem; background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 10px;">
+                                <div style="font-size: 0.75rem; color: #d8b4fe; font-weight: 600;">INVOICE PENDENTE</div>
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #c084fc;">${ca.invoices_pendentes_envio} para emitir</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Moto liberada sem invoice</div>
+                            </div>
+                        `;
+                    }
+                    if (ca.invoices_vencidos > 0) {
+                        cardsHtml += `
+                            <div style="padding: 0.75rem 1rem; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 10px;">
+                                <div style="font-size: 0.75rem; color: #fca5a5; font-weight: 600;">INVOICE VENCIDO (+14D)</div>
+                                <div style="font-size: 1.2rem; font-weight: 800; color: #f87171;">${ca.invoices_vencidos} sem pagamento</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">Cobrar seguradora</div>
+                            </div>
+                        `;
+                    }
+                    containerClaims.innerHTML = cardsHtml;
+                } else {
+                    sectionClaims.style.display = 'none';
+                }
+            }
 
             // Highlight maintenance card if > 0
             const cardManut = document.getElementById('cardManutencao');
-            if (data.motos_manutencao > 0) {
-                cardManut.style.borderColor = 'rgba(245, 158, 11, 0.4)';
-                cardManut.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.12)';
-                document.getElementById('motos_manutencao_desc').textContent = `${data.motos_manutencao} bike(s) need attention`;
-            } else {
-                cardManut.style.borderColor = 'var(--border-color)';
-                cardManut.style.boxShadow = 'none';
-                document.getElementById('motos_manutencao_desc').textContent = 'All fleet bikes operational';
+            const descManut = document.getElementById('motos_manutencao_desc');
+            if (cardManut) {
+                if (data.motos_manutencao > 0) {
+                    cardManut.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                    cardManut.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.12)';
+                    if (descManut) descManut.textContent = `${data.motos_manutencao} bike(s) need attention`;
+                } else {
+                    cardManut.style.borderColor = 'var(--border-color)';
+                    cardManut.style.boxShadow = 'none';
+                    if (descManut) descManut.textContent = 'All fleet bikes operational';
+                }
             }
 
             // 2. Fleet Allocation Bar
-            const total = data.total_motos || 0;
-            const alugadas = data.motos_alugadas || 0;
-            const disponiveis = data.motos_disponiveis || 0;
-            const manutencao = data.motos_manutencao || 0;
+            const elBarRented = document.getElementById('barRented');
+            if (elBarRented) {
+                const total = data.total_motos || 0;
+                const alugadas = data.motos_alugadas || 0;
+                const disponiveis = data.motos_disponiveis || 0;
+                const manutencao = data.motos_manutencao || 0;
 
-            document.getElementById('legendRented').textContent = alugadas;
-            document.getElementById('legendAvailable').textContent = disponiveis;
-            document.getElementById('legendMaintenance').textContent = manutencao;
+                const elLegRented = document.getElementById('legendRented');
+                if (elLegRented) elLegRented.textContent = alugadas;
+                const elLegAvail = document.getElementById('legendAvailable');
+                if (elLegAvail) elLegAvail.textContent = disponiveis;
+                const elLegManut = document.getElementById('legendMaintenance');
+                if (elLegManut) elLegManut.textContent = manutencao;
 
-            if (total > 0) {
-                const pRented = ((alugadas / total) * 100).toFixed(0);
-                const pAvail = ((disponiveis / total) * 100).toFixed(0);
-                const pManut = ((manutencao / total) * 100).toFixed(0);
+                const elBarAvail = document.getElementById('barAvailable');
+                const elBarManut = document.getElementById('barMaintenance');
+                const elFleetSum = document.getElementById('fleetPercentSummary');
 
-                document.getElementById('barRented').style.width = `${pRented}%`;
-                document.getElementById('barAvailable').style.width = `${pAvail}%`;
-                document.getElementById('barMaintenance').style.width = `${pManut}%`;
+                if (total > 0) {
+                    const pRented = ((alugadas / total) * 100).toFixed(0);
+                    const pAvail = ((disponiveis / total) * 100).toFixed(0);
+                    const pManut = ((manutencao / total) * 100).toFixed(0);
 
-                document.getElementById('fleetPercentSummary').textContent = `${pRented}% Rented • ${pAvail}% Available • ${pManut}% Maintenance`;
-            } else {
-                document.getElementById('fleetPercentSummary').textContent = 'No motorbikes in fleet';
+                    elBarRented.style.width = `${pRented}%`;
+                    if (elBarAvail) elBarAvail.style.width = `${pAvail}%`;
+                    if (elBarManut) elBarManut.style.width = `${pManut}%`;
+                    if (elFleetSum) elFleetSum.textContent = `${pRented}% Rented • ${pAvail}% Available • ${pManut}% Maintenance`;
+                } else {
+                    if (elFleetSum) elFleetSum.textContent = 'No motorbikes in fleet';
+                }
             }
 
             // 3. Render Bikes in Maintenance
-            renderMaintenanceList(data.motos_manutencao_lista || []);
+            if (document.getElementById('maintenanceListContainer')) {
+                renderMaintenanceList(data.motos_manutencao_lista || []);
+            }
 
             // 4. Render Recent Inspections
-            renderRecentInspections(data.recent_inspections || []);
+            if (document.getElementById('recentInspectionsContainer')) {
+                renderRecentInspections(data.recent_inspections || []);
+            }
 
-            // 5. Load Notices & Alerts
-            await carregarAlertas(data);
+            // 5. Load Notices & Alerts (apenas se o container existir)
+            if (document.getElementById('alertasContainer')) {
+                await carregarAlertas(data);
+            }
 
         } catch(e) {
             console.error('Error loading dashboard', e);

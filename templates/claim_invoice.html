@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Invoice — Claim #{{ claim.claim_number }}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        body {
+            background: #0b0f19;
+            color: #f8fafc;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            padding: 2rem 1rem;
+        }
+        .invoice-card {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0;
+            }
+            .invoice-card {
+                border: none !important;
+                box-shadow: none !important;
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="max-width: 800px; margin: 0 auto 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+        <a href="/claims" class="btn-secondary" style="text-decoration: none; padding: 0.6rem 1.2rem; display: flex; align-items: center; gap: 8px;">
+            &larr; Voltar para Claims
+        </a>
+        <button onclick="window.print()" class="btn-primary" style="padding: 0.6rem 1.5rem; display: flex; align-items: center; gap: 8px;">
+            🖨️ Imprimir / Salvar PDF
+        </button>
+    </div>
+
+    <div class="invoice-card">
+        <!-- Top Header: Logo e Dados da Empresa -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid rgba(255,255,255,0.1); padding-bottom: 1.5rem; margin-bottom: 2rem;">
+            <div>
+                <h1 style="margin: 0 0 0.3rem; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px;">FF MOTORS</h1>
+                <p style="margin: 0; font-size: 0.85rem; color: #94a3b8; line-height: 1.4;">
+                    Fleet Management & Motorcycle Storage Facility<br>
+                    Birmingham, United Kingdom<br>
+                    Email: contact@ffmotors.co.uk
+                </p>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #f59e0b; letter-spacing: 1px;">
+                    VEHICLE STORAGE INVOICE
+                </div>
+                <div style="font-size: 1.5rem; font-weight: 800; margin: 0.25rem 0;">
+                    INV-STR-{{ claim.id }}
+                </div>
+                <div style="font-size: 0.85rem; color: #94a3b8;">
+                    Date: {{ claim.data_envio_invoice.strftime('%d/%m/%Y') if claim.data_envio_invoice else 'Draft' }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Billed To & Claim Details -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2.5rem;">
+            <div style="background: rgba(255,255,255,0.03); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 0.5rem;">
+                    Billed To (Accident Management):
+                </span>
+                {% if claim.empresa_parceira == 'McAms' %}
+                <div style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem;">
+                    McAMS (Accident Management Service) Ltd
+                </div>
+                <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 0.5rem;">
+                    10 Greenheys Road, South Manchester Industrial Estate<br>
+                    Altrincham, Cheshire, WA14 5HH, United Kingdom<br>
+                    Tel: 0845 054 1000 | Email: claims@mc-ams.co.uk
+                </div>
+                {% elif claim.empresa_parceira == 'ALS' %}
+                <div style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem;">
+                    ALS Motorcycle Claims & Assistance Services Ltd
+                </div>
+                <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 0.5rem;">
+                    Direct House, St Andrews Road<br>
+                    Birmingham, West Midlands, B9 4TN, United Kingdom<br>
+                    Tel: 0121 773 1122 | Email: claims@alsassistance.co.uk
+                </div>
+                {% elif claim.empresa_parceira == '365' %}
+                <div style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem;">
+                    365 Bike Claims UK Ltd
+                </div>
+                <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 0.5rem;">
+                    Exchange Quay, Building 5<br>
+                    Salford, Greater Manchester, M5 3EQ, United Kingdom<br>
+                    Tel: 0333 365 2453 | Email: storage@365bikeclaims.co.uk
+                </div>
+                {% else %}
+                <div style="font-size: 1.1rem; font-weight: 800; color: #f8fafc; margin-bottom: 0.25rem;">
+                    {{ claim.empresa_parceira }}
+                </div>
+                <div style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 0.5rem;">
+                    Accident Claims Department<br>
+                    United Kingdom
+                </div>
+                {% endif %}
+                <div style="font-size: 0.88rem; color: #cbd5e1; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.06);">
+                    <strong>Claim Ref / Reference:</strong> <span style="font-weight: 700; color: #f59e0b;">{{ claim.claim_number }}</span>
+                </div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 1.25rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 0.5rem;">
+                    Vehicle & Customer Record:
+                </span>
+                <div style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.25rem;">
+                    VRM: <span style="letter-spacing: 1px; color: #f59e0b;">{{ claim.placa }}</span>
+                </div>
+                <div style="font-size: 0.88rem; color: #cbd5e1;">
+                    <strong>Customer:</strong> {{ claim.cliente_nome }}
+                </div>
+                <div style="font-size: 0.88rem; color: #cbd5e1;">
+                    <strong>Model:</strong> {{ claim.modelo_moto or 'Motorcycle' }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Itemized Table -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.15); text-align: left; font-size: 0.85rem; text-transform: uppercase; color: #94a3b8;">
+                    <th style="padding: 0.75rem 0;">Description</th>
+                    <th style="padding: 0.75rem 0; text-align: center;">Storage Period</th>
+                    <th style="padding: 0.75rem 0; text-align: center;">Days</th>
+                    <th style="padding: 0.75rem 0; text-align: right;">Daily Rate</th>
+                    <th style="padding: 0.75rem 0; text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody style="font-size: 0.95rem;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <td style="padding: 1.25rem 0;">
+                        <strong>Secure Motorcycle Yard Storage</strong><br>
+                        <span style="font-size: 0.8rem; color: #94a3b8;">Accident recovery and holding facility</span>
+                    </td>
+                    <td style="padding: 1.25rem 0; text-align: center; color: #cbd5e1; font-size: 0.88rem;">
+                        {{ claim.data_entrada_storage.strftime('%d/%m/%Y') if claim.data_entrada_storage else '-' }} 
+                        to 
+                        {{ claim.data_liberacao_storage.strftime('%d/%m/%Y') if claim.data_liberacao_storage else 'Present' }}
+                    </td>
+                    <td style="padding: 1.25rem 0; text-align: center; font-weight: 700;">
+                        {{ claim.dias_storage }}
+                    </td>
+                    <td style="padding: 1.25rem 0; text-align: right; color: #cbd5e1;">
+                        £{{ "%.2f"|format(claim.valor_diaria_storage) }}
+                    </td>
+                    <td style="padding: 1.25rem 0; text-align: right; font-weight: 800; font-size: 1.1rem; color: #10b981;">
+                        £{{ "%.2f"|format(claim.valor_total_storage) }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Totais e Pagamento -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 2px solid rgba(255,255,255,0.1);">
+            <div style="font-size: 0.85rem; color: #94a3b8; max-width: 420px; line-height: 1.5;">
+                <strong>Payment Terms:</strong> 14 days from invoice date.<br>
+                Due Date: <strong style="color: #f8fafc;">{{ claim.prazo_pagamento_invoice.strftime('%d/%m/%Y') if claim.prazo_pagamento_invoice else 'Upon Receipt' }}</strong><br>
+                Please reference invoice number <strong>INV-STR-{{ claim.id }}</strong> and Claim <strong>{{ claim.claim_number }}</strong> on remittances.
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.85rem; color: #94a3b8; text-transform: uppercase; font-weight: 600;">Total Amount Due</div>
+                <div style="font-size: 2.2rem; font-weight: 900; color: #10b981; letter-spacing: -0.5px;">
+                    £{{ "%.2f"|format(claim.valor_total_storage) }}
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

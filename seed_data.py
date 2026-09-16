@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta, date
 from app import app
 from database import (
-    db, Motorcycle, Client, Contract, Inspection, FinancialTransaction, User, AuditLog,
+    db, Motorcycle, Client, Contract, Inspection, FinancialTransaction, User, AuditLog, Claim,
     MotoStatus, ContractStatus, InspectionType, TransactionType, TransactionStatus
 )
 
@@ -50,12 +50,13 @@ def seed():
         Contract.query.delete()
         Client.query.delete()
         Motorcycle.query.delete()
+        Claim.query.delete()
         User.query.delete()
         
         # Reset sqlite autoincrement sequence
         conn = db.session.connection()
         try:
-            conn.execute(db.text("DELETE FROM sqlite_sequence WHERE name IN ('usuarios', 'clientes', 'contratos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria');"))
+            conn.execute(db.text("DELETE FROM sqlite_sequence WHERE name IN ('usuarios', 'clientes', 'contratos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims');"))
         except Exception:
             pass
         db.session.commit()
@@ -65,6 +66,9 @@ def seed():
             nome="Thiago Brandão",
             email="tmuniz570@gmail.com",
             role="admin",
+            is_admin=True,
+            perm_alugueis=True,
+            perm_claims=True,
             ativo=True
         )
         u_admin.set_password("Admin123!")
@@ -73,6 +77,9 @@ def seed():
             nome="Carlos Silva",
             email="carlos@ffmotors.co.uk",
             role="staff",
+            is_admin=False,
+            perm_alugueis=True,
+            perm_claims=False,
             ativo=True
         )
         u_staff1.set_password("Staff123!")
@@ -81,11 +88,25 @@ def seed():
             nome="Emma Watson",
             email="emma@ffmotors.co.uk",
             role="staff",
+            is_admin=False,
+            perm_alugueis=True,
+            perm_claims=False,
             ativo=True
         )
         u_staff2.set_password("Staff123!")
 
-        db.session.add_all([u_admin, u_staff1, u_staff2])
+        u_aline = User(
+            nome="Aline Ferreira",
+            email="aline@ffmotors.co.uk",
+            role="staff",
+            is_admin=False,
+            perm_alugueis=False,
+            perm_claims=True,
+            ativo=True
+        )
+        u_aline.set_password("Aline123!")
+
+        db.session.add_all([u_admin, u_staff1, u_staff2, u_aline])
         db.session.flush()
 
         hoje = datetime.utcnow()
@@ -419,12 +440,133 @@ def seed():
                 ip_origem="127.0.0.1"
             ))
 
+        print("Seeding realistic Claims & Storage processes (McAms, ALS, 365)...")
+        claims_data = [
+            # 1. McAms: Em Aberto, Indicação Pendente (vencendo em breve, 8 dias atrás aprovado)
+            Claim(
+                claim_number="MC-2026-8819",
+                empresa_parceira="McAms",
+                cliente_nome="Gabriel Santos",
+                cliente_telefone="07890123456",
+                placa="BK22NMX",
+                modelo_moto="Yamaha NMAX 125",
+                status="Em Aberto",
+                data_acidente=hoje_date - timedelta(days=12),
+                data_aprovacao=hoje_date - timedelta(days=8),
+                valor_indicacao=600.00,
+                prazo_indicacao=hoje_date - timedelta(days=8) + timedelta(days=14),
+                status_indicacao="Pendente",
+                data_entrada_storage=hoje_date - timedelta(days=10),
+                prazo_liberacao_storage=hoje_date - timedelta(days=8) + timedelta(days=28),
+                status_storage="No Pátio",
+                valor_diaria_storage=18.50,
+                observacoes="Terceiro bateu na traseira no semáforo em Digbeth. Documentação enviada à McAms.",
+                criado_por_nome=u_aline.nome
+            ),
+            # 2. ALS: Em Aberto, Indicação Atrasada (+14 dias de aprovação), moto liberada sem invoice
+            Claim(
+                claim_number="ALS-UK-4412",
+                empresa_parceira="ALS",
+                cliente_nome="Lucas Oliveira",
+                cliente_telefone="07512345678",
+                placa="BM19WKP",
+                modelo_moto="Honda Vision 110",
+                status="Em Aberto",
+                data_acidente=hoje_date - timedelta(days=25),
+                data_aprovacao=hoje_date - timedelta(days=18),
+                valor_indicacao=550.00,
+                prazo_indicacao=hoje_date - timedelta(days=18) + timedelta(days=14),
+                status_indicacao="Atrasado",
+                data_entrada_storage=hoje_date - timedelta(days=22),
+                prazo_liberacao_storage=hoje_date - timedelta(days=18) + timedelta(days=28),
+                data_liberacao_storage=hoje_date - timedelta(days=2),
+                status_storage="Liberado",
+                valor_diaria_storage=18.50,
+                dias_storage=20,
+                valor_total_storage=370.00,
+                observacoes="Moto retirada pelo guincho da ALS. Falta Aline emitir e enviar o invoice.",
+                criado_por_nome=u_aline.nome
+            ),
+            # 3. 365: Em Aberto, Indicação Paga, Invoice de Storage Enviado (aguardando pagamento)
+            Claim(
+                claim_number="365-CLM-9031",
+                empresa_parceira="365",
+                cliente_nome="Rafael Costa",
+                cliente_telefone="07455667788",
+                placa="BP23XMN",
+                modelo_moto="Yamaha XMAX 125",
+                status="Em Aberto",
+                data_acidente=hoje_date - timedelta(days=35),
+                data_aprovacao=hoje_date - timedelta(days=30),
+                valor_indicacao=500.00,
+                prazo_indicacao=hoje_date - timedelta(days=30) + timedelta(days=14),
+                status_indicacao="Pago",
+                data_pagamento_indicacao=hoje_date - timedelta(days=20),
+                data_entrada_storage=hoje_date - timedelta(days=34),
+                prazo_liberacao_storage=hoje_date - timedelta(days=30) + timedelta(days=28),
+                data_liberacao_storage=hoje_date - timedelta(days=10),
+                status_storage="Invoice Enviado",
+                valor_diaria_storage=18.50,
+                dias_storage=24,
+                valor_total_storage=444.00,
+                data_envio_invoice=hoje_date - timedelta(days=8),
+                prazo_pagamento_invoice=hoje_date - timedelta(days=8) + timedelta(days=14),
+                status_pagamento_storage="Pendente",
+                observacoes="Invoice #FF-INV-101 enviado para contas da 365. Aguardando TED.",
+                criado_por_nome=u_aline.nome
+            ),
+            # 4. McAms: Concluído (Tudo Pago)
+            Claim(
+                claim_number="MC-2026-7730",
+                empresa_parceira="McAms",
+                cliente_nome="Rodrigo Lima",
+                cliente_telefone="07322114455",
+                placa="WN21TYU",
+                modelo_moto="Honda Vision 110",
+                status="Concluido",
+                data_acidente=hoje_date - timedelta(days=60),
+                data_aprovacao=hoje_date - timedelta(days=50),
+                valor_indicacao=600.00,
+                prazo_indicacao=hoje_date - timedelta(days=50) + timedelta(days=14),
+                status_indicacao="Pago",
+                data_pagamento_indicacao=hoje_date - timedelta(days=40),
+                data_entrada_storage=hoje_date - timedelta(days=58),
+                prazo_liberacao_storage=hoje_date - timedelta(days=50) + timedelta(days=28),
+                data_liberacao_storage=hoje_date - timedelta(days=35),
+                status_storage="Pago",
+                valor_diaria_storage=18.50,
+                dias_storage=23,
+                valor_total_storage=425.50,
+                data_envio_invoice=hoje_date - timedelta(days=34),
+                prazo_pagamento_invoice=hoje_date - timedelta(days=34) + timedelta(days=14),
+                status_pagamento_storage="Pago",
+                data_pagamento_storage=hoje_date - timedelta(days=24),
+                observacoes="Processo concluído com sucesso. Todos os valores recebidos e conferidos.",
+                criado_por_nome=u_aline.nome
+            )
+        ]
+        db.session.add_all(claims_data)
+        db.session.flush()
+
+        for cl in claims_data:
+            all_logs.append(AuditLog(
+                data_hora=hoje - timedelta(days=10),
+                id_usuario=u_aline.id,
+                usuario_nome=u_aline.nome,
+                acao="CREATE_CLAIM",
+                entidade="Claim",
+                entidade_id=str(cl.id),
+                descricao=f"Claim #{cl.claim_number} ({cl.empresa_parceira}) cadastrado para {cl.cliente_nome} ({cl.placa}) por {u_aline.nome}",
+                ip_origem="127.0.0.1"
+            ))
+
         db.session.add_all(all_logs)
         db.session.commit()
 
         print("\n=======================================================")
         print("🎉 RICH REALISTIC SEED COMPLETED SUCCESSFULLY!")
-        print(f"✓ {User.query.count()} Staff Accounts (Thiago Brandão [Admin], Carlos Silva, Emma Watson)")
+        print(f"✓ {User.query.count()} Staff Accounts (Thiago Brandão [Admin], Carlos Silva, Emma Watson, Aline Ferreira [Claims])")
+        print(f"✓ {Claim.query.count()} Claims & Storage processes (McAms, ALS, 365)")
         print(f"✓ {Motorcycle.query.count()} Motorbikes in Birmingham Fleet:")
         print("    - 4 Available (including 1 with MOT due in 18d)")
         print("    - 13 Rented (including 1 with Tax due in 14d, 1 with Cancelled Insurance, 1 with 15-day check overdue)")
