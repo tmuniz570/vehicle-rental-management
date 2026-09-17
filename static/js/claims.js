@@ -142,11 +142,11 @@ async function carregarClaims() {
     });
 
     try {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2.5rem; color:var(--text-secondary);">Carregando processos de claims...</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2.5rem; color:var(--text-secondary);">Carregando processos de claims...</td></tr>`;
 
         const res = await fetch(`/api/claims?${params.toString()}`);
         if (!res.ok) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#f87171;">Erro ao carregar claims (${res.status}).</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#f87171;">Erro ao carregar claims (${res.status}).</td></tr>`;
             return;
         }
 
@@ -169,7 +169,7 @@ async function carregarClaims() {
 
     } catch (err) {
         console.error('Erro ao buscar claims:', err);
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:2rem; color:#f87171;">Erro de conexão com o servidor.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:2rem; color:#f87171;">Erro de conexão com o servidor.</td></tr>`;
     }
 }
 
@@ -211,12 +211,23 @@ function atualizarKPIs(resumo) {
     }
 }
 
+function formatarDataUK(dataStr) {
+    if (!dataStr) return '-';
+    // Accepts YYYY-MM-DD or YYYY-MM-DD HH:MM:SS
+    const parteData = dataStr.includes('T') ? dataStr.split('T')[0] : dataStr.split(' ')[0];
+    const partes = parteData.split('-');
+    if (partes.length === 3) {
+        return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return dataStr;
+}
+
 function renderizarTabelaClaims(claims) {
     const tbody = document.getElementById('claimsTableBody');
     if (!tbody) return;
 
     if (claims.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:3rem; color:var(--text-secondary);">Nenhum claim encontrado para os filtros selecionados.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:3rem; color:var(--text-secondary);">Nenhum claim encontrado para os filtros selecionados.</td></tr>`;
         return;
     }
 
@@ -224,6 +235,16 @@ function renderizarTabelaClaims(claims) {
     claims.forEach(c => {
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid var(--border-color)';
+
+        // 0. Badge Status Geral do Processo (agora integrado na 1ª coluna)
+        let badgeStatusGeral = '';
+        if (c.status === 'Concluido') {
+            badgeStatusGeral = `<span class="badge badge-success" style="font-size: 0.7rem; font-weight: 700; padding: 2px 7px;">Concluído</span>`;
+        } else if (c.status === 'Cancelado') {
+            badgeStatusGeral = `<span class="badge badge-danger" style="font-size: 0.7rem; font-weight: 700; padding: 2px 7px;">Cancelado</span>`;
+        } else {
+            badgeStatusGeral = `<span class="badge badge-warning" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); font-size: 0.7rem; font-weight: 700; padding: 2px 7px;">Em Aberto</span>`;
+        }
 
         // 1. Badge Indicação (14 dias)
         let badgeInd = '';
@@ -268,31 +289,26 @@ function renderizarTabelaClaims(claims) {
             badgeInvoice = `<span style="font-size:0.8rem; color:var(--text-secondary);">Acumulando: £${c.valor_total_storage.toFixed(2)}</span>`;
         }
 
-        // 0. Badge Status Geral do Processo
-        let badgeStatusGeral = '';
-        if (c.status === 'Concluido') {
-            badgeStatusGeral = `<span class="badge badge-success" style="font-weight: 700;">Concluído</span>`;
-        } else if (c.status === 'Cancelado') {
-            badgeStatusGeral = `<span class="badge badge-danger" style="font-weight: 700;">Cancelado</span>`;
-        } else {
-            badgeStatusGeral = `<span class="badge badge-warning" style="background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); font-weight: 700;">Em Aberto</span>`;
-        }
+        const dataAprovUK = c.data_aprovacao ? formatarDataUK(c.data_aprovacao) : 'Pendente';
+        const dataEntradaUK = c.data_entrada_storage ? formatarDataUK(c.data_entrada_storage) : '-';
+        const dataLibUK = c.data_liberacao_storage ? formatarDataUK(c.data_liberacao_storage) : '-';
+        const dataInvoiceUK = c.data_envio_invoice ? formatarDataUK(c.data_envio_invoice) : '';
+        const dataCriacaoUK = c.data_criacao ? formatarDataUK(c.data_criacao) : '-';
 
         tr.innerHTML = `
             <td style="padding: 1rem;">
-                <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">
-                    ${escapeHtml(c.claim_number)}
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">
+                        ${escapeHtml(c.claim_number)}
+                    </span>
+                    ${badgeStatusGeral}
                 </div>
-                <div style="font-size: 0.8rem; color: #f59e0b; font-weight: 600;">
+                <div style="font-size: 0.82rem; color: #f59e0b; font-weight: 600; margin-top: 3px;">
                     ${escapeHtml(c.empresa_parceira)}
                 </div>
                 <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px;">
-                    Criado em ${c.data_criacao ? c.data_criacao.substring(0,10) : '-'}
+                    Criado em ${dataCriacaoUK}
                 </div>
-            </td>
-
-            <td style="padding: 1rem; vertical-align: middle;">
-                ${badgeStatusGeral}
             </td>
 
             <td style="padding: 1rem;">
@@ -312,21 +328,21 @@ function renderizarTabelaClaims(claims) {
             <td style="padding: 1rem;">
                 ${badgeInd}
                 <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                    Aprov: ${c.data_aprovacao || 'Pendente'}
+                    Aprov: ${dataAprovUK}
                 </div>
             </td>
 
             <td style="padding: 1rem;">
                 ${badgeStorage}
                 <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                    Entrada: ${c.data_entrada_storage || '-'} | Lib: ${c.data_liberacao_storage || '-'}
+                    Entrada: ${dataEntradaUK} | Lib: ${dataLibUK}
                 </div>
             </td>
 
             <td style="padding: 1rem;">
                 ${badgeInvoice}
                 <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                    ${c.data_envio_invoice ? `Envio: ${c.data_envio_invoice}` : ''}
+                    ${dataInvoiceUK ? `Envio: ${dataInvoiceUK}` : ''}
                 </div>
             </td>
 
@@ -420,7 +436,7 @@ function abrirModalEditClaim(id) {
     document.getElementById('edit_data_pagamento_indicacao').value = claim.data_pagamento_indicacao || '';
     const badgeInd = document.getElementById('badgeIndicacaoModal');
     if (badgeInd) {
-        badgeInd.innerHTML = claim.status_indicacao === 'Pago' 
+        badgeInd.innerHTML = claim.status_indicacao === 'Pago'
             ? '<span class="badge badge-success">Pago</span>'
             : (claim.indicacao_atrasada ? '<span class="badge badge-danger">Atrasado</span>' : '<span class="badge badge-info">Pendente</span>');
     }

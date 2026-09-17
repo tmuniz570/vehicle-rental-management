@@ -17,7 +17,7 @@ from flask_login import (
 from database import (
     db, init_db, Contract, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
-    User, AuditLog, JobExecutionLock, Claim
+    User, AuditLog, JobExecutionLock, Claim, ContractAttachment
 )
 from sqlalchemy.orm import joinedload
 import werkzeug.utils
@@ -64,6 +64,10 @@ LONDON_TZ = pytz.timezone('Europe/London')
 def get_london_now():
     """Returns current timezone-aware datetime in Europe/London."""
     return datetime.now(LONDON_TZ)
+
+def get_local_now():
+    """Returns naive datetime representing local London time."""
+    return get_london_now().replace(tzinfo=None)
 
 def get_london_date():
     """Returns today's date in Europe/London."""
@@ -189,7 +193,7 @@ def registrar_log(acao, entidade, entidade_id, descricao):
             entidade_id=str(entidade_id) if entidade_id else None,
             descricao=descricao,
             ip_origem=ip,
-            data_hora=datetime.utcnow()
+            data_hora=get_local_now()
         )
         db.session.add(log)
         db.session.commit()
@@ -304,6 +308,7 @@ def login():
             clear_failed_logins(client_ip)
             session.permanent = True
             login_user(user, remember=remember)
+            registrar_log('LOGIN_SUCCESS', 'User', user.id, f"Usuário {user.nome} fez login no sistema.")
             session['last_activity'] = time.time()
             next_page = request.args.get('next')
             if not next_page or not next_page.startswith('/'):
@@ -311,14 +316,19 @@ def login():
             return redirect(next_page)
         else:
             record_failed_login(client_ip)
+            registrar_log('LOGIN_FAILED', 'User', None, f"Tentativa de login falha para o email: {email} (IP: {client_ip})")
             flash('Credenciais inválidas. Verifique seu e-mail e senha.', 'danger')
             return render_template('login.html', email=email)
             
     return render_template('login.html')
 
 @app.route('/logout', methods=['GET', 'POST'])
+@login_required
 def logout():
     session.pop('last_activity', None)
+    uid = current_user.id if current_user.is_authenticated else None
+    unome = current_user.nome if current_user.is_authenticated else 'System'
+    if uid: registrar_log('LOGOUT', 'User', uid, f"Usuário {unome} fez logout.")
     logout_user()
     flash('Você saiu do sistema com segurança.', 'info')
     return redirect(url_for('login'))
@@ -558,6 +568,51 @@ def relatorio_vencidos():
 @alugueis_required
 def pagina_detalhes_contrato(id):
     return render_template('detalhe_contrato.html', contrato_id=id)
+
+@app.route('/contratos/<int:id>/imprimir')
+@alugueis_required
+def imprimir_contrato(id):
+    contrato = db.session.get(Contract, id)
+    if not contrato:
+        return render_template('404.html'), 404
+        
+    cliente = db.session.get(Client, contrato.id_cliente)
+    moto = db.session.get(Motorcycle, contrato.placa)
+    
+    dias_nomes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    dia_pagamento_nome = dias_nomes[contrato.dia_pagamento_semanal] if 0 <= contrato.dia_pagamento_semanal <= 6 else 'Monday'
+    
+    # Depósito original registrado
+    dep_tx = FinancialTransaction.query.filter_by(
+        id_contrato=id, 
+        tipo=TransactionType.DEPOSIT.value
+    ).first()
+    deposito_valor = float(dep_tx.valor) if dep_tx else 500.00
+    
+    # Datas formatadas UK (DD/MM/YYYY)
+    data_retirada_uk = contrato.data_retirada.strftime('%d/%m/%Y') if contrato.data_retirada else '-'
+    hora_retirada_uk = contrato.data_retirada.strftime('%H:%M') if contrato.data_retirada else '-'
+    
+    data_devolucao_uk = contrato.data_devolucao.strftime('%d/%m/%Y') if contrato.data_devolucao else None
+    hora_devolucao_uk = contrato.data_devolucao.strftime('%H:%M') if contrato.data_devolucao else None
+    
+    data_assinatura_inicial_uk = contrato.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_inicial else None
+    data_assinatura_devolucao_uk = contrato.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_devolucao else None
+
+    return render_template(
+        'contrato_print.html',
+        contrato=contrato,
+        cliente=cliente,
+        moto=moto,
+        dia_pagamento_nome=dia_pagamento_nome,
+        deposito_valor=deposito_valor,
+        data_retirada_uk=data_retirada_uk,
+        hora_retirada_uk=hora_retirada_uk,
+        data_devolucao_uk=data_devolucao_uk,
+        hora_devolucao_uk=hora_devolucao_uk,
+        data_assinatura_inicial_uk=data_assinatura_inicial_uk,
+        data_assinatura_devolucao_uk=data_assinatura_devolucao_uk
+    )
 
 @app.route('/usuarios')
 @admin_required
@@ -899,8 +954,6 @@ def atualizar_claim(id):
         claim.placa = data['placa'].strip().upper().replace(' ', '')
     if 'modelo_moto' in data:
         claim.modelo_moto = data['modelo_moto'].strip()
-    if 'status' in data and data['status'].strip():
-        claim.status = data['status'].strip()
     if 'observacoes' in data:
         claim.observacoes = data['observacoes'].strip()
 
@@ -970,6 +1023,13 @@ def atualizar_claim(id):
         if claim.data_pagamento_storage:
             claim.status_pagamento_storage = 'Pago'
             claim.status_storage = 'Pago'
+
+    # Auto-conclusão: Se indicação está paga e storage pago (ou liberado sem cobrança de storage), e não foi cancelado
+    if claim.status != 'Cancelado':
+        if 'status' in data and data['status'].strip():
+            claim.status = data['status'].strip()
+        elif claim.status_indicacao == 'Pago' and (claim.status_pagamento_storage == 'Pago' or float(claim.valor_total_storage or 0.0) == 0):
+            claim.status = 'Concluido'
 
     db.session.commit()
     operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
@@ -1259,7 +1319,7 @@ def listar_auditoria():
     
     itens = [{
         'id': a.id,
-        'data_hora': a.data_hora.isoformat() + 'Z' if a.data_hora else None,
+        'data_hora': a.data_hora.isoformat() if a.data_hora else None,
         'usuario_nome': a.usuario_nome or 'System',
         'acao': a.acao,
         'entidade': a.entidade,
@@ -1307,28 +1367,28 @@ def criar_cliente():
     if 'habilitacao' in request.files:
         f = request.files['habilitacao']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_hab = f"/static/uploads/{nome_salvo}"
 
     if 'habilitacao_verso' in request.files:
         f = request.files['habilitacao_verso']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_verso_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_verso_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_hab_verso = f"/static/uploads/{nome_salvo}"
 
     if 'cbt' in request.files:
         f = request.files['cbt']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_cbt_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_cbt_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_cbt = f"/static/uploads/{nome_salvo}"
             
     if 'comprovante_endereco' in request.files:
         f = request.files['comprovante_endereco']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_comp_end_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_comp_end_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_comp_end = f"/static/uploads/{nome_salvo}"
             
@@ -1383,6 +1443,7 @@ def criar_moto():
         modelo=dados['modelo'].strip(),
         cor=dados['cor'].strip(),
         status=dados.get('status', MotoStatus.AVAILABLE.value),
+        milhagem_atual=int(dados.get('milhagem_atual') or 0),
         vencimento_mot=vencimento_mot,
         vencimento_tax=vencimento_tax
     )
@@ -1390,7 +1451,7 @@ def criar_moto():
     db.session.commit()
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('MOTO_CREATE', 'Motorcycle', nova_moto.placa, f"Moto {nova_moto.placa} ({nova_moto.modelo}) cadastrada por {operador_atual}")
+    registrar_log('MOTO_CREATE', 'Motorcycle', nova_moto.placa, f"Moto {nova_moto.placa} ({nova_moto.modelo}) cadastrada por {operador_atual} (Milhagem: {nova_moto.milhagem_atual} mi)")
 
     return jsonify({'message': 'Motorbike registered successfully', 'mensagem': 'Moto cadastrada com sucesso', 'placa': nova_moto.placa}), 201
 
@@ -1476,33 +1537,36 @@ def atualizar_cliente(id):
         if 'habilitacao' in request.files:
             f = request.files['habilitacao']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_habilitacao = f"/static/uploads/{nome_salvo}"
 
         if 'habilitacao_verso' in request.files:
             f = request.files['habilitacao_verso']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_verso_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_verso_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_habilitacao_verso = f"/static/uploads/{nome_salvo}"
 
         if 'cbt' in request.files:
             f = request.files['cbt']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_cbt_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_cbt_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_cbt = f"/static/uploads/{nome_salvo}"
                 
         if 'comprovante_endereco' in request.files:
             f = request.files['comprovante_endereco']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_comp_end_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_comp_end_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_comprovante_endereco = f"/static/uploads/{nome_salvo}"
     
     db.session.commit()
-    return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'})
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('CLIENT_UPDATE', 'Client', cliente.id, f"Cliente {cliente.nome} atualizado por {operador_atual}")
+
+    return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'}), 200
 
 @app.route('/api/motos', methods=['GET'])
 @alugueis_required
@@ -1535,6 +1599,8 @@ def listar_motos():
         'colour': Motorcycle.cor,
         'color': Motorcycle.cor,
         'status': Motorcycle.status,
+        'milhagem_atual': Motorcycle.milhagem_atual,
+        'mileage': Motorcycle.milhagem_atual,
         'vencimento_mot': Motorcycle.vencimento_mot,
         'mot': Motorcycle.vencimento_mot,
         'vencimento_tax': Motorcycle.vencimento_tax,
@@ -1549,6 +1615,7 @@ def listar_motos():
         'modelo': m.modelo,
         'cor': m.cor,
         'status': m.status,
+        'milhagem_atual': int(m.milhagem_atual or 0),
         'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
         'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None
     } for m in paginated.items]
@@ -1572,6 +1639,11 @@ def atualizar_moto(placa):
     if 'modelo' in dados: moto.modelo = dados['modelo']
     if 'cor' in dados: moto.cor = dados['cor']
     if 'status' in dados: moto.status = dados['status']
+    if 'milhagem_atual' in dados and dados['milhagem_atual'] is not None:
+        try:
+            moto.milhagem_atual = int(dados['milhagem_atual'])
+        except (ValueError, TypeError):
+            pass
     
     if 'vencimento_mot' in dados:
         if dados['vencimento_mot']:
@@ -1634,7 +1706,7 @@ def criar_contrato():
         
     # Save inspection photos
     urls_fotos = []
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
     for i, foto in enumerate(fotos):
         if foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
@@ -1655,6 +1727,10 @@ def criar_contrato():
 
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
 
+    # Milhagem Inicial (UK Miles)
+    milhagem_inicial = int(request.form.get('milhagem_inicial') or (moto.milhagem_atual or 0))
+    moto.milhagem_atual = milhagem_inicial
+
     # Create Contract
     novo_contrato = Contract(
         id_cliente=id_cliente,
@@ -1664,7 +1740,8 @@ def criar_contrato():
         url_seguro=url_seguro,
         status=ContractStatus.ACTIVE.value,
         criado_por_nome=operador_atual,
-        data_ultima_checagem_seguro=datetime.utcnow().date(),
+        milhagem_inicial=milhagem_inicial,
+        data_ultima_checagem_seguro=get_local_now().date(),
         status_seguro='Valid',
         seguro_verificado_por=operador_atual
     )
@@ -1675,7 +1752,7 @@ def criar_contrato():
     
     db.session.flush() # Retrieve generated contract ID
     
-    hoje = datetime.utcnow()
+    hoje = get_local_now()
     
     # Security deposit transaction
     deposito = FinancialTransaction(
@@ -1712,10 +1789,11 @@ def criar_contrato():
     )
     db.session.add(aluguel_semana_2)
     
-    # Create Check-out Inspection
+    # Create Check-out Inspection with mileage
     nova_vistoria = Inspection(
         id_contrato=novo_contrato.id,
         tipo=InspectionType.CHECK_OUT.value,
+        milhagem=milhagem_inicial,
         observacoes=observacoes,
         url_fotos=url_foto_str,
         realizado_por_nome=operador_atual
@@ -1724,7 +1802,7 @@ def criar_contrato():
     
     db.session.commit()
     
-    registrar_log('CREATE_CONTRACT', 'Contract', novo_contrato.id, f"Contrato #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f})")
+    registrar_log('CREATE_CONTRACT', 'Contract', novo_contrato.id, f"Contrato #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Milhagem: {milhagem_inicial} mi, Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f})")
     
     return jsonify({'message': 'Contract and initial inspection created successfully', 'mensagem': 'Contrato e vistoria criados com sucesso', 'id': novo_contrato.id}), 201
 
@@ -1740,10 +1818,12 @@ def atualizar_seguro_contrato(id):
         if f.filename:
             if not is_allowed_file(f.filename):
                 return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
-            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_seguro_upd_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_seguro_upd_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             contrato.url_seguro = f"/static/uploads/{nome_salvo}"
             db.session.commit()
+            operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+            registrar_log('INSURANCE_UPLOADED', 'Contract', contrato.id, f"Apólice de seguro do contrato #{contrato.id} atualizada por {operador_atual}.")
             return jsonify({'message': 'Insurance document updated successfully', 'mensagem': 'Seguro atualizado'})
             
     return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
@@ -1761,7 +1841,7 @@ def verificar_seguro_contrato(id):
         novo_status = 'Valid'
         
     operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    hoje_date = datetime.utcnow().date()
+    hoje_date = get_local_now().date()
     
     contrato.data_ultima_checagem_seguro = hoje_date
     contrato.status_seguro = novo_status
@@ -1781,6 +1861,135 @@ def verificar_seguro_contrato(id):
         'data_ultima_checagem_seguro': contrato.data_ultima_checagem_seguro.strftime('%Y-%m-%d'),
         'seguro_verificado_por': contrato.seguro_verificado_por
     })
+
+# --- DIGITAL SIGNATURES & CONTRACT ATTACHMENTS ---
+
+@app.route('/api/contratos/<int:id>/assinar', methods=['POST'])
+@alugueis_required
+def assinar_contrato(id):
+    contrato = db.session.get(Contract, id)
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+
+    dados = request.get_json() or {}
+    tipo_assinatura = dados.get('tipo', 'inicial') # 'inicial' ou 'devolucao'
+    assinatura_base64 = dados.get('assinatura') # Data URL 'data:image/png;base64,...'
+
+    if not assinatura_base64 or not assinatura_base64.startswith('data:image/'):
+        return jsonify({'error': 'Invalid signature data', 'erro': 'Dados de assinatura inválidos'}), 400
+
+    import base64
+    try:
+        header, encoded = assinatura_base64.split(',', 1)
+        data = base64.b64decode(encoded)
+        
+        agora = get_london_now()
+        timestamp = agora.strftime("%Y%m%d_%H%M%S")
+        filename = f"sig_{tipo_assinatura}_{id}_{timestamp}.png"
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        
+        with open(filepath, 'wb') as f:
+            f.write(data)
+            
+        url_salva = f"/static/uploads/{filename}"
+        operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+
+        # Salva como naive datetime local de Londres no DB SQLite para consistência
+        agora_london_naive = agora.replace(tzinfo=None)
+
+        if tipo_assinatura == 'devolucao':
+            contrato.assinatura_cliente_devolucao = url_salva
+            contrato.data_assinatura_devolucao = agora_london_naive
+            registrar_log('CONTRACT_SIGNED_RETURN', 'Contract', contrato.id, f"Contrato #{contrato.id} assinado digitalmente na devolução por {contrato.cliente.nome if contrato.cliente else 'Cliente'} (Operador: {operador})")
+        else:
+            contrato.assinatura_cliente_inicial = url_salva
+            contrato.data_assinatura_inicial = agora_london_naive
+            registrar_log('CONTRACT_SIGNED_START', 'Contract', contrato.id, f"Contrato #{contrato.id} assinado digitalmente na retirada por {contrato.cliente.nome if contrato.cliente else 'Cliente'} (Operador: {operador})")
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Signature saved successfully',
+            'url': url_salva,
+            'data_assinatura': agora.strftime('%d/%m/%Y %H:%M')
+        }), 200
+
+    except Exception as e:
+        print(f"[Signature Error]: {e}")
+        return jsonify({'error': 'Failed to save signature', 'erro': f'Erro ao salvar assinatura: {str(e)}'}), 500
+
+@app.route('/api/contratos/<int:id>/anexos', methods=['POST'])
+@alugueis_required
+def upload_anexos_contrato(id):
+    contrato = db.session.get(Contract, id)
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+
+    if 'arquivos' not in request.files:
+        return jsonify({'error': 'No files provided', 'erro': 'Nenhum arquivo enviado'}), 400
+
+    arquivos = request.files.getlist('arquivos')
+    if not arquivos or arquivos[0].filename == '':
+        return jsonify({'error': 'No files selected', 'erro': 'Nenhum arquivo selecionado'}), 400
+
+    tipo_anexo = request.form.get('tipo', 'initial_contract')
+    
+    # Validar extensões
+    for arq in arquivos:
+        if arq.filename and not is_allowed_file(arq.filename):
+            return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+
+    salvos = []
+    timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
+    for i, arq in enumerate(arquivos):
+        if arq.filename:
+            sec_name = werkzeug.utils.secure_filename(arq.filename)
+            nome_arq = f"{timestamp}_anexo_{id}_{i}_{sec_name}"
+            nome_salvo = salvar_arquivo_otimizado(arq, nome_arq)
+            url_arquivo = f"/static/uploads/{nome_salvo}"
+
+            novo_anexo = ContractAttachment(
+                id_contrato=id,
+                tipo=tipo_anexo,
+                url_arquivo=url_arquivo,
+                nome_original=sec_name
+            )
+            db.session.add(novo_anexo)
+            salvos.append(novo_anexo)
+
+    db.session.commit()
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('ATTACHMENT_UPLOADED', 'Contract', id, f"{len(salvos)} anexo(s) ({tipo_anexo}) anexados ao Contrato #{id} por {operador}")
+
+    return jsonify({
+        'success': True,
+        'message': f'{len(salvos)} attachment(s) uploaded successfully',
+        'anexos': [{
+            'id': a.id,
+            'tipo': a.tipo,
+            'url_arquivo': a.url_arquivo,
+            'nome_original': a.nome_original,
+            'data_criacao': a.data_criacao.strftime('%d/%m/%Y %H:%M')
+        } for a in salvos]
+    }), 201
+
+@app.route('/api/contratos/anexos/<int:anexo_id>', methods=['DELETE'])
+@alugueis_required
+def deletar_anexo_contrato(anexo_id):
+    anexo = db.session.get(ContractAttachment, anexo_id)
+    if not anexo:
+        return jsonify({'error': 'Attachment not found', 'erro': 'Anexo não encontrado'}), 404
+
+    id_contrato = anexo.id_contrato
+    delete_file_if_exists(anexo.url_arquivo)
+    db.session.delete(anexo)
+    db.session.commit()
+
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('ATTACHMENT_DELETED', 'Contract', id_contrato, f"Anexo #{anexo_id} excluído do Contrato #{id_contrato} por {operador}")
+
+    return jsonify({'success': True, 'message': 'Attachment deleted successfully'}), 200
 
 @app.route('/api/contratos', methods=['GET'])
 @alugueis_required
@@ -1845,10 +2054,10 @@ def listar_contratos():
     
     itens = [{
         'id': c.id, 'id_cliente': c.id_cliente, 'cliente_nome': c.cliente.nome, 'placa': c.placa,
-        'data_retirada': c.data_retirada.isoformat() + 'Z' if c.data_retirada else None,
+        'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
         'valor_aluguel_semanal': c.valor_aluguel_semanal,
-        'data_devolucao': c.data_devolucao.isoformat() + 'Z' if c.data_devolucao else None,
+        'data_devolucao': c.data_devolucao.isoformat() if c.data_devolucao else None,
         'status': c.status,
         'url_seguro': c.url_seguro
     } for c in paginated.items]
@@ -1897,7 +2106,7 @@ def detalhe_contrato(id):
     transacoes_cliente = [t for t in transacoes if t.tipo.lower() not in ['deposit_refund', 'devolucao_deposito', 'deposit refund']]
     
     # 15-Day Insurance Check calculation
-    hoje_date = datetime.utcnow().date()
+    hoje_date = get_local_now().date()
     ultima_checagem = c.data_ultima_checagem_seguro or (c.data_retirada.date() if c.data_retirada else hoje_date)
     dias_desde_checagem = (hoje_date - ultima_checagem).days
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
@@ -1917,10 +2126,27 @@ def detalhe_contrato(id):
         'placa': c.placa,
         'modelo': moto.modelo if moto else '-',
         'cor': moto.cor if moto else '-',
+        'milhagem_atual_moto': int(moto.milhagem_atual or 0) if moto else 0,
+        'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
+        'milhagem_final': c.milhagem_final,
+        'milhas_rodadas': (c.milhagem_final - (c.milhagem_inicial or 0)) if (c.milhagem_final is not None and c.milhagem_inicial is not None) else None,
+        'assinatura_cliente_inicial': c.assinatura_cliente_inicial,
+        'data_assinatura_inicial': c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial else None,
+        'data_assinatura_inicial_uk': c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial else None,
+        'assinatura_cliente_devolucao': c.assinatura_cliente_devolucao,
+        'data_assinatura_devolucao': c.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_devolucao else None,
+        'data_assinatura_devolucao_uk': c.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_devolucao else None,
+        'anexos': [{
+            'id': a.id,
+            'tipo': a.tipo,
+            'url_arquivo': a.url_arquivo,
+            'nome_original': a.nome_original or 'Anexo',
+            'data_criacao': a.data_criacao.strftime('%d/%m/%Y %H:%M') if a.data_criacao else None
+        } for a in (c.anexos or [])],
         'vencimento_mot': moto.vencimento_mot.strftime('%Y-%m-%d') if (moto and moto.vencimento_mot) else None,
         'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if (moto and moto.vencimento_tax) else None,
-        'data_retirada': c.data_retirada.isoformat() + 'Z' if c.data_retirada else None,
-        'data_devolucao': c.data_devolucao.isoformat() + 'Z' if c.data_devolucao else None,
+        'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
+        'data_devolucao': c.data_devolucao.isoformat() if c.data_devolucao else None,
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
         'valor_aluguel_semanal': float(c.valor_aluguel_semanal) if c.valor_aluguel_semanal else 0.0,
         'status': c.status,
@@ -1946,13 +2172,14 @@ def detalhe_contrato(id):
             'status': t.status,
             'forma_pagamento': t.forma_pagamento,
             'registrado_por_nome': t.registrado_por_nome or '',
-            'data_vencimento': t.data_vencimento.isoformat() + 'Z' if t.data_vencimento else None,
-            'data_pagamento': t.data_pagamento.isoformat() + 'Z' if t.data_pagamento else None
+            'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
+            'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None
         } for t in transacoes_cliente],
         'vistorias': [{
             'id': v.id,
             'tipo': v.tipo,
-            'data_vistoria': v.data.isoformat() + 'Z' if v.data else None,
+            'data_vistoria': v.data.isoformat() if v.data else None,
+            'milhagem': v.milhagem,
             'foto_url': v.url_fotos,
             'observacoes': v.observacoes,
             'realizado_por_nome': v.realizado_por_nome or ''
@@ -2006,7 +2233,7 @@ def pagar_cobranca(id):
         
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     t.status = TransactionStatus.PAID.value
-    t.data_pagamento = datetime.utcnow()
+    t.data_pagamento = get_local_now()
     t.forma_pagamento = forma_pagamento
     t.registrado_por_nome = operador_atual
     
@@ -2034,7 +2261,7 @@ def criar_vistoria():
             return jsonify({'error': 'Invalid inspection photo format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de foto inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
 
     urls_fotos = []
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
     for i, foto in enumerate(fotos):
         if foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
@@ -2045,29 +2272,49 @@ def criar_vistoria():
     url_foto_str = ",".join(urls_fotos)
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    
+    milhagem_val = None
+    if request.form.get('milhagem'):
+        try:
+            milhagem_val = int(request.form.get('milhagem'))
+        except (ValueError, TypeError):
+            milhagem_val = None
+
     nova_vistoria = Inspection(
         id_contrato=id_contrato,
         tipo=tipo,
+        milhagem=milhagem_val,
         observacoes=observacoes,
         url_fotos=url_foto_str,
         realizado_por_nome=operador_atual
     )
     db.session.add(nova_vistoria)
     
+    # Atualiza a milhagem da moto se a vistoria contiver uma milhagem maior, 
+    # independentemente do tipo de vistoria
+    moto = None
+    contrato = db.session.get(Contract, id_contrato)
+    if contrato and contrato.placa:
+        moto = db.session.get(Motorcycle, contrato.placa)
+        if moto and milhagem_val is not None:
+            if milhagem_val > (moto.milhagem_atual or 0):
+                moto.milhagem_atual = milhagem_val
+
     if tipo in [InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']:
-        contrato = db.session.get(Contract, id_contrato)
         if contrato:
             contrato.status = ContractStatus.DEPOSIT_HOLD.value
-            contrato.data_devolucao = datetime.utcnow()
-            moto = db.session.get(Motorcycle, contrato.placa) if contrato.placa else None
+            contrato.data_devolucao = get_local_now()
+            if milhagem_val is not None:
+                contrato.milhagem_final = milhagem_val
             if moto:
                 moto.status = MotoStatus.MAINTENANCE.value
                 
     db.session.commit()
     
-    registrar_log('CREATE_INSPECTION', 'Inspection', nova_vistoria.id, f"Vistoria de {tipo} registrada por {operador_atual} no Contrato #{id_contrato}")
+    milhas_txt = f" (Milhagem: {milhagem_val} mi)" if milhagem_val is not None else ""
+    registrar_log('CREATE_INSPECTION', 'Inspection', nova_vistoria.id, f"Vistoria de {tipo} registrada por {operador_atual} no Contrato #{id_contrato}{milhas_txt}")
     if tipo in [InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']:
-        registrar_log('RETURN_VEHICLE', 'Contract', id_contrato, f"Moto devolvida / Check-in confirmado por {operador_atual} no Contrato #{id_contrato}")
+        registrar_log('RETURN_VEHICLE', 'Contract', id_contrato, f"Moto devolvida / Check-in confirmado por {operador_atual} no Contrato #{id_contrato}{milhas_txt}")
     
     return jsonify({'message': 'Inspection recorded successfully', 'mensagem': 'Vistoria registrada com sucesso', 'id': nova_vistoria.id, 'url': url_foto_str}), 201
 
@@ -2127,8 +2374,9 @@ def listar_vistorias():
     itens = [{
         'id': v.id,
         'id_contrato': v.id_contrato,
-        'data_vistoria': v.data.isoformat() + 'Z',
+        'data_vistoria': v.data.isoformat(),
         'tipo': v.tipo,
+        'milhagem': v.milhagem,
         'foto_url': v.url_fotos,
         'observacoes': v.observacoes,
         'realizado_por_nome': v.realizado_por_nome or '',
@@ -2177,7 +2425,7 @@ def listar_financeiro():
         
     if status_filtro:
         if status_filtro.lower() in ['overdue', 'vencidos', 'vencido']:
-            agora = datetime.utcnow()
+            agora = get_local_now()
             query = query.filter(
                 FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
                 FinancialTransaction.data_vencimento < agora
@@ -2229,8 +2477,8 @@ def listar_financeiro():
         'id': t.id,
         'id_contrato': t.id_contrato,
         'tipo': t.tipo,
-        'data_vencimento': t.data_vencimento.isoformat() + 'Z' if t.data_vencimento else None,
-        'data_pagamento': t.data_pagamento.isoformat() + 'Z' if t.data_pagamento else None,
+        'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
+        'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None,
         'valor': float(t.valor),
         'status': t.status,
         'forma_pagamento': t.forma_pagamento or '',
@@ -2261,7 +2509,7 @@ def pagar_transacao(id):
         
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     t.status = TransactionStatus.PAID.value
-    t.data_pagamento = datetime.utcnow()
+    t.data_pagamento = get_local_now()
     t.forma_pagamento = forma
     t.registrado_por_nome = operador_atual
     db.session.commit()
@@ -2325,6 +2573,8 @@ def excluir_transacao(id):
         
     db.session.delete(t)
     db.session.commit()
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('TRANSACTION_DELETE', 'Transaction', id, f"Transação #{id} excluída por {operador_atual}")
     return jsonify({'message': 'Transaction deleted successfully', 'mensagem': 'Transação excluída com sucesso'}), 200
 
 @app.route('/api/dashboard', methods=['GET'])
@@ -2577,7 +2827,7 @@ def get_dashboard():
 @alugueis_required
 def listar_alertas():
     alertas = []
-    hoje = datetime.utcnow()
+    hoje = get_local_now()
     
     # 1. Deposit hold alerts (14 or 15+ days)
     contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
@@ -2610,13 +2860,15 @@ def finalizar_quarentena(id):
         if f.filename:
             if not is_allowed_file(f.filename):
                 return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
-            nome_arq = werkzeug.utils.secure_filename(f"{int(datetime.utcnow().timestamp())}_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_comprovante = f"/static/uploads/{nome_salvo}"
             
     contrato.url_comprovante_deposito = url_comprovante
     contrato.status = ContractStatus.COMPLETED.value
     db.session.commit()
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('QUARANTINE_END', 'Contract', contrato.id, f"Quarentena do contrato #{contrato.id} finalizada por {operador_atual}.")
     return jsonify({'message': 'Deposit hold finalized successfully', 'mensagem': 'Quarentena finalizada com sucesso'})
 
 @app.route('/api/relatorios/resumo', methods=['GET'])
@@ -2660,7 +2912,7 @@ def _gerar_cobrancas_semanais_logic():
     hoje = datetime.now(tz)
     dia_semana_atual = hoje.weekday() # 0 = Monday, 6 = Sunday
     
-    hoje_utc = datetime.utcnow()
+    hoje_utc = get_local_now()
     
     contratos_ativos = Contract.query.filter(
         Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
@@ -2711,6 +2963,7 @@ def gerar_cobrancas_semanais():
     if not check_cron_auth():
         return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
     transacoes = _gerar_cobrancas_semanais_logic()
+    registrar_log('JOB_WEEKLY_RENT', 'System', None, f"Job de cobranças semanais executado. {len(transacoes)} novas cobranças geradas.")
     return jsonify({
         "message": "Weekly rent charges processed successfully",
         "charges_generated": transacoes,
@@ -2722,7 +2975,7 @@ def _processar_quarentenas_logic():
     Checks contracts in deposit hold that have exceeded 15 days
     and calculates refundable deposit balance.
     """
-    hoje = datetime.utcnow()
+    hoje = get_local_now()
     limite_quarentena = hoje - timedelta(days=15)
     
     contratos_quarentena = Contract.query.filter(
@@ -2766,6 +3019,7 @@ def processar_quarentenas():
     if not check_cron_auth():
         return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
     processados = _processar_quarentenas_logic()
+    registrar_log('JOB_QUARANTINE', 'System', None, f"Job de quarentena executado. {len(processados)} contratos finalizados automaticamente.")
     return jsonify({
         "message": "Deposit holds processed successfully",
         "contracts_completed": processados,
@@ -2790,13 +3044,13 @@ def run_daily_jobs():
                 lock = JobExecutionLock(
                     job_name=job_name,
                     last_run_date=london_date_str,
-                    last_run_at=datetime.utcnow(),
+                    last_run_at=get_local_now(),
                     executed_by=worker_id
                 )
                 db.session.add(lock)
             else:
                 lock.last_run_date = london_date_str
-                lock.last_run_at = datetime.utcnow()
+                lock.last_run_at = get_local_now()
                 lock.executed_by = worker_id
             db.session.commit()
         except Exception as e:

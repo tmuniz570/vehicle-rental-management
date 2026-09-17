@@ -34,10 +34,10 @@ async function carregarClientes() {
         clientes.forEach(c => {
             const tr = document.createElement('tr');
             
-            let docs = [];
-            if(c.url_habilitacao) docs.push(`<a href="${c.url_habilitacao}" target="_blank" style="color:var(--accent); text-decoration:none;" title="Driving Licence Front">🪪 Licence Front</a>`);
-            if(c.url_habilitacao_verso) docs.push(`<a href="${c.url_habilitacao_verso}" target="_blank" style="color:var(--accent); text-decoration:none;" title="Driving Licence Back">🪪 Licence Back</a>`);
-            if(c.url_cbt) docs.push(`<a href="${c.url_cbt}" target="_blank" style="color:#10b981; text-decoration:none;" title="CBT Certificate">📜 CBT</a>`);
+            const docs = [];
+            if(c.url_habilitacao) docs.push(`<a href="${c.url_habilitacao}" target="_blank" style="color:var(--accent); text-decoration:none;" title="Driving Licence Front">🪪 Front</a>`);
+            if(c.url_habilitacao_verso) docs.push(`<a href="${c.url_habilitacao_verso}" target="_blank" style="color:var(--accent); text-decoration:none;" title="Driving Licence Back">🪪 Back</a>`);
+            if(c.url_cbt) docs.push(`<a href="${c.url_cbt}" target="_blank" style="color:var(--success); text-decoration:none;" title="CBT Certificate">📜 CBT</a>`);
             if(c.url_comprovante_endereco) docs.push(`<a href="${c.url_comprovante_endereco}" target="_blank" style="color:#c084fc; text-decoration:none;" title="Proof of Address">🏠 Address</a>`);
             const docsHtml = docs.length > 0 ? docs.join('<br>') : '-';
             

@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.3.0--Hardened-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.5.0--Hardened-success?style=for-the-badge)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red?style=for-the-badge)
@@ -73,6 +73,10 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - **Rental Module (`perm_alugueis`):** Access to fleet, customers, contracts, inspections, financial transactions, and overdue reports. Non-rental users are strictly blocked at route and API levels.
   - **Claims Module (`perm_claims`):** Access to accident claims, yard storage monitoring, referral fees, and storage invoices.
   - **Administrator (`is_admin`):** Full privileges to manage accounts, audit logs, and system operations.
+* **Comprehensive Audit Trail:** 100% coverage of state-modifying actions (Login/Logout, Client updates, Transaction deletions, Contract alterations) capturing User, Timestamp, IP, and exact action details.
+* **Brute-force Protection & Rate Limiting:** Built-in IP-based login rate limiting, blocking users after consecutive failed attempts.
+* **Storage Optimization Script:** Standalone cleanup script to prune orphan file uploads generated from aborted registrations, preventing server bloat.
+* **Role-Based Access Control (RBAC):** Distinct permissions (`admin`, `operador`, `financeiro`, `alugueis`) providing granular control over sensitive financial data and system configurations.
 * **Secure Session Auth, Idle Timeout & Brute-Force Rate Limiting:** Protected dashboard and API endpoints powered by `Flask-Login` and hashed passwords (`werkzeug.security`). Configured with a 60-minute idle inactivity timeout (`check_authentication` hook), 12-hour session lifetime cap, and opt-in "Keep me signed in" checkbox. Built-in thread-safe IP rate limiter restricting failed login attempts to a maximum of 10 within 15 minutes (HTTP 429 on abuse).
 * **CSRF Protection & Secure POST Logout:** Universal CSRF protection intercepting all state-altering requests (`POST`, `PUT`, `DELETE`, `PATCH`). Logout upgraded to CSRF-protected `POST` with public route isolation to prevent redirect loops.
 * **Strict Upload Whitelist & Sandboxed Delivery:** File uploads strictly limited to safe image and document extensions (`.jpg`, `.jpeg`, `.png`, `.webp`, `.pdf`). Static file delivery `/static/uploads/...` enforces `Content-Security-Policy: default-src 'none'; sandbox` and `X-Content-Type-Options: nosniff`.

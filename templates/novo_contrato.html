@@ -23,16 +23,21 @@
             </div>
             
             <div class="form-group half">
-                <label for="placa">Available Motorbike</label>
+                <label for="placa">Available Motorbike *</label>
                 <select id="placa" name="placa" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
                     <option value="">Loading motorbikes...</option>
                 </select>
             </div>
         </div>
-        
+
         <div class="form-row">
             <div class="form-group half">
-                <label for="dia_pagamento_semanal">Weekly Payment Due Day</label>
+                <label for="milhagem_inicial">Start Mileage (Miles) *</label>
+                <input type="number" id="milhagem_inicial" name="milhagem_inicial" placeholder="e.g. 12450" min="0" step="1" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Odometer reading at collection. Pre-filled from fleet records.</small>
+            </div>
+            <div class="form-group half">
+                <label for="dia_pagamento_semanal">Weekly Payment Due Day *</label>
                 <select id="dia_pagamento_semanal" name="dia_pagamento_semanal" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
                     <option value="0">Monday</option>
                     <option value="1">Tuesday</option>
@@ -43,17 +48,20 @@
                     <option value="6">Sunday</option>
                 </select>
             </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group half">
+                <label for="valor_aluguel_semanal">Weekly Rent (£) *</label>
+                <input type="number" inputmode="decimal" id="valor_aluguel_semanal" name="valor_aluguel_semanal" placeholder="e.g. 250.00" step="0.01" required>
+            </div>
             
             <div class="form-group half">
-                <label for="valor_aluguel_semanal">Weekly Rent (£)</label>
-                <input type="number" inputmode="decimal" id="valor_aluguel_semanal" name="valor_aluguel_semanal" placeholder="e.g. 250.00" step="0.01" required>
+                <label for="valor_deposito">Security Deposit (£) *</label>
+                <input type="number" inputmode="decimal" id="valor_deposito" name="valor_deposito" placeholder="e.g. 500.00" step="0.01" required>
             </div>
         </div>
         
-        <div class="form-group">
-            <label for="valor_deposito">Security Deposit (£)</label>
-            <input type="number" inputmode="decimal" id="valor_deposito" name="valor_deposito" placeholder="e.g. 500.00" step="0.01" required>
-        </div>
         <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0;">
         <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Documentation & Initial Check-out Inspection</h3>
         
@@ -102,8 +110,66 @@
         </div>
     </form>
 </div>
+
+<!-- Post-Creation Modal: Print, Sign On-Screen, or Upload Agreement -->
+<div id="modalPosCriacaoContrato" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
+    <div class="glass-card" style="width:100%; max-width:520px; padding:2rem; border-radius:20px; text-align:center;">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
+        <h2 style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem;">Contract Created Successfully!</h2>
+        <p style="color: var(--text-secondary); font-size: 0.88rem; margin-bottom: 1.75rem;">
+            Rental agreement #<span id="createdContractIdText" style="font-weight:700; color:var(--text-primary);"></span> has been registered. How would you like the client to sign?
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <button type="button" id="btnAssinarAgoraModal" class="btn-primary" style="padding: 0.85rem 1.25rem; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span>✍️</span> Sign on Screen (Mobile / Tablet / Mouse)
+            </button>
+
+            <a id="btnImprimirContratoCriado" href="#" class="btn-secondary" style="padding: 0.85rem 1.25rem; font-size: 0.95rem; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <span>🖨️</span> Print Agreement (Physical Paper)
+            </a>
+
+            <a id="btnIrParaDetalhesCriado" href="#" class="btn-secondary" style="padding: 0.75rem 1.25rem; font-size: 0.85rem; text-decoration: none; color: var(--text-secondary); border-color: transparent;">
+                Skip for now &rarr; Go to Contract Details
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- On-Screen Digital Signature Modal (Touch Canvas) -->
+<div id="modalSignaturePad" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:1200; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(8px);">
+    <div class="glass-card" style="width:100%; max-width:560px; padding:1.75rem; border-radius:20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">Renter Signature</h3>
+                <p style="margin: 2px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Ask the client to sign using finger, stylus or mouse.</p>
+            </div>
+            <button type="button" id="btnCloseSignatureModal" style="background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer;">&times;</button>
+        </div>
+
+        <div style="background: #ffffff; border-radius: 12px; border: 2px dashed #94a3b8; overflow: hidden; touch-action: none; position: relative;">
+            <canvas id="signatureCanvas" style="width: 100%; height: 220px; display: block; cursor: crosshair;"></canvas>
+            <div style="position: absolute; bottom: 8px; left: 12px; font-size: 0.75rem; color: #94a3b8; pointer-events: none;">
+                Sign above line • Assine acima
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; gap: 0.75rem;">
+            <button type="button" id="btnClearSignature" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem;">
+                🔄 Clear
+            </button>
+            <div style="display: flex; gap: 0.75rem;">
+                <button type="button" id="btnCancelSignature" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem;">Cancel</button>
+                <button type="button" id="btnSaveSignature" class="btn-primary" style="padding: 0.65rem 1.5rem; font-size: 0.85rem; font-weight: 600;">
+                    ✓ Confirm Signature
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/novo_contrato.js"></script>
+<script src="/static/js/signature_pad.umd.min.js"></script>
+<script src="/static/js/novo_contrato.js?v=2"></script>
 {% endblock %}

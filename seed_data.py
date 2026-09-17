@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, date
 from app import app
 from database import (
     db, Motorcycle, Client, Contract, Inspection, FinancialTransaction, User, AuditLog, Claim,
-    MotoStatus, ContractStatus, InspectionType, TransactionType, TransactionStatus
+    ContractAttachment, MotoStatus, ContractStatus, InspectionType, TransactionType, TransactionStatus
 )
 
 def seed():
@@ -45,6 +45,7 @@ def seed():
 
         print("Clearing database tables for clean state...")
         AuditLog.query.delete()
+        ContractAttachment.query.delete()
         FinancialTransaction.query.delete()
         Inspection.query.delete()
         Contract.query.delete()
@@ -56,7 +57,7 @@ def seed():
         # Reset sqlite autoincrement sequence
         conn = db.session.connection()
         try:
-            conn.execute(db.text("DELETE FROM sqlite_sequence WHERE name IN ('usuarios', 'clientes', 'contratos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims');"))
+            conn.execute(db.text("DELETE FROM sqlite_sequence WHERE name IN ('usuarios', 'clientes', 'contratos', 'contrato_anexos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims');"))
         except Exception:
             pass
         db.session.commit()
@@ -118,34 +119,35 @@ def seed():
         # - Rented bikes (some fresh, one with Tax expiring soon, one with insurance cancelled, one with 15-day check overdue)
         # - Maintenance bikes (one with MOT already expired!)
         motos_data = [
-            # (plate, model, colour, status, mot_days_ahead, tax_days_ahead, scenario_note)
-            ("XX10YYY", "Honda Forza 300", "Blue Metallic", MotoStatus.RENTED.value, 240, 210),
-            ("FF27MOT", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 300, 270),
-            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150),  # YELLOW ALERT: MOT due in 18 days!
-            ("WM23PCX", "Honda PCX 125", "Silver Frost", MotoStatus.AVAILABLE.value, 330, 330),     # AVAILABLE: 100% valid
-            ("BM19WKP", "Honda Vision 110", "Red Gloss", MotoStatus.MAINTENANCE.value, -4, 90),     # RED ALERT: Expired MOT (-4 days)!
-            ("BV21XKT", "Honda PCX 125", "Matt Black", MotoStatus.RENTED.value, 180, 14),           # YELLOW ALERT: Road Tax due in 14 days!
-            ("BW71FGH", "Yamaha NMAX 125", "Phantom Blue", MotoStatus.RENTED.value, 210, 190),
-            ("BL20ZTR", "Honda Vision 110", "Moondust Grey", MotoStatus.RENTED.value, 270, 240),    # CONTRACT ALERT: 15-day insurance check due!
-            ("BN22LKP", "Honda PCX 125", "Pearl Jasmine White", MotoStatus.RENTED.value, 310, 290),
-            ("BP23XMN", "Yamaha XMAX 125", "Icon Blue", MotoStatus.RENTED.value, 340, 310),
-            ("BX69VTR", "Honda Forza 125", "Matt Cynos Grey", MotoStatus.RENTED.value, 160, 140),  # RED ALERT: Insurance CANCELLED!
-            ("WM22KLJ", "Piaggio Liberty 125", "Nero Lucido", MotoStatus.RENTED.value, 220, 200),  # OVERDUE ALERT: 2 weeks rent behind (£170)!
-            ("WN21TYU", "Honda Vision 110", "Candy Luster Red", MotoStatus.RENTED.value, 290, 260),# OVERDUE ALERT: 1 week rent behind (£80)!
-            ("WO72HJK", "Honda PCX 125", "Matt Dim Gray", MotoStatus.RENTED.value, 320, 300),
-            ("WP20QWE", "Yamaha NMAX 125", "Anvil Grey", MotoStatus.AVAILABLE.value, 250, 220),     # AVAILABLE: 100% valid
-            ("WR23ZXC", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 360, 330),
-            ("WT21OPL", "Honda PCX 125", "Matte Galaxy Black", MotoStatus.RENTED.value, 190, 170),
-            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250),     # AVAILABLE: Just returned from contract
+            # (plate, model, colour, status, mot_days_ahead, tax_days_ahead, milhagem_atual)
+            ("XX10YYY", "Honda Forza 300", "Blue Metallic", MotoStatus.RENTED.value, 240, 210, 14850),
+            ("FF27MOT", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 300, 270, 8920),
+            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150, 11400),  # YELLOW ALERT: MOT due in 18 days!
+            ("WM23PCX", "Honda PCX 125", "Silver Frost", MotoStatus.AVAILABLE.value, 330, 330, 6200),      # AVAILABLE: 100% valid
+            ("BM19WKP", "Honda Vision 110", "Red Gloss", MotoStatus.MAINTENANCE.value, -4, 90, 24350),     # RED ALERT: Expired MOT (-4 days)!
+            ("BV21XKT", "Honda PCX 125", "Matt Black", MotoStatus.RENTED.value, 180, 14, 16100),           # YELLOW ALERT: Road Tax due in 14 days!
+            ("BW71FGH", "Yamaha NMAX 125", "Phantom Blue", MotoStatus.RENTED.value, 210, 190, 12750),
+            ("BL20ZTR", "Honda Vision 110", "Moondust Grey", MotoStatus.RENTED.value, 270, 240, 19800),    # CONTRACT ALERT: 15-day insurance check due!
+            ("BN22LKP", "Honda PCX 125", "Pearl Jasmine White", MotoStatus.RENTED.value, 310, 290, 9400),
+            ("BP23XMN", "Yamaha XMAX 125", "Icon Blue", MotoStatus.RENTED.value, 340, 310, 5800),
+            ("BX69VTR", "Honda Forza 125", "Matt Cynos Grey", MotoStatus.RENTED.value, 160, 140, 18200),   # RED ALERT: Insurance CANCELLED!
+            ("WM22KLJ", "Piaggio Liberty 125", "Nero Lucido", MotoStatus.RENTED.value, 220, 200, 13600),   # OVERDUE ALERT: 2 weeks rent behind (£170)!
+            ("WN21TYU", "Honda Vision 110", "Candy Luster Red", MotoStatus.RENTED.value, 290, 260, 15900), # OVERDUE ALERT: 1 week rent behind (£80)!
+            ("WO72HJK", "Honda PCX 125", "Matt Dim Gray", MotoStatus.RENTED.value, 320, 300, 8100),
+            ("WP20QWE", "Yamaha NMAX 125", "Anvil Grey", MotoStatus.AVAILABLE.value, 250, 220, 14200),     # AVAILABLE: 100% valid
+            ("WR23ZXC", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 360, 330, 7500),
+            ("WT21OPL", "Honda PCX 125", "Matte Galaxy Black", MotoStatus.RENTED.value, 190, 170, 11950),
+            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250, 17320),      # AVAILABLE: Just returned from contract
         ]
         
         motos = {}
-        for placa, modelo, cor, status, mot_offset, tax_offset in motos_data:
+        for placa, modelo, cor, status, mot_offset, tax_offset, milhagem in motos_data:
             m = Motorcycle(
                 placa=placa,
                 modelo=modelo,
                 cor=cor,
                 status=status,
+                milhagem_atual=milhagem,
                 vencimento_mot=hoje_date + timedelta(days=mot_offset),
                 vencimento_tax=hoje_date + timedelta(days=tax_offset)
             )
@@ -234,6 +236,38 @@ def seed():
             elif c_status == ContractStatus.COMPLETED.value:
                 devolucao = hoje - timedelta(days=20) # returned 20 days ago
 
+            moto_obj = motos[plate]
+            milhas_rodadas_semanais = 150 # media realista de entregador em Birmingham (150 milhas/semana)
+            milhas_totais_contrato = weeks_active * milhas_rodadas_semanais
+
+            # Milhagem inicial no início do contrato
+            milhagem_ini = max(1000, moto_obj.milhagem_atual - milhas_totais_contrato)
+            milhagem_fim = None
+            if c_status in (ContractStatus.DEPOSIT_HOLD.value, ContractStatus.COMPLETED.value):
+                milhagem_fim = moto_obj.milhagem_atual
+
+            # Cenários de Assinatura:
+            # - A maioria assinou na retirada (touch screen)
+            # - O contrato 1 anexou via escaneada/PDF
+            # - Os contratos encerrados (DEPOSIT_HOLD e COMPLETED) também têm assinatura de devolução
+            assinatura_ini = None
+            data_assinatura_ini = None
+            assinatura_dev = None
+            data_assinatura_dev = None
+
+            if idx == 1:
+                # Contrato com documento assinado escaneado / anexado (papel)
+                assinatura_ini = None
+                data_assinatura_ini = None
+            elif idx % 5 != 4:
+                # 80% dos clientes assinaram na tela na retirada
+                assinatura_ini = "/static/uploads/demo_signature_client.png"
+                data_assinatura_ini = retirada
+
+            if c_status in (ContractStatus.DEPOSIT_HOLD.value, ContractStatus.COMPLETED.value):
+                assinatura_dev = "/static/uploads/demo_signature_client.png"
+                data_assinatura_dev = devolucao
+
             ct = Contract(
                 id_cliente=c_client.id,
                 placa=plate,
@@ -242,6 +276,12 @@ def seed():
                 dia_pagamento_semanal=pay_day,
                 valor_aluguel_semanal=rent_val,
                 status=c_status,
+                milhagem_inicial=milhagem_ini,
+                milhagem_final=milhagem_fim,
+                assinatura_cliente_inicial=assinatura_ini,
+                data_assinatura_inicial=data_assinatura_ini,
+                assinatura_cliente_devolucao=assinatura_dev,
+                data_assinatura_devolucao=data_assinatura_dev,
                 url_seguro="/static/uploads/demo_insurance_forza.webp",
                 url_comprovante_deposito="/static/uploads/demo_proof_address.webp",
                 criado_por_nome=staff_member.nome,
@@ -252,6 +292,28 @@ def seed():
             db.session.add(ct)
             db.session.flush()
             created_contracts.append(ct)
+
+            # Anexos de Contrato Físico / Escaneado
+            if idx in (1, 3): # Contrato 2 e 4 possuem contratos escaneados anexados
+                anexo_pdf = ContractAttachment(
+                    id_contrato=ct.id,
+                    tipo='initial_contract',
+                    url_arquivo="/static/uploads/demo_contract_scan.pdf",
+                    nome_original=f"Rental_Agreement_Signed_{plate}.pdf",
+                    data_criacao=retirada
+                )
+                db.session.add(anexo_pdf)
+
+            if c_status == ContractStatus.COMPLETED.value:
+                # Contrato concluído tem anexo da via de devolução escaneada
+                anexo_ret = ContractAttachment(
+                    id_contrato=ct.id,
+                    tipo='return_contract',
+                    url_arquivo="/static/uploads/demo_contract_scan.pdf",
+                    nome_original=f"Termination_Return_Inspection_{plate}.pdf",
+                    data_criacao=devolucao
+                )
+                db.session.add(anexo_ret)
 
             # Contract Creation Audit Log
             all_logs.append(AuditLog(
@@ -336,6 +398,7 @@ def seed():
                 id_contrato=ct.id,
                 tipo=InspectionType.CHECK_OUT.value,
                 data=retirada,
+                milhagem=milhagem_ini,
                 observacoes=f"Full pre-delivery checkout for {plate}. Tires checked, brakes tested, full tank of petrol, helmet and lock handed over.",
                 url_fotos="/static/uploads/demo_forza_front.webp,/static/uploads/demo_forza_side.webp,/static/uploads/demo_forza_rear.webp" if is_forza else "/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
                 realizado_por_nome=staff_member.nome
@@ -349,6 +412,7 @@ def seed():
                     id_contrato=ct.id,
                     tipo=InspectionType.CHECK_IN.value,
                     data=devolucao,
+                    milhagem=milhagem_fim,
                     observacoes=f"Bike {plate} returned in good order. Minimal wear on rear tyre. Retained deposit under standard 14-day quarantine hold.",
                     url_fotos="/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
                     realizado_por_nome=staff_pool[1].nome
@@ -361,70 +425,92 @@ def seed():
                     acao="RETURN_VEHICLE",
                     entidade="Contract",
                     entidade_id=str(ct.id),
-                    descricao=f"Moto {plate} devolvida no Contrato #{ct.id}. Depósito de £{dep_val:.2f} retido em quarentena de 14 dias.",
-                    ip_origem="127.0.0.1"
-                ))
-
-            elif c_status == ContractStatus.COMPLETED.value and idx == 2:
-                # Completed with Damage Deduction (£50 damage deduction, £300 refunded)
-                t_deduction = FinancialTransaction(
-                    id_contrato=ct.id,
-                    tipo=TransactionType.FINE.value,
-                    data_vencimento=devolucao,
-                    data_pagamento=devolucao,
-                    valor=50.0,
-                    status=TransactionStatus.PAID.value,
-                    forma_pagamento="Damage / Deposit Deduction",
-                    registrado_por_nome=u_admin.nome
-                )
-                db.session.add(t_deduction)
-
-                t_refund = FinancialTransaction(
-                    id_contrato=ct.id,
-                    tipo=TransactionType.DEPOSIT_REFUND.value,
-                    data_vencimento=devolucao + timedelta(days=14),
-                    data_pagamento=devolucao + timedelta(days=14),
-                    valor=dep_val - 50.0,
-                    status=TransactionStatus.PAID.value,
-                    forma_pagamento="Bank Transfer",
-                    registrado_por_nome=u_admin.nome
-                )
-                db.session.add(t_refund)
-
-                all_logs.append(AuditLog(
-                    data_hora=devolucao + timedelta(days=14),
-                    id_usuario=u_admin.id,
-                    usuario_nome=u_admin.nome,
-                    acao="REFUND_DEPOSIT",
-                    entidade="Contract",
-                    entidade_id=str(ct.id),
-                    descricao=f"Devolução parcial de caução: £50.00 deduzidos por danos no retrovisor, £{dep_val - 50.0:.2f} restituídos via Bank Transfer no Contrato #{ct.id}",
+                    descricao=f"Moto {plate} devolvida no Contrato #{ct.id}. Odômetro final: {milhagem_fim} mi ({milhagem_fim - milhagem_ini} mi rodadas). Depósito de £{dep_val:.2f} retido em quarentena de 14 dias.",
                     ip_origem="127.0.0.1"
                 ))
 
             elif c_status == ContractStatus.COMPLETED.value:
-                # Full completed contract with deposit refund
-                t_refund = FinancialTransaction(
+                # Returned bike check-in for completed contract
+                insp_checkin = Inspection(
                     id_contrato=ct.id,
-                    tipo=TransactionType.DEPOSIT_REFUND.value,
-                    data_vencimento=devolucao + timedelta(days=14),
-                    data_pagamento=devolucao + timedelta(days=14),
-                    valor=dep_val,
-                    status=TransactionStatus.PAID.value,
-                    forma_pagamento="Bank Transfer",
-                    registrado_por_nome=u_admin.nome
+                    tipo=InspectionType.CHECK_IN.value,
+                    data=devolucao,
+                    milhagem=milhagem_fim,
+                    observacoes=f"Contract completed. Bike {plate} final inspection passed. All equipment returned, return mileage recorded ({milhagem_fim} mi).",
+                    url_fotos="/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
+                    realizado_por_nome=u_admin.nome
                 )
-                db.session.add(t_refund)
+                db.session.add(insp_checkin)
                 all_logs.append(AuditLog(
-                    data_hora=devolucao + timedelta(days=14),
+                    data_hora=devolucao,
                     id_usuario=u_admin.id,
                     usuario_nome=u_admin.nome,
-                    acao="REFUND_DEPOSIT",
+                    acao="RETURN_VEHICLE",
                     entidade="Contract",
                     entidade_id=str(ct.id),
-                    descricao=f"Devolução integral de caução de £{dep_val:.2f} confirmada por {u_admin.nome} via Bank Transfer no Contrato #{ct.id}",
+                    descricao=f"Encerramento de contrato: Moto {plate} devolvida no Contrato #{ct.id}. Odômetro final: {milhagem_fim} mi ({milhagem_fim - milhagem_ini} mi rodadas no total).",
                     ip_origem="127.0.0.1"
                 ))
+
+                if idx == 2:
+                    # Completed with Damage Deduction (£50 damage deduction, £300 refunded)
+                    t_deduction = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.FINE.value,
+                        data_vencimento=devolucao,
+                        data_pagamento=devolucao,
+                        valor=50.0,
+                        status=TransactionStatus.PAID.value,
+                        forma_pagamento="Damage / Deposit Deduction",
+                        registrado_por_nome=u_admin.nome
+                    )
+                    db.session.add(t_deduction)
+
+                    t_refund = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.DEPOSIT_REFUND.value,
+                        data_vencimento=devolucao + timedelta(days=14),
+                        data_pagamento=devolucao + timedelta(days=14),
+                        valor=dep_val - 50.0,
+                        status=TransactionStatus.PAID.value,
+                        forma_pagamento="Bank Transfer",
+                        registrado_por_nome=u_admin.nome
+                    )
+                    db.session.add(t_refund)
+
+                    all_logs.append(AuditLog(
+                        data_hora=devolucao + timedelta(days=14),
+                        id_usuario=u_admin.id,
+                        usuario_nome=u_admin.nome,
+                        acao="REFUND_DEPOSIT",
+                        entidade="Contract",
+                        entidade_id=str(ct.id),
+                        descricao=f"Devolução parcial de caução: £50.00 deduzidos por danos no retrovisor, £{dep_val - 50.0:.2f} restituídos via Bank Transfer no Contrato #{ct.id}",
+                        ip_origem="127.0.0.1"
+                    ))
+                else:
+                    # Full completed contract with deposit refund
+                    t_refund = FinancialTransaction(
+                        id_contrato=ct.id,
+                        tipo=TransactionType.DEPOSIT_REFUND.value,
+                        data_vencimento=devolucao + timedelta(days=14),
+                        data_pagamento=devolucao + timedelta(days=14),
+                        valor=dep_val,
+                        status=TransactionStatus.PAID.value,
+                        forma_pagamento="Bank Transfer",
+                        registrado_por_nome=u_admin.nome
+                    )
+                    db.session.add(t_refund)
+                    all_logs.append(AuditLog(
+                        data_hora=devolucao + timedelta(days=14),
+                        id_usuario=u_admin.id,
+                        usuario_nome=u_admin.nome,
+                        acao="REFUND_DEPOSIT",
+                        entidade="Contract",
+                        entidade_id=str(ct.id),
+                        descricao=f"Devolução integral de caução de £{dep_val:.2f} confirmada por {u_admin.nome} via Bank Transfer no Contrato #{ct.id}",
+                        ip_origem="127.0.0.1"
+                    ))
 
         # Add recent staff payment received logs for rich audit stream
         recent_payments = FinancialTransaction.query.filter_by(status=TransactionStatus.PAID.value).limit(10).all()
@@ -581,7 +667,9 @@ def seed():
         print("    - 14-day Deposit Hold (quarantine after bike return)")
         print("    - Completed rentals (1 with £50 damage deduction, 1 with full refund)")
         print(f"✓ {FinancialTransaction.query.count()} Financial Ledger Transactions")
-        print(f"✓ {Inspection.query.count()} Check-out and Check-in Inspections with multi-photo galleries")
+        print(f"✓ {Inspection.query.count()} Check-out and Check-in Inspections with odometer mileages & photos")
+        print(f"✓ {ContractAttachment.query.count()} Official Signed Agreement Attachments (PDFs & Scans)")
+        print(f"✓ {Contract.query.filter(Contract.assinatura_cliente_inicial.isnot(None)).count()} Contracts with touch-screen digital signatures")
         print(f"✓ {AuditLog.query.count()} Audit Log activities across the timeline")
         print("=======================================================\n")
 

@@ -152,6 +152,7 @@ async function carregarVistorias() {
                 : '<span style="color:var(--text-secondary); opacity:0.5;">-</span>';
 
             const staffTag = v.realizado_por_nome ? `<small style="display:block; color:#c084fc; font-size:0.75rem; margin-top:2px;">👤 ${escapeHtml(v.realizado_por_nome)}</small>` : '';
+            const milhagemSnippet = v.milhagem != null ? `<span style="color:#fbbf24; font-weight: 600;">${v.milhagem} mi</span>` : '<span style="color:var(--text-secondary); opacity:0.5;">-</span>';
 
             tr.innerHTML = `
                 <td style="font-weight: 500; font-size: 0.9rem; white-space: nowrap;">${dataVistoria}${staffTag}</td>
@@ -163,6 +164,7 @@ async function carregarVistorias() {
                 <td class="nowrap"><span class="badge-plate">${escapeHtml(v.placa || '-')}</span></td>
                 <td style="font-weight: 500; white-space: nowrap;" title="${escapeHtml(v.cliente || '')}">${escapeHtml(v.cliente || '-')}</td>
                 <td>${tipoBadge}</td>
+                <td>${milhagemSnippet}</td>
                 <td>${obsSnippet}</td>
                 <td style="text-align: right; white-space: nowrap;">
                     <button class="btn-action btn-ver-detalhes" data-index="${index}">
@@ -229,6 +231,8 @@ function abrirModalVistoria(v) {
     document.getElementById('modalCliente').textContent = v.cliente || '-';
     const elOp = document.getElementById('modalOperador');
     if (elOp) elOp.textContent = v.realizado_por_nome || '-';
+    const elMil = document.getElementById('modalMilhagem');
+    if (elMil) elMil.textContent = v.milhagem != null ? `${v.milhagem} mi` : '-';
     document.getElementById('modalObs').textContent = v.observacoes ? v.observacoes : 'No notes recorded.';
 
     // Gallery

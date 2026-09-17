@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motorcycle Rental Agreement — Contract #{{ contrato.id }}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        body {
+            background: #0b0f19;
+            color: #1e293b;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 2rem 1rem;
+            line-height: 1.5;
+        }
+
+        .agreement-page {
+            max-width: 820px;
+            margin: 0 auto 2.5rem auto;
+            background: #ffffff;
+            color: #0f172a;
+            border-radius: 12px;
+            padding: 3rem 3.5rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .header-logo {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .header-logo img {
+            max-height: 85px;
+            width: auto;
+            object-fit: contain;
+            background: white !important;
+        }
+
+        .agreement-title {
+            text-align: center;
+            font-size: 1.6rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            margin: 0 0 1.5rem 0;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            margin-top: 1.5rem;
+            margin-bottom: 0.6rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+        }
+
+        .subsection-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-top: 0.75rem;
+            margin-bottom: 0.4rem;
+        }
+
+        p, li {
+            font-size: 0.88rem;
+            color: #334155;
+            line-height: 1.55;
+            margin-bottom: 0.5rem;
+        }
+
+        ul {
+            margin: 0.3rem 0 0.8rem 1.25rem;
+            padding: 0;
+        }
+
+        li {
+            margin-bottom: 0.25rem;
+        }
+
+        .data-highlight {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .signature-box {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 1.5rem;
+            padding: 1rem;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+        }
+
+        .sig-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .sig-img {
+            max-height: 70px;
+            max-width: 200px;
+            object-fit: contain;
+            margin-bottom: 5px;
+        }
+
+        .sig-line {
+            width: 100%;
+            border-bottom: 1.5px solid #0f172a;
+            margin-top: 40px;
+            margin-bottom: 6px;
+        }
+
+        .sig-label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+        }
+
+        .page-footer-num {
+            text-align: right;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #64748b;
+            margin-top: 2rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #f1f5f9;
+        }
+
+        .badge-status {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        @media print {
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-size: 0.8rem !important; /* Smaller for print */
+            }
+            .no-print {
+                display: none !important;
+            }
+            .agreement-page {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 0.75cm !important; /* Minimal margin for print */
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                page-break-after: auto;
+                box-sizing: border-box;
+            }
+            .signature-box {
+                background: transparent !important;
+                border: 1px solid #cbd5e1 !important;
+                page-break-inside: avoid;
+            }
+            .section-title, .subsection-title {
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+            p, li {
+                font-size: 0.8rem !important;
+                line-height: 1.4 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Action Bar (No-Print) -->
+    <div class="no-print" style="max-width: 820px; margin: 0 auto 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <a href="/contratos/{{ contrato.id }}" class="btn-secondary" style="text-decoration: none; padding: 0.65rem 1.25rem; display: inline-flex; align-items: center; gap: 8px;">
+            &larr; Back to Contract #{{ contrato.id }}
+        </a>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button onclick="window.print()" class="btn-primary" style="padding: 0.65rem 1.5rem; display: inline-flex; align-items: center; gap: 8px; font-weight: 600;">
+                <span>🖨️</span> Print / Save PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- ================= PAGE 1 ================= -->
+    <div class="agreement-page">
+        <div class="header-logo">
+            <img src="/static/images/logo.png" alt="FF Motors Logo">
+        </div>
+
+        <h1 class="agreement-title">Motorcycle Rental Agreement</h1>
+
+        <div class="section-title">1. The Parties to this Agreement</div>
+        
+        <div class="subsection-title">1.1 The Owner:</div>
+        <p>
+            <strong>J&F Motorcycles LTD</strong> (trading as <strong>FF Motors</strong>)<br>
+            109 WINDMILL LANE, BIRMINGHAM, B66 3EW
+        </p>
+
+        <div class="subsection-title">1.2 The Renter (Client):</div>
+        <ul>
+            <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente.nome }}</span></li>
+            <li><strong>Phone Number:</strong> <span class="data-highlight">{{ cliente.telefone }}</span></li>
+            <li><strong>Physical Address:</strong> <span class="data-highlight">{{ cliente.endereco or 'Not provided' }}</span></li>
+            {% if cliente.email %}
+            <li><strong>Email:</strong> <span class="data-highlight">{{ cliente.email }}</span></li>
+            {% endif %}
+        </ul>
+
+        <div class="section-title">2. The Object of the Rental (Vehicle Details)</div>
+        <ul>
+            <li><strong>Make and Model:</strong> <span class="data-highlight">{{ moto.modelo }}</span></li>
+            <li><strong>Color:</strong> <span class="data-highlight">{{ moto.cor or 'Not specified' }}</span></li>
+            <li><strong>Registration Number:</strong> <span class="data-highlight" style="font-family: monospace; letter-spacing: 1px;">{{ moto.placa }}</span></li>
+            <li><strong>Mileage at start:</strong> <span class="data-highlight">{{ contrato.milhagem_inicial or 0 }} miles</span></li>
+        </ul>
+
+        <div class="section-title">3. Rental Requirements, Payments, and Deposit</div>
+        <p>
+            <strong>3.1 Initial Payment:</strong> To release the motorcycle, the Renter agrees to pay a security deposit of 
+            <span class="data-highlight">£{{ "%.2f"|format(deposito_valor) }}</span> and the first week's rent of 
+            <span class="data-highlight">£{{ "%.2f"|format(contrato.valor_aluguel_semanal) }}</span> in advance.
+        </p>
+        <p>
+            <strong>3.2 Required Documents:</strong> The Renter must provide proof of active insurance for the assigned motorcycle plate, a valid Driving Licence, a valid CBT (if applicable), and Proof of Address before taking possession of the vehicle.
+        </p>
+        <p>
+            <strong>3.3 Weekly Rent:</strong> The Renter agrees to pay a total amount of 
+            <span class="data-highlight">£{{ "%.2f"|format(contrato.valor_aluguel_semanal) }}</span> per week for the use of the bike. Recurring payment due day: <strong>{{ dia_pagamento_nome }}</strong>.
+        </p>
+        <p>
+            <strong>3.4 Deposit Refund:</strong> The security deposit (or its remaining balance) will be refunded to the Renter 15 calendar days after the official return date of the motorcycle. The Owner reserves the right to deduct any outstanding costs, mechanical damages, recovery fees, or traffic/parking fines that may arise or be received by the Owner during this 15-day period.
+        </p>
+
+        <div class="section-title">4. Terms and Conditions of Rental</div>
+        <p>
+            <strong>4.1 Insurance Requirements:</strong> The motorcycle must have valid insurance coverage at all times. If the motorcycle is found to be without active insurance at any point, the Owner reserves the right to immediately collect and repossess the vehicle without prior notice.
+        </p>
+        <p>
+            <strong>4.2 Payments, Delays, and Recovery:</strong> Rent payments are strictly weekly. If the Renter fails to pay the weekly rent and falls one (1) week in arrears (e.g., if rent is due on Monday the 7th and is not paid, and remains unpaid by Monday the 14th), the Owner will repossess the motorcycle on the due date of the second unpaid week. In the event of repossession due to non-payment, the Renter will be fully responsible for all recovery costs, which will be deducted directly from the security deposit.
+        </p>
+
+        <div class="page-footer-num">Page 1 of 3</div>
+    </div>
+
+    <!-- ================= PAGE 2 ================= -->
+    <div class="agreement-page">
+        <div class="header-logo">
+            <img src="/static/images/logo.png" alt="FF Motors Logo">
+        </div>
+
+        <p>
+            <strong>4.3 Maintenance and Oil Changes:</strong> Oil changes must be performed at <strong>FF Motors Birmingham</strong> every <strong>500 to 600 miles</strong>. Oil changes and scheduled maintenance (e.g., brakes, drive belt, battery, etc.) are included in the rental price. If the Renter fails to perform oil changes and maintenance within the correct mileage timeframe, any resulting damage to the motorcycle will be the Renter's full financial responsibility. If the Renter chooses to perform maintenance at a different garage, they must provide all official receipts and evidence of the completed work. Failure to provide proper evidence makes the Renter fully liable for any mechanical damages.
+        </p>
+        <p>
+            <strong>4.4 Condition of Vehicle and MOT Standards:</strong> The Renter is fully responsible for any damages caused to the motorcycle during the rental period. The vehicle must be returned to the Owner in the exact same condition it was rented. Under no circumstances may the motorcycle be ridden if it falls below the minimum legal safety conditions required by UK law (MOT standards).
+        </p>
+        <p>
+            <strong>4.5 Fines, Penalties, and Transfer of Liability:</strong> All traffic, speeding, and parking fines or penalties are the sole responsibility of the Renter. The Renter must pay these fines within the discount period offered by the issuing authority, or within a maximum of 14 days from the date of the notification letter if no discount is available. In the event of serious traffic offenses (such as speeding, red light violations, bus lane contraventions, etc.), the Owner will automatically nominate the Renter as the driver at the time of the offense and transfer liability directly to the issuing authority or Police.
+        </p>
+        <p>
+            <strong>4.6 Accidents:</strong> In the event of an accident, the Renter assumes full and total responsibility for the motorcycle.<br>
+            - If the Renter is at fault, they must assume all legal and financial consequences, including the payment of any insurance excess (deductible) applied by the insurance company.<br>
+            - If the Renter is not at fault, they must notify the Owner immediately and initiate the necessary insurance claim in cooperation with the Owner.
+        </p>
+        <p>
+            <strong>4.7 Theft:</strong> In the event of theft, the Renter assumes full financial and legal responsibility. The Renter must take all necessary legal actions (reporting to the Police immediately). If the motorcycle is not recovered, the Renter must pay the Owner the full market value of the motorcycle.
+        </p>
+        <p>
+            <strong>4.8 General Use Restrictions:</strong><br>
+            a. The Renter states that they are physically and legally qualified to operate the vehicle.<br>
+            b. The vehicle shall not be used for any illegal purpose, racing, towing, or subletting.<br>
+            c. The vehicle must be locked and secured at all times when not in use, and keys kept under personal control. In case of loss of keys, the Renter is responsible for the cost of a new key.<br>
+            d. Only the specified fuel type must be used, and tire pressures/oil levels must be checked regularly.
+        </p>
+        <p>
+            <strong>4.9 Data Protection (GDPR) and Information Sharing:</strong> The Renter explicitly agrees that their personal data (including name, address, and driving licence details) may be processed and shared with third parties, such as local authorities, councils, debt collection agencies, or the Police, strictly for the purpose of transferring liability for fines, resolving traffic offenses, or reporting criminal activity (e.g., theft).
+        </p>
+        <p>
+            <strong>4.10 Indemnity:</strong> The Renter agrees to indemnify and hold harmless the Owner (FF Motors) against any claims, liabilities, costs, or damages arising from the Renter's use of the motorcycle, including but not limited to damages caused to third-party property or individuals.
+        </p>
+        <p>
+            <strong>4.11 Governing Law:</strong> This Agreement shall be governed by and construed in accordance with the laws of England and Wales.
+        </p>
+
+        <div class="page-footer-num">Page 2 of 3</div>
+    </div>
+
+    <!-- ================= PAGE 3 ================= -->
+    <div class="agreement-page">
+        <div class="header-logo">
+            <img src="/static/images/logo.png" alt="FF Motors Logo">
+        </div>
+
+        <!-- Section 5: START OF RENTAL -->
+        <div class="section-title">5. Declaration and Signatures (Start of Rental)</div>
+        <p style="font-size: 0.85rem; margin-bottom: 0.75rem;">
+            I, the Renter, confirm that I have read, understood, and agree to be bound by all the terms and conditions stated in this Motorcycle Rental Agreement. I acknowledge that I am fully responsible for the vehicle, its maintenance as specified, and any fines or liabilities incurred during the rental period.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.75rem; font-size: 0.88rem;">
+            <div><strong>Start Date:</strong> <span class="data-highlight">{{ data_retirada_uk }}</span></div>
+            <div><strong>Start Time:</strong> <span class="data-highlight">{{ hora_retirada_uk }}</span></div>
+        </div>
+
+        <div class="signature-box">
+            <!-- Owner Signature (Fixed) -->
+            <div class="sig-item">
+                <img src="/static/images/signature_fernando.png" alt="Owner Signature" class="sig-img">
+                <div class="sig-label">Signed by the Owner (FF MOTORS)</div>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">J&F Motorcycles LTD</div>
+            </div>
+
+            <!-- Renter Signature (Digital or Line) -->
+            <div class="sig-item">
+                {% if contrato.assinatura_cliente_inicial %}
+                    <img src="{{ contrato.assinatura_cliente_inicial }}" alt="Renter Signature" class="sig-img">
+                    <div class="sig-label">Signed by the Renter</div>
+                    <div style="font-size: 0.75rem; color: #0f172a; font-weight: 600; margin-top: 2px;">{{ cliente.nome }}</div>
+                    <div style="font-size: 0.7rem; color: #16a34a; font-weight: 600;">✓ Digitally Signed on {{ data_assinatura_inicial_uk or data_retirada_uk }}</div>
+                {% else %}
+                    <div class="sig-line"></div>
+                    <div class="sig-label">Signed by the Renter ({{ cliente.nome }})</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Sign on screen or above line</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="margin-top: 2.5rem;"></div>
+
+        <!-- Section 6: TERMINATION OF RENTAL -->
+        <div class="section-title">6. Termination of Rental (To be Signed upon Returning the Vehicle)</div>
+        <p style="font-size: 0.85rem; margin-bottom: 0.75rem;">
+            I confirm that the vehicle has been returned to the owner. I understand that my security deposit will be held for 15 calendar days from today's date to clear any pending fines or damages.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 0.75rem; font-size: 0.88rem;">
+            <div><strong>Return Date:</strong> <span class="data-highlight">{{ data_devolucao_uk or '_________________' }}</span></div>
+            <div><strong>Return Time:</strong> <span class="data-highlight">{{ hora_devolucao_uk or '_________' }}</span></div>
+            <div><strong>Return Mileage:</strong> <span class="data-highlight">{{ contrato.milhagem_final ~ ' miles' if contrato.milhagem_final is not none else '_________________' }}</span></div>
+        </div>
+
+        <div class="signature-box">
+            <!-- Owner Signature (Fixed) -->
+            <div class="sig-item">
+                <img src="/static/images/signature_fernando.png" alt="Owner Signature" class="sig-img">
+                <div class="sig-label">Signed by the Owner (FF MOTORS)</div>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 2px;">J&F Motorcycles LTD</div>
+            </div>
+
+            <!-- Renter Return Signature (Digital or Line) -->
+            <div class="sig-item">
+                {% if contrato.assinatura_cliente_devolucao %}
+                    <img src="{{ contrato.assinatura_cliente_devolucao }}" alt="Renter Return Signature" class="sig-img">
+                    <div class="sig-label">Signed by the Renter (Vehicle Returned)</div>
+                    <div style="font-size: 0.75rem; color: #0f172a; font-weight: 600; margin-top: 2px;">{{ cliente.nome }}</div>
+                    <div style="font-size: 0.7rem; color: #16a34a; font-weight: 600;">✓ Digitally Signed on {{ data_assinatura_devolucao_uk or data_devolucao_uk }}</div>
+                {% else %}
+                    <div class="sig-line"></div>
+                    <div class="sig-label">Signed by the Renter ({{ cliente.nome }})</div>
+                    <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Sign on screen or above line upon vehicle return</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="page-footer-num">Page 3 of 3</div>
+    </div>
+
+</body>
+</html>

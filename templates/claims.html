@@ -3,11 +3,14 @@
 {% block title %}Claims & Storage — FF Motors{% endblock %}
 
 {% block content %}
-<div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem;">
+<div class="page-header"
+    style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem;">
     <div>
-        <h1 style="margin: 0 0 0.4rem; font-size: 1.75rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+        <h1
+            style="margin: 0 0 0.4rem; font-size: 1.75rem; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
             <span>Claims & Storage</span>
-            <span style="font-size: 0.8rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 10px; border-radius: 8px; font-weight: 700;">
+            <span
+                style="font-size: 0.8rem; background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); padding: 4px 10px; border-radius: 8px; font-weight: 700;">
                 McAms / ALS / 365
             </span>
         </h1>
@@ -16,15 +19,19 @@
         </p>
     </div>
     <div style="display: flex; gap: 0.75rem;">
-        <button type="button" class="btn-primary" onclick="abrirModalNovoClaim()" style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.25rem;">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        <button type="button" class="btn-primary" onclick="abrirModalNovoClaim()"
+            style="display: flex; align-items: center; gap: 8px; padding: 0.75rem 1.25rem;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
             <span>Novo Claim</span>
         </button>
     </div>
 </div>
 
 <!-- KPI Cards Resumo da Aline -->
-<div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem;">
+<div class="dashboard-grid"
+    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem;">
     <!-- 1. Indicações Pendentes (£) -->
     <div class="stat-card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -71,9 +78,11 @@
     <div style="display: flex; flex-direction: column; gap: 1rem;">
         <!-- Linha 1: Busca e Seletores de Empresa e Status -->
         <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;">
-            <input type="text" id="claimSearchInput" placeholder="Buscar por Claim Number, Placa, Cliente ou Modelo..." style="flex: 2; min-width: 240px; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); font-size: 0.9rem;">
-            
-            <select id="filtroEmpresa" style="flex: 1; min-width: 160px; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.9); color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
+            <input type="text" id="claimSearchInput" placeholder="Buscar por Claim Number, Placa, Cliente ou Modelo..."
+                style="flex: 2; min-width: 240px; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.25); color: var(--text-primary); font-size: 0.9rem;">
+
+            <select id="filtroEmpresa"
+                style="flex: 1; min-width: 160px; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.9); color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
                 <option value="">Todas as Empresas</option>
                 <option value="McAms">McAms</option>
                 <option value="ALS">ALS</option>
@@ -81,7 +90,8 @@
                 <option value="Outra">Outra</option>
             </select>
 
-            <select id="filtroStatus" style="flex: 1; min-width: 160px; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.9); color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
+            <select id="filtroStatus"
+                style="flex: 1; min-width: 160px; padding: 0.7rem 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15,23,42,0.9); color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
                 <option value="Em Aberto" selected>Status: Em Aberto</option>
                 <option value="Concluido">Concluído</option>
                 <option value="Cancelado">Cancelado</option>
@@ -91,26 +101,35 @@
 
         <!-- Linha 2: Filtro de Período de Datas e Ações -->
         <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.25); padding: 0.45rem 0.85rem; border-radius: 10px; border: 1px solid var(--border-color); flex-wrap: wrap;">
-                <select id="filtroCampoData" style="background: transparent; border: none; color: #f59e0b; font-size: 0.85rem; font-weight: 600; outline: none; cursor: pointer;">
-                    <option value="acidente" selected style="background: #1e293b; color: white;">📅 Data do Acidente</option>
+            <div
+                style="display: flex; align-items: center; gap: 0.5rem; background: rgba(0,0,0,0.25); padding: 0.45rem 0.85rem; border-radius: 10px; border: 1px solid var(--border-color); flex-wrap: wrap;">
+                <select id="filtroCampoData"
+                    style="background: transparent; border: none; color: #f59e0b; font-size: 0.85rem; font-weight: 600; outline: none; cursor: pointer;">
+                    <option value="acidente" selected style="background: #1e293b; color: white;">📅 Data do Acidente
+                    </option>
                     <option value="aprovacao" style="background: #1e293b; color: white;">✅ Data de Aprovação</option>
-                    <option value="storage_entrada" style="background: #1e293b; color: white;">🏍️ Entrada no Storage</option>
-                    <option value="storage_liberacao" style="background: #1e293b; color: white;">🚀 Liberação do Pátio</option>
+                    <option value="storage_entrada" style="background: #1e293b; color: white;">🏍️ Entrada no Storage
+                    </option>
+                    <option value="storage_liberacao" style="background: #1e293b; color: white;">🚀 Liberação do Pátio
+                    </option>
                     <option value="invoice" style="background: #1e293b; color: white;">📋 Envio do Invoice</option>
                     <option value="criacao" style="background: #1e293b; color: white;">🕒 Data de Cadastro</option>
                 </select>
                 <span style="color: var(--text-secondary); font-size: 0.8rem;">De:</span>
-                <input type="date" id="filtroDataInicio" title="Data inicial" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); padding: 0.35rem 0.5rem; font-size: 0.85rem; outline: none; cursor: pointer;">
+                <input type="date" id="filtroDataInicio" title="Data inicial"
+                    style="background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); padding: 0.35rem 0.5rem; font-size: 0.85rem; outline: none; cursor: pointer;">
                 <span style="color: var(--text-secondary); font-size: 0.8rem;">Até:</span>
-                <input type="date" id="filtroDataFim" title="Data final" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); padding: 0.35rem 0.5rem; font-size: 0.85rem; outline: none; cursor: pointer;">
+                <input type="date" id="filtroDataFim" title="Data final"
+                    style="background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-primary); padding: 0.35rem 0.5rem; font-size: 0.85rem; outline: none; cursor: pointer;">
             </div>
 
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button type="button" id="btnClearClaimFilters" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.6rem 0.9rem; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 500;">
+                <button type="button" id="btnClearClaimFilters"
+                    style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.6rem 0.9rem; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 500;">
                     Limpar Filtros
                 </button>
-                <button type="button" class="btn-secondary" onclick="carregarClaims()" style="padding: 0.6rem 1rem; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
+                <button type="button" class="btn-secondary" onclick="carregarClaims()"
+                    style="padding: 0.6rem 1rem; display: flex; align-items: center; gap: 6px; font-size: 0.85rem;">
                     <span>🔄 Atualizar</span>
                 </button>
             </div>
@@ -125,17 +144,18 @@
             <thead>
                 <tr style="border-bottom: 1px solid var(--border-color); background: rgba(255,255,255,0.02);">
                     <th data-sort-field="claim_number" style="padding: 1rem; cursor: pointer;">Processo & Parceiro</th>
-                    <th data-sort-field="status" style="padding: 1rem; cursor: pointer;">Status</th>
                     <th data-sort-field="cliente_nome" style="padding: 1rem; cursor: pointer;">Cliente & Moto</th>
-                    <th data-sort-field="valor_indicacao" style="padding: 1rem; cursor: pointer;">Indicação (14 Dias)</th>
+                    <th data-sort-field="valor_indicacao" style="padding: 1rem; cursor: pointer;">Indicação (14 Dias)
+                    </th>
                     <th data-sort-field="storage" style="padding: 1rem; cursor: pointer;">Storage (28 Dias)</th>
-                    <th data-sort-field="valor_total_storage" style="padding: 1rem; cursor: pointer;">Invoice & Cobrança</th>
+                    <th data-sort-field="valor_total_storage" style="padding: 1rem; cursor: pointer;">Invoice & Cobrança
+                    </th>
                     <th style="padding: 1rem; text-align: right;">Ações</th>
                 </tr>
             </thead>
             <tbody id="claimsTableBody">
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+                    <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
                         Carregando processos de claims...
                     </td>
                 </tr>
@@ -145,25 +165,37 @@
 </div>
 
 <!-- Paginação -->
-<div class="pagination-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 10px;">
-    <button id="btnPrevPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 100px;">&laquo; Anterior</button>
+<div class="pagination-controls"
+    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 10px;">
+    <button id="btnPrevPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 100px;">&laquo;
+        Anterior</button>
     <span id="paginationInfo" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
-    <button id="btnNextPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 100px;">Próximo &raquo;</button>
+    <button id="btnNextPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 100px;">Próximo
+        &raquo;</button>
 </div>
 
 <!-- Modal: Novo Claim -->
-<div id="modalNovoClaim" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
-    <div class="glass-card" style="width:100%; max-width:620px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
-        <button type="button" class="close-modal-btn" onclick="fecharModalNovoClaim()" style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;" aria-label="Close">&times;</button>
-        
-        <h2 style="margin: 0 0 0.4rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">Novo Processo de Claim</h2>
-        <p style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Cadastre o sinistro para controle automático de prazos de indicação e pátio.</p>
-        
+<div id="modalNovoClaim" class="modal-backdrop"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
+    <div class="glass-card"
+        style="width:100%; max-width:620px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
+        <button type="button" class="close-modal-btn" onclick="fecharModalNovoClaim()"
+            style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;"
+            aria-label="Close">&times;</button>
+
+        <h2 style="margin: 0 0 0.4rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">Novo Processo
+            de Claim</h2>
+        <p style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Cadastre o sinistro para
+            controle automático de prazos de indicação e pátio.</p>
+
         <form id="formNovoClaim" onsubmit="handleNovoClaimSubmit(event)">
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Empresa Parceira *</label>
-                    <select id="novo_empresa_parceira" required style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Empresa
+                        Parceira *</label>
+                    <select id="novo_empresa_parceira" required
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
                         <option value="McAms" selected>McAms</option>
                         <option value="ALS">ALS</option>
                         <option value="365">365</option>
@@ -171,147 +203,221 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Claim Number (Ref) *</label>
-                    <input type="text" id="novo_claim_number" required placeholder="Ex: MC-89201 / 365-1024" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Claim
+                        Number (Ref) *</label>
+                    <input type="text" id="novo_claim_number" required placeholder="Ex: MC-89201 / 365-1024"
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Nome do Cliente *</label>
-                    <input type="text" id="novo_cliente_nome" required placeholder="Ex: Michael Brown" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Nome
+                        do Cliente *</label>
+                    <input type="text" id="novo_cliente_nome" required placeholder="Ex: Michael Brown"
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                 </div>
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Telefone do Cliente</label>
-                    <input type="text" id="novo_cliente_telefone" placeholder="Ex: 07360..." style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Telefone
+                        do Cliente</label>
+                    <input type="text" id="novo_cliente_telefone" placeholder="Ex: 07360..."
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                 </div>
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Placa da Moto *</label>
-                    <input type="text" id="novo_placa" required placeholder="Ex: RO70ABC" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); text-transform:uppercase;">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Placa
+                        da Moto *</label>
+                    <input type="text" id="novo_placa" required placeholder="Ex: RO70ABC"
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); text-transform:uppercase;">
                 </div>
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Modelo da Moto</label>
-                    <input type="text" id="novo_modelo_moto" placeholder="Ex: Honda PCX 125" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Modelo
+                        da Moto</label>
+                    <input type="text" id="novo_modelo_moto" placeholder="Ex: Honda PCX 125"
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                 </div>
             </div>
 
-            <div style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; margin-bottom: 1rem;">
+            <div
+                style="border-top: 1px solid var(--border-color); padding-top: 1rem; margin-top: 1rem; margin-bottom: 1rem;">
                 <h4 style="margin: 0 0 0.75rem; font-size: 0.95rem; color: #60a5fa;">Datas & Prazos Automáticos</h4>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-group">
-                        <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Data da Aprovação</label>
-                        <input type="date" id="novo_data_aprovacao" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
-                        <small style="color: var(--text-secondary); font-size: 0.72rem;">Gatilho dos 14d de indicação e 28d de storage</small>
+                        <label
+                            style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Data
+                            da Aprovação</label>
+                        <input type="date" id="novo_data_aprovacao"
+                            style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                        <small style="color: var(--text-secondary); font-size: 0.72rem;">Gatilho dos 14d de indicação e
+                            28d de storage</small>
                     </div>
                     <div class="form-group">
-                        <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Valor da Indicação (£)</label>
-                        <input type="number" step="0.01" id="novo_valor_indicacao" value="500.00" placeholder="Ex: 500.00" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                        <label
+                            style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Valor
+                            da Indicação (£)</label>
+                        <input type="number" step="0.01" id="novo_valor_indicacao" value="500.00"
+                            placeholder="Ex: 500.00"
+                            style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                     <div class="form-group">
-                        <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Entrada no Pátio (Storage)</label>
-                        <input type="date" id="novo_data_entrada_storage" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                        <label
+                            style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Entrada
+                            no Pátio (Storage)</label>
+                        <input type="date" id="novo_data_entrada_storage"
+                            style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                     </div>
                     <div class="form-group">
-                        <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Diária de Storage (£/dia)</label>
-                        <input type="number" step="0.01" id="novo_valor_diaria_storage" value="15.00" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                        <label
+                            style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Diária
+                            de Storage (£/dia)</label>
+                        <input type="number" step="0.01" id="novo_valor_diaria_storage" value="15.00"
+                            style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                     </div>
                 </div>
             </div>
 
             <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Observações / Notas</label>
-                <textarea id="novo_observacoes" rows="2" placeholder="Ex: Guincho trouxe a moto, danos na lateral direita..." style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); resize:vertical;"></textarea>
+                <label
+                    style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Observações
+                    / Notas</label>
+                <textarea id="novo_observacoes" rows="2"
+                    placeholder="Ex: Guincho trouxe a moto, danos na lateral direita..."
+                    style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); resize:vertical;"></textarea>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-                <button type="button" onclick="fecharModalNovoClaim()" class="btn-secondary" style="padding: 0.75rem 1.25rem;">Cancelar</button>
-                <button type="submit" id="btnSalvarNovoClaim" class="btn-primary" style="padding: 0.75rem 1.5rem;">Salvar Processo</button>
+                <button type="button" onclick="fecharModalNovoClaim()" class="btn-secondary"
+                    style="padding: 0.75rem 1.25rem;">Cancelar</button>
+                <button type="submit" id="btnSalvarNovoClaim" class="btn-primary"
+                    style="padding: 0.75rem 1.5rem;">Salvar Processo</button>
             </div>
         </form>
     </div>
 </div>
 
 <!-- Modal: Editar / Atualizar Claim & Baixas -->
-<div id="modalEditClaim" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
-    <div class="glass-card" style="width:100%; max-width:650px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
-        <button type="button" class="close-modal-btn" onclick="fecharModalEditClaim()" style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;" aria-label="Close">&times;</button>
-        
-        <h2 id="editClaimTitle" style="margin: 0 0 0.4rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">Atualizar Claim</h2>
-        <p id="editClaimSubtitle" style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Registre baixas de indicação, liberação de moto e invoices.</p>
-        
+<div id="modalEditClaim" class="modal-backdrop"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:1100; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
+    <div class="glass-card"
+        style="width:100%; max-width:650px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
+        <button type="button" class="close-modal-btn" onclick="fecharModalEditClaim()"
+            style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;"
+            aria-label="Close">&times;</button>
+
+        <h2 id="editClaimTitle"
+            style="margin: 0 0 0.4rem; font-size: 1.35rem; font-weight: 700; color: var(--text-primary);">Atualizar
+            Claim</h2>
+        <p id="editClaimSubtitle" style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Registre
+            baixas de indicação, liberação de moto e invoices.</p>
+
         <form id="formEditClaim" onsubmit="handleEditClaimSubmit(event)">
             <input type="hidden" id="edit_claim_id">
 
             <!-- Bloco 1: Indicação (14 Dias) -->
-            <div style="background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <h4 style="margin: 0; font-size: 0.95rem; color: #60a5fa; display: flex; align-items: center; gap: 8px;">
+            <div
+                style="background: rgba(96,165,250,0.06); border: 1px solid rgba(96,165,250,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4
+                        style="margin: 0; font-size: 0.95rem; color: #60a5fa; display: flex; align-items: center; gap: 8px;">
                         <span>1. Comissão de Indicação (14 Dias)</span>
                     </h4>
                     <span id="badgeIndicacaoModal"></span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Aprovação</label>
-                        <input type="date" id="edit_data_aprovacao" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Aprovação</label>
+                        <input type="date" id="edit_data_aprovacao"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Valor (£)</label>
-                        <input type="number" step="0.01" id="edit_valor_indicacao" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Valor
+                            (£)</label>
+                        <input type="number" step="0.01" id="edit_valor_indicacao"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data Pgto Indicação</label>
-                        <input type="date" id="edit_data_pagamento_indicacao" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data
+                            Pgto Indicação</label>
+                        <input type="date" id="edit_data_pagamento_indicacao"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                 </div>
             </div>
 
             <!-- Bloco 2: Liberação de Pátio (28 Dias) -->
-            <div style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <h4 style="margin: 0; font-size: 0.95rem; color: #f59e0b; display: flex; align-items: center; gap: 8px;">
+            <div
+                style="background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4
+                        style="margin: 0; font-size: 0.95rem; color: #f59e0b; display: flex; align-items: center; gap: 8px;">
                         <span>2. Controle de Storage (28 Dias para Liberação)</span>
                     </h4>
                     <span id="badgeStorageModal"></span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 0.75rem;">
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Entrada no Pátio</label>
-                        <input type="date" id="edit_data_entrada_storage" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Entrada
+                            no Pátio</label>
+                        <input type="date" id="edit_data_entrada_storage"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data Liberação (Saiu do Pátio)</label>
-                        <input type="date" id="edit_data_liberacao_storage" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data
+                            Liberação (Saiu do Pátio)</label>
+                        <input type="date" id="edit_data_liberacao_storage"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-secondary); padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--text-secondary); padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
                     <span id="storageResumoModal">0 dias apurados (£0.00)</span>
-                    <span style="font-size: 0.75rem; color: var(--text-secondary); font-style: italic;">(Após salvar, gere o invoice pela tabela)</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary); font-style: italic;">(Após salvar,
+                        gere o invoice pela tabela)</span>
                 </div>
             </div>
 
             <!-- Bloco 3: Faturamento e Pagamento do Storage (+14 Dias do Invoice) -->
-            <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <h4 style="margin: 0; font-size: 0.95rem; color: #10b981; display: flex; align-items: center; gap: 8px;">
+            <div
+                style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4
+                        style="margin: 0; font-size: 0.95rem; color: #10b981; display: flex; align-items: center; gap: 8px;">
                         <span>3. Faturamento do Storage (+14 Dias após Invoice)</span>
                     </h4>
                     <span id="badgeInvoiceModal"></span>
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data Envio do Invoice</label>
-                        <input type="date" id="edit_data_envio_invoice" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data
+                            Envio do Invoice</label>
+                        <input type="date" id="edit_data_envio_invoice"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                     <div>
-                        <label style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data Pagamento do Storage</label>
-                        <input type="date" id="edit_data_pagamento_storage" style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
+                        <label
+                            style="display:block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Data
+                            Pagamento do Storage</label>
+                        <input type="date" id="edit_data_pagamento_storage"
+                            style="width:100%; padding:0.6rem; border-radius:8px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); font-size: 0.85rem;">
                     </div>
                 </div>
             </div>
@@ -319,31 +425,43 @@
             <!-- Observações & Status Geral -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Status Geral do Processo</label>
-                    <select id="edit_status" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Status
+                        Geral do Processo</label>
+                    <select id="edit_status"
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(15,23,42,0.9); color:var(--text-primary);">
                         <option value="Em Aberto">Em Aberto</option>
                         <option value="Concluido">Concluído (Tudo Recebido)</option>
                         <option value="Cancelado">Cancelado</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Diária de Storage (£/dia)</label>
-                    <input type="number" step="0.01" id="edit_valor_diaria_storage" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <label
+                        style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Diária
+                        de Storage (£/dia)</label>
+                    <input type="number" step="0.01" id="edit_valor_diaria_storage"
+                        style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                 </div>
             </div>
 
             <div class="form-group" style="margin-bottom: 1.5rem;">
-                <label style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Notas e Observações</label>
-                <textarea id="edit_observacoes" rows="2" style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); resize:vertical;"></textarea>
+                <label
+                    style="display:block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.35rem;">Notas
+                    e Observações</label>
+                <textarea id="edit_observacoes" rows="2"
+                    style="width:100%; padding:0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary); resize:vertical;"></textarea>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem;">
-                <button type="button" class="btn-secondary" onclick="confirmarExclusaoClaimModal()" style="color: #f87171; border-color: rgba(239, 68, 68, 0.3);">
+                <button type="button" class="btn-secondary" onclick="confirmarExclusaoClaimModal()"
+                    style="color: #f87171; border-color: rgba(239, 68, 68, 0.3);">
                     Excluir
                 </button>
                 <div style="display: flex; gap: 0.75rem;">
-                    <button type="button" onclick="fecharModalEditClaim()" class="btn-secondary" style="padding: 0.75rem 1.25rem;">Cancelar</button>
-                    <button type="submit" id="btnSalvarEditClaim" class="btn-primary" style="padding: 0.75rem 1.5rem;">Salvar Alterações</button>
+                    <button type="button" onclick="fecharModalEditClaim()" class="btn-secondary"
+                        style="padding: 0.75rem 1.25rem;">Cancelar</button>
+                    <button type="submit" id="btnSalvarEditClaim" class="btn-primary"
+                        style="padding: 0.75rem 1.5rem;">Salvar Alterações</button>
                 </div>
             </div>
         </form>
@@ -352,5 +470,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/claims.js?v=1"></script>
+<script src="/static/js/claims.js?v=2"></script>
 {% endblock %}

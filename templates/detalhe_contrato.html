@@ -13,7 +13,7 @@
             <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             Complete Contract / Return Bike
         </button>
-        <a href="/contratos" class="btn-secondary btn-back" data-back="true">
+        <a href="/contratos" class="btn-secondary">
             &larr; Back to Contracts
         </a>
     </div>
@@ -69,6 +69,22 @@
             </div>
             <div id="info_modelo_cor" style="color: var(--text-primary); font-weight: 500; font-size: 1rem; margin-bottom: 0.25rem;">-</div>
             <div id="info_data_retirada" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Collection Date: -</div>
+            <!-- Mileage Tracker in Vehicle Card -->
+            <div id="box_mileage_info" style="margin-top: 0.85rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); font-size: 0.82rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <span style="color: var(--text-secondary);">Start Mileage:</span>
+                    <strong id="info_milhagem_inicial" style="color: var(--text-primary);">-</strong>
+                </div>
+                <div id="row_milhagem_final" style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <span style="color: var(--text-secondary);">Return Mileage:</span>
+                    <strong id="info_milhagem_final" style="color: var(--text-primary);">-</strong>
+                </div>
+                <div id="row_milhas_rodadas" style="display: none; justify-content: space-between; margin-top: 4px; padding-top: 4px; border-top: 1px dashed var(--border-color); color: #60a5fa;">
+                    <span>Total Distance:</span>
+                    <strong id="info_milhas_rodadas">-</strong>
+                </div>
+            </div>
+            
             <div id="info_mot_tax" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;"></div>
         </div>
         
@@ -204,6 +220,86 @@
     </div>
 </div>
 
+<!-- Rental Agreement, Signatures & Physical Attachments -->
+<div class="glass-card" style="padding: 1.5rem; margin-bottom: 2rem;">
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <div>
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+                <span>📄 Rental Agreement & Signatures</span>
+                <span style="font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 8px; border-radius: 6px; font-weight: 700;">
+                    J&F / FF Motors UK
+                </span>
+            </h3>
+            <p style="margin: 3px 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                Manage digital touch signatures (on screen) and physical signed contract scans/photos.
+            </p>
+        </div>
+        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+            <a href="/contratos/{{ contrato_id }}/imprimir" class="btn-primary" style="padding: 0.6rem 1.15rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <span>🖨️</span> View / Print Agreement
+            </a>
+            <button type="button" id="btnAbrirAnexarContrato" class="btn-secondary" style="padding: 0.6rem 1.15rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                <span>📎</span> Attach Scans / Photos
+            </button>
+        </div>
+    </div>
+
+    <!-- Signatures Status Grid (Start & Return) -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+        <!-- 1. Start of Rental Signature -->
+        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+                    1. Start of Rental Signature
+                </span>
+                <span id="badge_sig_inicial" class="badge" style="font-size: 0.72rem;">-</span>
+            </div>
+
+            <div id="box_sig_inicial_content" style="min-height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.75rem; border: 1px dashed var(--border-color); margin-bottom: 0.75rem;">
+                <!-- Populated by JS: Signature image or Pending notice -->
+            </div>
+
+            <div id="box_sig_inicial_actions" style="display: flex; justify-content: flex-end;">
+                <button type="button" id="btnAssinarInicialTouch" class="btn-secondary" style="padding: 6px 14px; font-size: 0.8rem; display: none; align-items: center; gap: 6px;">
+                    ✍️ Sign on Screen Now
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. Termination of Rental Signature -->
+        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+                    2. Termination / Return Signature
+                </span>
+                <span id="badge_sig_devolucao" class="badge" style="font-size: 0.72rem;">-</span>
+            </div>
+
+            <div id="box_sig_devolucao_content" style="min-height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.2); border-radius: 8px; padding: 0.75rem; border: 1px dashed var(--border-color); margin-bottom: 0.75rem;">
+                <!-- Populated by JS: Return Signature or Waiting for return -->
+            </div>
+
+            <div id="box_sig_devolucao_actions" style="display: flex; justify-content: flex-end;">
+                <button type="button" id="btnAssinarDevolucaoTouch" class="btn-secondary" style="padding: 6px 14px; font-size: 0.8rem; display: none; align-items: center; gap: 6px;">
+                    ✍️ Sign Return on Screen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attached Files / Scans List -->
+    <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">
+                📁 Physical Agreement Attachments (<span id="anexos_count">0</span>)
+            </span>
+        </div>
+        <div id="anexos_list" style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+            <p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0;">No scanned contract pages attached yet.</p>
+        </div>
+    </div>
+</div>
+
 <!-- Financial Statement (Alone in its own full-width row) -->
 <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column; width: 100%; margin-bottom: 2rem;">
     <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
@@ -254,6 +350,10 @@
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
                     <span style="color:var(--text-secondary); font-size:0.85rem;">Date & Time:</span>
                     <strong id="modalVistoriaData" style="color:var(--text-primary); font-size:0.9rem;">-</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;" id="modalVistoriaMilhagemRow">
+                    <span style="color:var(--text-secondary); font-size:0.85rem;">Mileage:</span>
+                    <strong id="modalVistoriaMilhagem" style="color:#fbbf24; font-size:0.9rem;">-</strong>
                 </div>
                 <div>
                     <span style="color:var(--text-secondary); font-size:0.85rem; display:block; margin-bottom:0.25rem;">Observations:</span>
@@ -337,6 +437,12 @@
                     <div id="oc_preview" class="photo-grid" style="display:none; margin-top:0.75rem;"></div>
                 </div>
                 
+                <div class="form-group" id="group_oc_milhagem">
+                    <label for="oc_milhagem">Odometer Mileage (Miles) *</label>
+                    <input type="number" id="oc_milhagem" placeholder="e.g. 13200" min="0" step="1" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Record current motorcycle mileage at return or incident.</small>
+                </div>
+
                 <div class="form-group">
                     <label for="oc_obs">Damage Observations / Notes</label>
                     <textarea id="oc_obs" rows="3" required placeholder="Describe damages, reason for incident or return condition..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;"></textarea>
@@ -489,11 +595,80 @@
         </div>
     </div>
 </div>
+<!-- Modal: Attach Contract Scans / Multiple Photos -->
+<div id="modalAnexosContrato" class="modal-overlay">
+    <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3>Attach Signed Agreement (Photos/PDF)</h3>
+            <button id="closeAnexosModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p style="color:var(--text-secondary); margin-bottom: 1.25rem; font-size: 0.85rem; line-height: 1.4;">
+                Upload multiple photos (page 1, page 2, page 3) or a single scanned PDF of the physically signed contract.
+            </p>
+            <form id="formUploadAnexos" class="modern-form">
+                <div class="form-group">
+                    <label for="anexo_tipo">Attachment Category</label>
+                    <select id="anexo_tipo" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.75rem 1rem; border-radius: 12px; width: 100%;">
+                        <option value="initial_contract">Signed Agreement (Start of Rental)</option>
+                        <option value="return_contract">Signed Return Term (Termination)</option>
+                        <option value="general">Other Contract Document</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="inputContratoAnexos">Select Photos / PDF Files *</label>
+                    <input type="file" id="inputContratoAnexos" multiple accept="image/*,.pdf" required style="padding: 0.75rem; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 12px; width: 100%;">
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">
+                        Select all pages at once (JPG, PNG, PDF supported).
+                    </small>
+                </div>
+                <button type="submit" id="btnSalvarAnexos" class="btn-primary" style="width:100%; margin-top:0.75rem;">
+                    Upload Attachments
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Touch Screen Signature Pad (Start or Return) -->
+<div id="modalDetalheSignaturePad" class="modal-overlay">
+    <div class="modal-card" style="max-width: 540px;">
+        <div class="modal-header">
+            <div>
+                <h3 id="detalheSignatureTitle" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">Renter Signature</h3>
+                <p id="detalheSignatureSubtitle" style="margin: 2px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Ask the client to sign using finger, stylus or mouse.</p>
+            </div>
+            <button id="closeDetalheSignatureModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="detalhe_sig_tipo" value="inicial">
+            <div style="background: #ffffff; border-radius: 12px; border: 2px dashed #94a3b8; overflow: hidden; touch-action: none; position: relative;">
+                <canvas id="detalheSignatureCanvas" style="width: 100%; height: 220px; display: block; cursor: crosshair;"></canvas>
+                <div style="position: absolute; bottom: 8px; left: 12px; font-size: 0.75rem; color: #94a3b8; pointer-events: none;">
+                    Sign above line • Assine acima
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.25rem; gap: 0.75rem;">
+                <button type="button" id="btnDetalheClearSig" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem;">
+                    🔄 Clear
+                </button>
+                <div style="display: flex; gap: 0.75rem;">
+                    <button type="button" id="btnDetalheCancelSig" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.85rem;">Cancel</button>
+                    <button type="button" id="btnDetalheSaveSig" class="btn-primary" style="padding: 0.65rem 1.5rem; font-size: 0.85rem; font-weight: 600;">
+                        ✓ Confirm Signature
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     const CONTRATO_ID = {{ contrato_id }};
 </script>
-<script src="/static/js/detalhe_contrato.js?v=8"></script>
+<script src="/static/js/signature_pad.umd.min.js"></script>
+<script src="/static/js/detalhe_contrato.js?v=10"></script>
 {% endblock %}

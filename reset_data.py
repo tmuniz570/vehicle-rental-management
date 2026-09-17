@@ -14,7 +14,7 @@ def clean_all():
         cursor = conn.cursor()
         cursor.execute("PRAGMA foreign_keys = OFF;")
         
-        tables = ['logs_auditoria', 'financeiro_transacoes', 'vistorias', 'contratos', 'clientes', 'motos', 'claims']
+        tables = ['logs_auditoria', 'contrato_anexos', 'financeiro_transacoes', 'vistorias', 'contratos', 'clientes', 'motos', 'claims']
         for table in tables:
             cursor.execute(f"DELETE FROM {table};")
             print(f"Limpa tabela: {table}")

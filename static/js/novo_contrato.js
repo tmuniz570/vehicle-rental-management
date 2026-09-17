@@ -29,7 +29,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         motos.forEach(m => {
             const st = (m.status || '').toLowerCase();
             if (st === 'available' || st === 'disponível') {
-                selectMoto.innerHTML += `<option value="${m.placa}">${m.placa} - ${m.modelo}</option>`;
+                const milhas = m.milhagem_atual !== undefined ? m.milhagem_atual : 0;
+                selectMoto.innerHTML += `<option value="${m.placa}" data-mileage="${milhas}">${m.placa} - ${m.modelo} (${milhas} mi)</option>`;
+            }
+        });
+
+        // Preencher milhagem inicial ao selecionar a moto
+        selectMoto.addEventListener('change', () => {
+            const opt = selectMoto.options[selectMoto.selectedIndex];
+            const inputMilhagem = document.getElementById('milhagem_inicial');
+            if (opt && opt.dataset.mileage && inputMilhagem) {
+                inputMilhagem.value = opt.dataset.mileage;
             }
         });
 
@@ -130,6 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const formData = new FormData();
         formData.append('id_cliente', document.getElementById('id_cliente').value);
         formData.append('placa', document.getElementById('placa').value);
+        formData.append('milhagem_inicial', document.getElementById('milhagem_inicial').value || '0');
         formData.append('dia_pagamento_semanal', document.getElementById('dia_pagamento_semanal').value);
         formData.append('valor_aluguel_semanal', document.getElementById('valor_aluguel_semanal').value);
         formData.append('valor_deposito', document.getElementById('valor_deposito').value);
@@ -185,8 +196,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await response.json();
 
             if (response.ok) {
-                showFeedback('Contract created successfully! Security deposit transaction generated.', 'success');
-                setTimeout(() => window.location.href = '/contratos', 2000);
+                const novoContratoId = result.id;
+                // Redireciona diretamente para a tela do contrato gerado para colher a assinatura
+                window.location.href = `/contratos/${novoContratoId}?assinar=1`;
+                return;
             } else {
                 showFeedback(result.message || result.mensagem || result.error || result.erro || 'Failed to create contract', 'error');
             }
@@ -203,6 +216,118 @@ document.addEventListener('DOMContentLoaded', async () => {
         feedbackMsg.textContent = message;
         feedbackMsg.classList.remove('hidden');
         feedbackMsg.classList.add(`feedback-${type}`);
+    }
+
+    // --- Modal Pós Criação e Signature Pad ---
+    let activeContractId = null;
+    let signaturePadInstance = null;
+
+    const modalPosCriacao = document.getElementById('modalPosCriacaoContrato');
+    const createdIdText = document.getElementById('createdContractIdText');
+    const btnImprimir = document.getElementById('btnImprimirContratoCriado');
+    const btnIrDetalhes = document.getElementById('btnIrParaDetalhesCriado');
+    const btnAssinarAgora = document.getElementById('btnAssinarAgoraModal');
+
+    const modalSig = document.getElementById('modalSignaturePad');
+    const canvas = document.getElementById('signatureCanvas');
+    const btnClearSig = document.getElementById('btnClearSignature');
+    const btnCancelSig = document.getElementById('btnCancelSignature');
+    const btnCloseSig = document.getElementById('btnCloseSignatureModal');
+    const btnSaveSig = document.getElementById('btnSaveSignature');
+
+    function showPostCreationModal(id) {
+        activeContractId = id;
+        if (createdIdText) createdIdText.textContent = id;
+        if (btnImprimir) btnImprimir.href = `/contratos/${id}/imprimir`;
+        if (btnIrDetalhes) btnIrDetalhes.href = `/contratos/${id}`;
+        if (modalPosCriacao) modalPosCriacao.style.display = 'flex';
+    }
+
+    function initSignaturePad() {
+        if (!canvas) return;
+        
+        // Resize canvas for device pixel ratio
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext("2d").scale(ratio, ratio);
+
+        if (!signaturePadInstance && typeof SignaturePad !== 'undefined') {
+            signaturePadInstance = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(15, 23, 42)',
+                minWidth: 1.5,
+                maxWidth: 3.5
+            });
+        } else if (signaturePadInstance) {
+            signaturePadInstance.clear();
+        }
+    }
+
+    if (btnAssinarAgora) {
+        btnAssinarAgora.addEventListener('click', () => {
+            if (modalPosCriacao) modalPosCriacao.style.display = 'none';
+            if (modalSig) {
+                modalSig.style.display = 'flex';
+                setTimeout(() => initSignaturePad(), 50);
+            }
+        });
+    }
+
+    function fecharModalAssinatura() {
+        if (modalSig) modalSig.style.display = 'none';
+        if (activeContractId) {
+            window.location.href = `/contratos/${activeContractId}`;
+        } else {
+            window.location.href = '/contratos';
+        }
+    }
+
+    if (btnCancelSig) btnCancelSig.addEventListener('click', fecharModalAssinatura);
+    if (btnCloseSig) btnCloseSig.addEventListener('click', fecharModalAssinatura);
+
+    if (btnClearSig) {
+        btnClearSig.addEventListener('click', () => {
+            if (signaturePadInstance) signaturePadInstance.clear();
+        });
+    }
+
+    if (btnSaveSig) {
+        btnSaveSig.addEventListener('click', async () => {
+            if (!signaturePadInstance || signaturePadInstance.isEmpty()) {
+                alert('Please provide a signature before confirming.');
+                return;
+            }
+
+            const dataUrl = signaturePadInstance.toDataURL('image/png');
+            btnSaveSig.disabled = true;
+            btnSaveSig.textContent = 'Saving signature...';
+
+            try {
+                const res = await fetch(`/api/contratos/${activeContractId}/assinar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tipo: 'inicial',
+                        assinatura: dataUrl
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Signature saved successfully! Opening contract agreement...');
+                    window.location.href = `/contratos/${activeContractId}/imprimir`;
+                } else {
+                    const d = await res.json();
+                    alert(d.message || d.mensagem || d.error || 'Failed to save signature.');
+                    btnSaveSig.disabled = false;
+                    btnSaveSig.textContent = '✓ Confirm Signature';
+                }
+            } catch (err) {
+                alert('Error connecting to server.');
+                btnSaveSig.disabled = false;
+                btnSaveSig.textContent = '✓ Confirm Signature';
+            }
+        });
     }
 });
 

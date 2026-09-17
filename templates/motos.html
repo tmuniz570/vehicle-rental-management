@@ -19,6 +19,7 @@
                 <th data-sort-field="placa">Reg Plate</th>
                 <th data-sort-field="modelo">Model</th>
                 <th data-sort-field="cor">Colour</th>
+                <th data-sort-field="milhagem_atual">Mileage (Miles)</th>
                 <th data-sort-field="vencimento_tax">Road Tax Expiry</th>
                 <th data-sort-field="vencimento_mot">MOT Expiry</th>
                 <th data-sort-field="status">Status</th>
@@ -26,7 +27,7 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="7" style="text-align:center;">Loading...</td></tr>
+            <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
         </tbody>
     </table>
 </div>
@@ -52,6 +53,11 @@
                     <label>Colour</label>
                     <input type="text" id="edit_cor" required>
                 </div>
+            </div>
+            <div class="form-group">
+                <label>Current Mileage (Miles)</label>
+                <input type="number" id="edit_milhagem" min="0" step="1" placeholder="e.g. 12500" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                <small style="display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-secondary);">Odometer reading in UK miles.</small>
             </div>
             <div class="form-row">
                 <div class="form-group half">
@@ -80,5 +86,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/motos.js"></script>
+<script src="/static/js/motos.js?v=2"></script>
 {% endblock %}

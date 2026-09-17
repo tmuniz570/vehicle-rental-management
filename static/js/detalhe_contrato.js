@@ -196,6 +196,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('info_data_retirada').textContent = 'Collection: ' + new Date(data.data_retirada).toLocaleDateString('en-GB');
         }
 
+        // Mileage Tracker
+        const elStartMileage = document.getElementById('info_milhagem_inicial');
+        if (elStartMileage) {
+            elStartMileage.textContent = (data.milhagem_inicial !== undefined && data.milhagem_inicial !== null) ? `${data.milhagem_inicial.toLocaleString('en-GB')} miles` : '0 miles';
+        }
+        const elEndMileage = document.getElementById('info_milhagem_final');
+        if (elEndMileage) {
+            elEndMileage.textContent = (data.milhagem_final !== undefined && data.milhagem_final !== null) ? `${data.milhagem_final.toLocaleString('en-GB')} miles` : 'Pending return';
+        }
+        const rowDistance = document.getElementById('row_milhas_rodadas');
+        const elDistance = document.getElementById('info_milhas_rodadas');
+        if (rowDistance && elDistance) {
+            if (data.milhas_rodadas !== undefined && data.milhas_rodadas !== null) {
+                rowDistance.style.display = 'flex';
+                elDistance.textContent = `${data.milhas_rodadas.toLocaleString('en-GB')} miles driven`;
+            } else {
+                rowDistance.style.display = 'none';
+            }
+        }
+
         // Helper for compliance date evaluation
         function evaluateCompliance(dateStr) {
             if (!dateStr) return { status: 'none', diffDays: null, formattedDate: '-' };
@@ -658,6 +678,123 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
+        // 3. Rental Agreement & Signatures Rendering
+        const badgeSigIni = document.getElementById('badge_sig_inicial');
+        const boxSigIniContent = document.getElementById('box_sig_inicial_content');
+        const btnAssinarIni = document.getElementById('btnAssinarInicialTouch');
+
+        if (data.assinatura_cliente_inicial) {
+            if (badgeSigIni) {
+                badgeSigIni.textContent = 'Signed';
+                badgeSigIni.className = 'badge badge-success';
+            }
+            if (boxSigIniContent) {
+                const dataAssina = data.data_assinatura_inicial_uk || data.data_assinatura_inicial || '';
+                boxSigIniContent.innerHTML = `
+                    <img src="${data.assinatura_cliente_inicial}" alt="Client Signature" style="max-height: 60px; max-width: 180px; object-fit: contain; margin-bottom: 4px;">
+                    <span style="font-size: 0.72rem; color: #4ade80; font-weight: 600;">✓ Digitally Signed on ${dataAssina}</span>
+                `;
+            }
+            if (btnAssinarIni) btnAssinarIni.style.display = 'none';
+        } else {
+            if (badgeSigIni) {
+                badgeSigIni.textContent = 'Pending Signature';
+                badgeSigIni.className = 'badge badge-warning';
+            }
+            if (boxSigIniContent) {
+                boxSigIniContent.innerHTML = `
+                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Client signature pending for start of rental.</span>
+                `;
+            }
+            if (btnAssinarIni) btnAssinarIni.style.display = 'inline-flex';
+        }
+
+        const badgeSigDev = document.getElementById('badge_sig_devolucao');
+        const boxSigDevContent = document.getElementById('box_sig_devolucao_content');
+        const btnAssinarDev = document.getElementById('btnAssinarDevolucaoTouch');
+
+        if (data.assinatura_cliente_devolucao) {
+            if (badgeSigDev) {
+                badgeSigDev.textContent = 'Signed';
+                badgeSigDev.className = 'badge badge-success';
+            }
+            if (boxSigDevContent) {
+                const dataAssinaDev = data.data_assinatura_devolucao_uk || data.data_assinatura_devolucao || '';
+                boxSigDevContent.innerHTML = `
+                    <img src="${data.assinatura_cliente_devolucao}" alt="Return Signature" style="max-height: 60px; max-width: 180px; object-fit: contain; margin-bottom: 4px;">
+                    <span style="font-size: 0.72rem; color: #4ade80; font-weight: 600;">✓ Return Signed on ${dataAssinaDev}</span>
+                `;
+            }
+            if (btnAssinarDev) btnAssinarDev.style.display = 'none';
+        } else {
+            if (stLower === 'deposit_hold' || stLower === 'quarentena_deposito' || isCompleted) {
+                if (badgeSigDev) {
+                    badgeSigDev.textContent = 'Pending Return Signature';
+                    badgeSigDev.className = 'badge badge-warning';
+                }
+                if (boxSigDevContent) {
+                    boxSigDevContent.innerHTML = `
+                        <span style="color: #f59e0b; font-size: 0.82rem;">Vehicle returned. Client return signature is pending.</span>
+                    `;
+                }
+                if (btnAssinarDev) btnAssinarDev.style.display = 'inline-flex';
+            } else {
+                if (badgeSigDev) {
+                    badgeSigDev.textContent = 'Waiting Vehicle Return';
+                    badgeSigDev.className = 'badge';
+                    badgeSigDev.style.background = 'rgba(255,255,255,0.05)';
+                    badgeSigDev.style.color = 'var(--text-secondary)';
+                }
+                if (boxSigDevContent) {
+                    boxSigDevContent.innerHTML = `
+                        <span style="color: var(--text-secondary); font-size: 0.8rem;">Will be collected upon vehicle return / check-in.</span>
+                    `;
+                }
+                if (btnAssinarDev) btnAssinarDev.style.display = 'none';
+            }
+        }
+
+        // Render Anexos de Contrato
+        const anexosCount = document.getElementById('anexos_count');
+        const anexosList = document.getElementById('anexos_list');
+        const anexos = data.anexos || [];
+
+        if (anexosCount) anexosCount.textContent = anexos.length;
+        if (anexosList) {
+            if (anexos.length === 0) {
+                anexosList.innerHTML = `<p style="color: var(--text-secondary); font-size: 0.82rem; margin: 0;">No scanned contract pages attached yet. Click "Attach Scans / Photos" to upload.</p>`;
+            } else {
+                anexosList.innerHTML = '';
+                anexos.forEach((a, idx) => {
+                    const item = document.createElement('div');
+                    item.style.cssText = 'background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px; padding: 0.6rem 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.82rem; min-width: 220px;';
+                    
+                    const isPdf = (a.url_arquivo || '').toLowerCase().endsWith('.pdf');
+                    const icon = isPdf ? '📄' : '🖼️';
+                    const tipoLabel = a.tipo === 'return_contract' ? 'Return Term' : 'Contract Page';
+
+                    item.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                            <span style="font-size: 1.2rem;">${icon}</span>
+                            <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <a href="${a.url_arquivo}" target="_blank" style="color: var(--text-primary); text-decoration: none; font-weight: 600;">
+                                    ${tipoLabel} #${idx + 1}
+                                </a>
+                                <div style="font-size: 0.7rem; color: var(--text-secondary);">${a.data_criacao || ''}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <a href="${a.url_arquivo}" target="_blank" class="btn-action" style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none; color: #60a5fa;">
+                                View ↗
+                            </a>
+                            <button type="button" onclick="deletarAnexoContrato(${a.id})" style="background: transparent; border: none; color: #f87171; cursor: pointer; font-size: 1.1rem; padding: 0 4px;" title="Delete attachment">&times;</button>
+                        </div>
+                    `;
+                    anexosList.appendChild(item);
+                });
+            }
+        }
+
         const infoComp = document.getElementById('info_comprovante');
         if (infoComp) {
             if (data.url_comprovante_deposito) {
@@ -900,13 +1037,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                             ${tBadge}
                             <span style="font-size: 0.8rem; color: var(--text-secondary);">${dataVist}</span>
+                            ${v.milhagem != null ? `<span style="font-size: 0.75rem; color: #fbbf24; font-weight: 600;">&bull; ⏱️ ${v.milhagem} mi</span>` : ''}
                             ${v.realizado_por_nome ? `<span style="font-size: 0.75rem; color: #c084fc;">&bull; 👤 ${escapeHtml(v.realizado_por_nome)}</span>` : ''}
                         </div>
                         <div style="font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">
                             ${escapeHtml(v.observacoes) || '<em style="opacity:0.5;">No notes</em>'}
                         </div>
                     </div>
-                    <button class="btn-action btn-ver-foto" data-tipo="${escapeHtml(v.tipo)}" data-data="${dataVist}" data-foto="${v.foto_url || ''}" data-obs="${escapeHtml(v.observacoes || 'No notes.')}" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
+                    <button class="btn-action btn-ver-foto" data-tipo="${escapeHtml(v.tipo)}" data-data="${dataVist}" data-foto="${v.foto_url || ''}" data-mil="${v.milhagem != null ? v.milhagem : ''}" data-obs="${escapeHtml(v.observacoes || 'No notes.')}" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
                         ${fotosLabel}
                     </button>
                 `;
@@ -921,6 +1059,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const obs = b.getAttribute('data-obs');
                     const tipo = b.getAttribute('data-tipo');
                     const dataStr = b.getAttribute('data-data');
+                    const milhagem = b.getAttribute('data-mil');
                     
                     const tLower = (tipo || '').toLowerCase();
                     document.getElementById('modalVistoriaTipo').innerHTML = (
@@ -930,6 +1069,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     );
                     document.getElementById('modalVistoriaData').textContent = dataStr;
                     document.getElementById('vistoria_obs').textContent = obs;
+
+                    const rowMilhagem = document.getElementById('modalVistoriaMilhagemRow');
+                    if (rowMilhagem) {
+                        if (milhagem) {
+                            rowMilhagem.style.display = 'flex';
+                            document.getElementById('modalVistoriaMilhagem').textContent = `${milhagem} mi`;
+                        } else {
+                            rowMilhagem.style.display = 'none';
+                        }
+                    }
                     
                     const galeria = document.getElementById('vistoria_galeria');
                     galeria.innerHTML = '';
@@ -1103,6 +1252,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const formData = new FormData();
             formData.append('id_contrato', CONTRATO_ID);
             formData.append('tipo', document.getElementById('oc_tipo').value);
+            const ocMilhagem = document.getElementById('oc_milhagem');
+            if (ocMilhagem && ocMilhagem.value) {
+                formData.append('milhagem', ocMilhagem.value);
+            }
             formData.append('observacoes', document.getElementById('oc_obs').value);
             
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -1252,7 +1405,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         ['closeOcorrenciaModal', 'ocorrenciaModal'],
         ['closePagamentoModal', 'pagamentoModal'],
         ['closeReciboModal', 'reciboModal'],
-        ['closeDevolverDepositoModal', 'devolverDepositoModal']
+        ['closeDevolverDepositoModal', 'devolverDepositoModal'],
+        ['closeAnexosModal', 'modalAnexosContrato'],
+        ['closeDetalheSignatureModal', 'modalDetalheSignaturePad'],
+        ['btnDetalheCancelSig', 'modalDetalheSignaturePad']
     ];
 
     closeMapping.forEach(([btnId, modalId]) => {
@@ -1266,6 +1422,165 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
     });
+
+    // --- Modal de Anexos (Upload de Fotos / Scans do Contrato Físico) ---
+    const btnAbrirAnexar = document.getElementById('btnAbrirAnexarContrato');
+    if (btnAbrirAnexar) {
+        btnAbrirAnexar.addEventListener('click', () => {
+            const formAnexos = document.getElementById('formUploadAnexos');
+            if (formAnexos) formAnexos.reset();
+            abrirModal('modalAnexosContrato');
+        });
+    }
+
+    const formUploadAnexos = document.getElementById('formUploadAnexos');
+    if (formUploadAnexos) {
+        formUploadAnexos.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const inputFiles = document.getElementById('inputContratoAnexos');
+            if (!inputFiles || !inputFiles.files || inputFiles.files.length === 0) {
+                alert('Please select at least one photo or PDF document.');
+                return;
+            }
+
+            const btn = document.getElementById('btnSalvarAnexos');
+            btn.disabled = true;
+            btn.textContent = 'Uploading attachments...';
+
+            const formData = new FormData();
+            formData.append('tipo', document.getElementById('anexo_tipo').value);
+            for (let i = 0; i < inputFiles.files.length; i++) {
+                formData.append('arquivos', inputFiles.files[i]);
+            }
+
+            try {
+                const res = await fetch(`/api/contratos/${CONTRATO_ID}/anexos`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    alert('Attachments uploaded successfully!');
+                    location.reload();
+                } else {
+                    const d = await res.json();
+                    alert(d.message || d.error || 'Failed to upload attachments.');
+                }
+            } catch (err) {
+                alert('Connection error while uploading attachments.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Upload Attachments';
+            }
+        });
+    }
+
+    window.deletarAnexoContrato = async function(anexoId) {
+        if (!confirm('Are you sure you want to delete this contract attachment?')) return;
+        try {
+            const res = await fetch(`/api/contratos/anexos/${anexoId}`, { method: 'DELETE' });
+            if (res.ok) {
+                location.reload();
+            } else {
+                alert('Failed to delete attachment.');
+            }
+        } catch (e) {
+            alert('Connection error.');
+        }
+    };
+
+    // --- Modal de Assinatura Digital Touch (Detalhe Contrato) ---
+    let detalheSignaturePad = null;
+    const canvasDetalhe = document.getElementById('detalheSignatureCanvas');
+    const btnAssinarIniTouch = document.getElementById('btnAssinarInicialTouch');
+    const btnAssinarDevTouch = document.getElementById('btnAssinarDevolucaoTouch');
+    const inputSigTipo = document.getElementById('detalhe_sig_tipo');
+    const titleSig = document.getElementById('detalheSignatureTitle');
+    const subTitleSig = document.getElementById('detalheSignatureSubtitle');
+    const btnClearDetalheSig = document.getElementById('btnDetalheClearSig');
+    const btnSaveDetalheSig = document.getElementById('btnDetalheSaveSig');
+
+    function initDetalheSignaturePad() {
+        if (!canvasDetalhe) return;
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvasDetalhe.width = canvasDetalhe.offsetWidth * ratio;
+        canvasDetalhe.height = canvasDetalhe.offsetHeight * ratio;
+        canvasDetalhe.getContext("2d").scale(ratio, ratio);
+
+        if (!detalheSignaturePad && typeof SignaturePad !== 'undefined') {
+            detalheSignaturePad = new SignaturePad(canvasDetalhe, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(15, 23, 42)',
+                minWidth: 1.5,
+                maxWidth: 3.5
+            });
+        } else if (detalheSignaturePad) {
+            detalheSignaturePad.clear();
+        }
+    }
+
+    function abrirAssinaturaTouch(tipo) {
+        if (inputSigTipo) inputSigTipo.value = tipo;
+        if (tipo === 'devolucao') {
+            if (titleSig) titleSig.textContent = 'Renter Return Signature';
+            if (subTitleSig) subTitleSig.textContent = 'Sign to confirm motorbike return and deposit hold terms.';
+        } else {
+            if (titleSig) titleSig.textContent = 'Renter Agreement Signature';
+            if (subTitleSig) subTitleSig.textContent = 'Sign to confirm start of rental and vehicle collection.';
+        }
+        abrirModal('modalDetalheSignaturePad');
+        setTimeout(() => initDetalheSignaturePad(), 50);
+    }
+
+    if (btnAssinarIniTouch) {
+        btnAssinarIniTouch.addEventListener('click', () => abrirAssinaturaTouch('inicial'));
+    }
+    if (btnAssinarDevTouch) {
+        btnAssinarDevTouch.addEventListener('click', () => abrirAssinaturaTouch('devolucao'));
+    }
+    if (btnClearDetalheSig) {
+        btnClearDetalheSig.addEventListener('click', () => {
+            if (detalheSignaturePad) detalheSignaturePad.clear();
+        });
+    }
+
+    if (btnSaveDetalheSig) {
+        btnSaveDetalheSig.addEventListener('click', async () => {
+            if (!detalheSignaturePad || detalheSignaturePad.isEmpty()) {
+                alert('Please sign before confirming.');
+                return;
+            }
+
+            const tipo = inputSigTipo ? inputSigTipo.value : 'inicial';
+            const dataUrl = detalheSignaturePad.toDataURL('image/png');
+            btnSaveDetalheSig.disabled = true;
+            btnSaveDetalheSig.textContent = 'Saving signature...';
+
+            try {
+                const res = await fetch(`/api/contratos/${CONTRATO_ID}/assinar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tipo: tipo,
+                        assinatura: dataUrl
+                    })
+                });
+
+                if (res.ok) {
+                    alert('Signature recorded successfully!');
+                    window.location.href = window.location.pathname; // Strips ?assinar=1 to prevent reopening
+                } else {
+                    const d = await res.json();
+                    alert(d.message || d.error || 'Failed to save signature.');
+                    btnSaveDetalheSig.disabled = false;
+                    btnSaveDetalheSig.textContent = '✓ Confirm Signature';
+                }
+            } catch (err) {
+                alert('Connection error while saving signature.');
+                btnSaveDetalheSig.disabled = false;
+                btnSaveDetalheSig.textContent = '✓ Confirm Signature';
+            }
+        });
+    }
 
     function imprimirReciboDireto(url) {
         if (!url || url === '#' || url.endsWith('#')) {
@@ -1320,6 +1635,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             closeMapping.forEach(([_, modalId]) => fecharModal(modalId));
         }
     });
+
+    // Auto-open signature pad if redirected after contract creation (?assinar=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('assinar') === '1') {
+        setTimeout(() => {
+            abrirAssinaturaTouch('inicial');
+        }, 400);
+    }
 });
 
 

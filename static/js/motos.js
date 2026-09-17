@@ -34,7 +34,7 @@ async function carregarMotos() {
         const motos = data.itens || [];
         
         if (motos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No motorbikes found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No motorbikes found.</td></tr>';
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
@@ -50,7 +50,8 @@ async function carregarMotos() {
             else if (st === 'rented' || st === 'alugada') statusBadge = '<span class="badge badge-info">Rented</span>';
             else statusBadge = `<span class="badge badge-danger">${escapeHtml(m.status)}</span>`;
             
-            const btnEdit = `<button class="btn-edit" data-placa="${escapeHtml(m.placa)}" data-modelo="${escapeHtml(m.modelo)}" data-cor="${escapeHtml(m.cor)}" data-status="${escapeHtml(m.status)}" data-mot="${m.vencimento_mot || ''}" data-tax="${m.vencimento_tax || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
+            const milhagemFormatada = Number(m.milhagem_atual || 0).toLocaleString('en-GB') + ' mi';
+            const btnEdit = `<button class="btn-edit" data-placa="${escapeHtml(m.placa)}" data-modelo="${escapeHtml(m.modelo)}" data-cor="${escapeHtml(m.cor)}" data-milhagem="${m.milhagem_atual || 0}" data-status="${escapeHtml(m.status)}" data-mot="${m.vencimento_mot || ''}" data-tax="${m.vencimento_tax || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             const motBadge = formatExpiryBadge(m.vencimento_mot);
             const taxBadge = formatExpiryBadge(m.vencimento_tax);
@@ -59,6 +60,7 @@ async function carregarMotos() {
                 <td class="nowrap"><span class="badge-plate">${escapeHtml(m.placa)}</span></td>
                 <td>${escapeHtml(m.modelo)}</td>
                 <td>${escapeHtml(m.cor)}</td>
+                <td data-sort="${m.milhagem_atual || 0}" style="font-weight: 600; color: #f8fafc;"><span style="color: var(--accent); font-weight:700;">${milhagemFormatada}</span></td>
                 <td data-sort="${m.vencimento_tax || ''}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${m.vencimento_mot || ''}" class="nowrap">${motBadge}</td>
                 <td>${statusBadge}</td>
@@ -85,6 +87,7 @@ async function carregarMotos() {
                 document.getElementById('display_placa').textContent = placa;
                 document.getElementById('edit_modelo').value = e.target.getAttribute('data-modelo');
                 document.getElementById('edit_cor').value = e.target.getAttribute('data-cor');
+                document.getElementById('edit_milhagem').value = e.target.getAttribute('data-milhagem') || '0';
                 document.getElementById('edit_status').value = e.target.getAttribute('data-status');
                 document.getElementById('edit_mot').value = e.target.getAttribute('data-mot') || '';
                 document.getElementById('edit_tax').value = e.target.getAttribute('data-tax') || '';
@@ -96,7 +99,7 @@ async function carregarMotos() {
         }
         
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
     }
 }
 
@@ -143,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modelo: document.getElementById('edit_modelo').value,
             cor: document.getElementById('edit_cor').value,
             status: document.getElementById('edit_status').value,
+            milhagem_atual: parseInt(document.getElementById('edit_milhagem').value || '0', 10),
             vencimento_mot: document.getElementById('edit_mot').value || null,
             vencimento_tax: document.getElementById('edit_tax').value || null
         };

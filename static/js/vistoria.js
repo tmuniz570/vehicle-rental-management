@@ -180,6 +180,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const formData = new FormData();
         formData.append('id_contrato', contratoId);
         formData.append('tipo', document.getElementById('tipo').value);
+        const milhagemInput = document.getElementById('milhagem');
+        if (milhagemInput && milhagemInput.value) {
+            formData.append('milhagem', milhagemInput.value);
+        }
         formData.append('observacoes', document.getElementById('observacoes').value.trim());
         
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);

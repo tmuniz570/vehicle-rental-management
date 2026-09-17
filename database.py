@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -34,7 +35,7 @@ class User(db.Model, UserMixin):
     perm_alugueis = db.Column(db.Boolean, default=True, nullable=False)
     perm_claims = db.Column(db.Boolean, default=False, nullable=False)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -126,6 +127,7 @@ class Motorcycle(db.Model):
     modelo = db.Column(db.String(100), nullable=False)
     cor = db.Column(db.String(50), nullable=True)
     status = db.Column(db.String(20), default=MotoStatus.DISPONIVEL.value, nullable=False, index=True)
+    milhagem_atual = db.Column(db.Integer, default=0, nullable=False)
     vencimento_mot = db.Column(db.Date, nullable=True, index=True)
     vencimento_tax = db.Column(db.Date, nullable=True, index=True)
     
@@ -138,7 +140,7 @@ class Contract(db.Model):
     id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False, index=True)
     placa = db.Column(db.String(10), db.ForeignKey('motos.placa'), nullable=False, index=True)
     
-    data_retirada = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    data_retirada = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
     dia_pagamento_semanal = db.Column(db.Integer, nullable=False) # 0-6 (Segunda-Domingo)
     valor_aluguel_semanal = db.Column(db.Float, nullable=False, default=250.00)
     data_devolucao = db.Column(db.DateTime, nullable=True)
@@ -147,6 +149,16 @@ class Contract(db.Model):
     url_comprovante_deposito = db.Column(db.String(255), nullable=True)
     criado_por_nome = db.Column(db.String(100), nullable=True)
     
+    # Mileage Tracker (UK Miles)
+    milhagem_inicial = db.Column(db.Integer, default=0, nullable=True)
+    milhagem_final = db.Column(db.Integer, nullable=True)
+    
+    # Signatures: Start of Rental & Termination of Rental
+    assinatura_cliente_inicial = db.Column(db.String(255), nullable=True)
+    data_assinatura_inicial = db.Column(db.DateTime, nullable=True)
+    assinatura_cliente_devolucao = db.Column(db.String(255), nullable=True)
+    data_assinatura_devolucao = db.Column(db.DateTime, nullable=True)
+    
     # 15-Day Insurance Compliance (askMID Verification)
     data_ultima_checagem_seguro = db.Column(db.Date, nullable=True)
     status_seguro = db.Column(db.String(20), default='Valid', nullable=False) # Valid, Cancelled
@@ -154,6 +166,17 @@ class Contract(db.Model):
     
     vistorias = db.relationship('Inspection', backref='contrato', lazy=True)
     transacoes = db.relationship('FinancialTransaction', backref='contrato', lazy=True)
+    anexos = db.relationship('ContractAttachment', backref='contrato', lazy=True, cascade='all, delete-orphan')
+
+class ContractAttachment(db.Model):
+    __tablename__ = 'contrato_anexos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id', ondelete='CASCADE'), nullable=False, index=True)
+    tipo = db.Column(db.String(30), default='initial_contract', nullable=False) # initial_contract, return_contract, general
+    url_arquivo = db.Column(db.String(255), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=True)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
 
 class Inspection(db.Model):
     __tablename__ = 'vistorias'
@@ -161,7 +184,8 @@ class Inspection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id'), nullable=False, index=True)
     tipo = db.Column(db.String(20), nullable=False, index=True) # Saída ou Entrada
-    data = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    data = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False, index=True)
+    milhagem = db.Column(db.Integer, nullable=True)
     observacoes = db.Column(db.Text, nullable=True)
     url_fotos = db.Column(db.String(255), nullable=True) # Pode ser JSON array se forem várias fotos
     realizado_por_nome = db.Column(db.String(100), nullable=True)
@@ -183,7 +207,7 @@ class AuditLog(db.Model):
     __tablename__ = 'logs_auditoria'
     
     id = db.Column(db.Integer, primary_key=True)
-    data_hora = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    data_hora = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False, index=True)
     id_usuario = db.Column(db.Integer, db.ForeignKey('usuarios.id', ondelete='SET NULL'), nullable=True)
     usuario_nome = db.Column(db.String(100), nullable=True)
     acao = db.Column(db.String(50), nullable=False, index=True)
@@ -234,7 +258,7 @@ class Claim(db.Model):
     # Observações e Auditoria
     observacoes = db.Column(db.Text, nullable=True)
     criado_por_nome = db.Column(db.String(100), nullable=True)
-    data_criacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
 
 class JobExecutionLock(db.Model):
     __tablename__ = 'job_locks'
@@ -269,12 +293,33 @@ def init_db(app):
                     if 'seguro_verificado_por' not in cols_c:
                         conn.execute(db.text("ALTER TABLE contratos ADD COLUMN seguro_verificado_por VARCHAR(100)"))
                         conn.commit()
+                    if 'milhagem_inicial' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN milhagem_inicial INTEGER DEFAULT 0"))
+                        conn.commit()
+                    if 'milhagem_final' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN milhagem_final INTEGER"))
+                        conn.commit()
+                    if 'assinatura_cliente_inicial' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN assinatura_cliente_inicial VARCHAR(255)"))
+                        conn.commit()
+                    if 'data_assinatura_inicial' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN data_assinatura_inicial DATETIME"))
+                        conn.commit()
+                    if 'assinatura_cliente_devolucao' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN assinatura_cliente_devolucao VARCHAR(255)"))
+                        conn.commit()
+                    if 'data_assinatura_devolucao' not in cols_c:
+                        conn.execute(db.text("ALTER TABLE contratos ADD COLUMN data_assinatura_devolucao DATETIME"))
+                        conn.commit()
                     
                 # Vistorias
                 if 'vistorias' in existing_tables:
                     cols_i = [col['name'] for col in inspector.get_columns('vistorias')]
                     if 'realizado_por_nome' not in cols_i:
                         conn.execute(db.text("ALTER TABLE vistorias ADD COLUMN realizado_por_nome VARCHAR(100)"))
+                        conn.commit()
+                    if 'milhagem' not in cols_i:
+                        conn.execute(db.text("ALTER TABLE vistorias ADD COLUMN milhagem INTEGER"))
                         conn.commit()
                     
                 # Financeiro Transações
@@ -292,6 +337,9 @@ def init_db(app):
                         conn.commit()
                     if 'vencimento_tax' not in cols_m:
                         conn.execute(db.text("ALTER TABLE motos ADD COLUMN vencimento_tax DATE"))
+                        conn.commit()
+                    if 'milhagem_atual' not in cols_m:
+                        conn.execute(db.text("ALTER TABLE motos ADD COLUMN milhagem_atual INTEGER DEFAULT 0"))
                         conn.commit()
 
                 # Clientes
@@ -344,6 +392,7 @@ def init_db(app):
                     ("idx_claims_placa", "claims", "placa"),
                     ("idx_claims_status", "claims", "status"),
                     ("idx_claims_empresa", "claims", "empresa_parceira"),
+                    ("idx_anexos_contrato", "contrato_anexos", "id_contrato"),
                 ]
                 for idx_name, tbl, col in indexes_to_create:
                     if tbl in existing_tables:

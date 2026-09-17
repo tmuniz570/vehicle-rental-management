@@ -46,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
             placa: cleanPlaca,
             modelo: document.getElementById('modelo').value.trim(),
             cor: document.getElementById('cor').value.trim(),
+            milhagem_atual: document.getElementById('milhagem_atual') ? parseInt(document.getElementById('milhagem_atual').value || '0', 10) : 0,
             vencimento_mot: document.getElementById('vencimento_mot') ? document.getElementById('vencimento_mot').value || null : null,
             vencimento_tax: document.getElementById('vencimento_tax') ? document.getElementById('vencimento_tax').value || null : null
         };
