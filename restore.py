@@ -1,6 +1,8 @@
 import os
 import sys
 import zipfile
+import subprocess
+import re
 
 def list_backups():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -42,6 +44,27 @@ def restore_backup(backup_file=None):
     
     with zipfile.ZipFile(target_zip, 'r') as zipf:
         zipf.extractall(base_dir)
+        
+    db_dump_file = os.path.join(base_dir, 'database_dump.sql')
+    if os.path.exists(db_dump_file):
+        print("\nPostgreSQL dump found in backup. Restoring database...")
+        env_path = os.path.join(base_dir, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                env_content = f.read()
+            db_match = re.search(r'^DATABASE_URL=(postgresql[^\s]+)', env_content, re.MULTILINE)
+            if db_match:
+                db_url = db_match.group(1)
+                try:
+                    subprocess.run(['psql', db_url, '-f', db_dump_file], check=True)
+                    print("PostgreSQL database restored successfully.")
+                except Exception as e:
+                    print(f"Warning: Failed to restore PostgreSQL database: {e}")
+            else:
+                print("Warning: .env does not contain a valid DATABASE_URL for Postgres, but a dump exists.")
+        else:
+            print("Warning: .env file not found. Could not restore PostgreSQL database.")
+        os.remove(db_dump_file)
         
     print("Application successfully restored to the chosen restore point!")
 

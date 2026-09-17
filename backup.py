@@ -1,5 +1,7 @@
 import os
 import zipfile
+import subprocess
+import re
 from datetime import datetime
 
 def create_backup():
@@ -13,6 +15,24 @@ def create_backup():
     
     ignore_dirs = {'venv', 'env', '__pycache__', '.git', 'backups'}
     ignore_exts = {'.pyc', '.pyo'}
+    
+    db_dump_file = None
+    env_path = os.path.join(base_dir, '.env')
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            env_content = f.read()
+        db_match = re.search(r'^DATABASE_URL=(postgresql[^\s]+)', env_content, re.MULTILINE)
+        if db_match:
+            db_url = db_match.group(1)
+            print("PostgreSQL connection detected in .env! Generating database dump...")
+            db_dump_file = os.path.join(base_dir, 'database_dump.sql')
+            try:
+                subprocess.run(['pg_dump', db_url, '-f', db_dump_file], check=True)
+            except Exception as e:
+                print(f"Warning: Failed to create PostgreSQL dump: {e}")
+                if os.path.exists(db_dump_file):
+                    os.remove(db_dump_file)
+                db_dump_file = None
     
     print(f"Creating restore point: {backup_filename} ...")
     
@@ -29,6 +49,9 @@ def create_backup():
                 zipf.write(file_path, arcname)
                 count += 1
                 
+    if db_dump_file and os.path.exists(db_dump_file):
+        os.remove(db_dump_file)
+        
     size_mb = os.path.getsize(backup_path) / (1024 * 1024)
     print(f"Backup successfully created!")
     print(f"File: {backup_path}")
