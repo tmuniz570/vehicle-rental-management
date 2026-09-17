@@ -21,6 +21,9 @@ backups/
 *.log
 .env
 *.env
+.context_memory.md
+PROJECT_CONTEXT_PRIVATE.md
+.agents/
 
 # SQLite databases & temporary/journal files
 *.db
