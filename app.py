@@ -582,12 +582,22 @@ def imprimir_contrato(id):
     dias_nomes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     dia_pagamento_nome = dias_nomes[contrato.dia_pagamento_semanal] if 0 <= contrato.dia_pagamento_semanal <= 6 else 'Monday'
     
-    # Depósito original registrado
+    # Depósito original registrado (prioriza valor_deposito congelado no contrato)
     dep_tx = FinancialTransaction.query.filter_by(
         id_contrato=id, 
         tipo=TransactionType.DEPOSIT.value
     ).first()
-    deposito_valor = float(dep_tx.valor) if dep_tx else 500.00
+    deposito_valor = float(contrato.valor_deposito) if contrato.valor_deposito is not None else (float(dep_tx.valor) if dep_tx else 500.00)
+    
+    # Dados imutáveis congelados no momento do contrato (com fallback seguro)
+    cliente_nome = contrato.cliente_nome or (cliente.nome if cliente else 'Unknown')
+    cliente_telefone = contrato.cliente_telefone or (cliente.telefone if cliente else '-')
+    cliente_endereco = contrato.cliente_endereco or (cliente.endereco if cliente else 'Not provided')
+    cliente_email = contrato.cliente_email or (cliente.email if cliente else None)
+    
+    moto_modelo = contrato.moto_modelo or (moto.modelo if moto else '-')
+    moto_cor = contrato.moto_cor or (moto.cor if moto else 'Not specified')
+    moto_placa = contrato.moto_placa or contrato.placa
     
     # Datas formatadas UK (DD/MM/YYYY)
     data_retirada_uk = contrato.data_retirada.strftime('%d/%m/%Y') if contrato.data_retirada else '-'
@@ -604,6 +614,13 @@ def imprimir_contrato(id):
         contrato=contrato,
         cliente=cliente,
         moto=moto,
+        cliente_nome=cliente_nome,
+        cliente_telefone=cliente_telefone,
+        cliente_endereco=cliente_endereco,
+        cliente_email=cliente_email,
+        moto_modelo=moto_modelo,
+        moto_cor=moto_cor,
+        moto_placa=moto_placa,
         dia_pagamento_nome=dia_pagamento_nome,
         deposito_valor=deposito_valor,
         data_retirada_uk=data_retirada_uk,
@@ -1700,6 +1717,10 @@ def criar_contrato():
     if arq_seguro_check.filename and not is_allowed_file(arq_seguro_check.filename):
         return jsonify({'error': 'Invalid insurance document format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de documento de seguro inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
 
+    cliente = db.session.get(Client, id_cliente)
+    if not cliente:
+        return jsonify({'error': 'Customer not found', 'erro': 'Cliente não encontrado'}), 400
+
     moto = db.session.get(Motorcycle, placa)
     if not moto or moto.status not in [MotoStatus.AVAILABLE.value, 'Disponível']:
         return jsonify({'error': 'Motorbike is not available for rental', 'erro': 'Moto não está disponível'}), 400
@@ -1731,19 +1752,33 @@ def criar_contrato():
     milhagem_inicial = int(request.form.get('milhagem_inicial') or (moto.milhagem_atual or 0))
     moto.milhagem_atual = milhagem_inicial
 
-    # Create Contract
+    # Create Contract with frozen immutable snapshots
     novo_contrato = Contract(
         id_cliente=id_cliente,
         placa=placa,
         dia_pagamento_semanal=dia_pagamento_semanal,
         valor_aluguel_semanal=valor_aluguel_semanal,
+        valor_deposito=valor_deposito,
         url_seguro=url_seguro,
         status=ContractStatus.ACTIVE.value,
         criado_por_nome=operador_atual,
         milhagem_inicial=milhagem_inicial,
         data_ultima_checagem_seguro=get_local_now().date(),
         status_seguro='Valid',
-        seguro_verificado_por=operador_atual
+        seguro_verificado_por=operador_atual,
+        # Immutable Snapshot of Customer at creation time
+        cliente_nome=cliente.nome,
+        cliente_telefone=cliente.telefone,
+        cliente_email=cliente.email,
+        cliente_endereco=cliente.endereco,
+        url_habilitacao=cliente.url_habilitacao,
+        url_habilitacao_verso=cliente.url_habilitacao_verso,
+        url_cbt=cliente.url_cbt,
+        url_comprovante_endereco=cliente.url_comprovante_endereco,
+        # Immutable Snapshot of Motorbike at creation time
+        moto_modelo=moto.modelo,
+        moto_cor=moto.cor,
+        moto_placa=moto.placa
     )
     db.session.add(novo_contrato)
     
@@ -2053,7 +2088,10 @@ def listar_contratos():
     paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
-        'id': c.id, 'id_cliente': c.id_cliente, 'cliente_nome': c.cliente.nome, 'placa': c.placa,
+        'id': c.id, 
+        'id_cliente': c.id_cliente, 
+        'cliente_nome': c.cliente_nome or (c.cliente.nome if c.cliente else 'Customer'), 
+        'placa': c.moto_placa or c.placa,
         'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
         'valor_aluguel_semanal': c.valor_aluguel_semanal,
@@ -2114,18 +2152,18 @@ def detalhe_contrato(id):
     
     return jsonify({
         'id': c.id,
-        'cliente': cliente.nome if cliente else f'ID {c.id_cliente}',
+        'cliente': c.cliente_nome or (cliente.nome if cliente else f'ID {c.id_cliente}'),
         'id_cliente': c.id_cliente,
-        'telefone': cliente.telefone if cliente else '-',
-        'email': cliente.email if cliente else '-',
-        'endereco': cliente.endereco if cliente else None,
-        'url_habilitacao': cliente.url_habilitacao if cliente else None,
-        'url_habilitacao_verso': cliente.url_habilitacao_verso if cliente else None,
-        'url_cbt': cliente.url_cbt if cliente else None,
-        'url_comprovante_endereco': cliente.url_comprovante_endereco if cliente else None,
-        'placa': c.placa,
-        'modelo': moto.modelo if moto else '-',
-        'cor': moto.cor if moto else '-',
+        'telefone': c.cliente_telefone or (cliente.telefone if cliente else '-'),
+        'email': c.cliente_email or (cliente.email if cliente else '-'),
+        'endereco': c.cliente_endereco or (cliente.endereco if cliente else None),
+        'url_habilitacao': c.url_habilitacao or (cliente.url_habilitacao if cliente else None),
+        'url_habilitacao_verso': c.url_habilitacao_verso or (cliente.url_habilitacao_verso if cliente else None),
+        'url_cbt': c.url_cbt or (cliente.url_cbt if cliente else None),
+        'url_comprovante_endereco': c.url_comprovante_endereco or (cliente.url_comprovante_endereco if cliente else None),
+        'placa': c.moto_placa or c.placa,
+        'modelo': c.moto_modelo or (moto.modelo if moto else '-'),
+        'cor': c.moto_cor or (moto.cor if moto else '-'),
         'milhagem_atual_moto': int(moto.milhagem_atual or 0) if moto else 0,
         'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
         'milhagem_final': c.milhagem_final,

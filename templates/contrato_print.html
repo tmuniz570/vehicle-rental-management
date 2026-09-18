@@ -218,19 +218,19 @@
 
         <div class="subsection-title">1.2 The Renter (Client):</div>
         <ul>
-            <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente.nome }}</span></li>
-            <li><strong>Phone Number:</strong> <span class="data-highlight">{{ cliente.telefone }}</span></li>
-            <li><strong>Physical Address:</strong> <span class="data-highlight">{{ cliente.endereco or 'Not provided' }}</span></li>
-            {% if cliente.email %}
-            <li><strong>Email:</strong> <span class="data-highlight">{{ cliente.email }}</span></li>
+            <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente_nome }}</span></li>
+            <li><strong>Phone Number:</strong> <span class="data-highlight">{{ cliente_telefone }}</span></li>
+            <li><strong>Physical Address:</strong> <span class="data-highlight">{{ cliente_endereco or 'Not provided' }}</span></li>
+            {% if cliente_email %}
+            <li><strong>Email:</strong> <span class="data-highlight">{{ cliente_email }}</span></li>
             {% endif %}
         </ul>
 
         <div class="section-title">2. The Object of the Rental (Vehicle Details)</div>
         <ul>
-            <li><strong>Make and Model:</strong> <span class="data-highlight">{{ moto.modelo }}</span></li>
-            <li><strong>Color:</strong> <span class="data-highlight">{{ moto.cor or 'Not specified' }}</span></li>
-            <li><strong>Registration Number:</strong> <span class="data-highlight" style="font-family: monospace; letter-spacing: 1px;">{{ moto.placa }}</span></li>
+            <li><strong>Make and Model:</strong> <span class="data-highlight">{{ moto_modelo }}</span></li>
+            <li><strong>Color:</strong> <span class="data-highlight">{{ moto_cor or 'Not specified' }}</span></li>
+            <li><strong>Registration Number:</strong> <span class="data-highlight" style="font-family: monospace; letter-spacing: 1px;">{{ moto_placa }}</span></li>
             <li><strong>Mileage at start:</strong> <span class="data-highlight">{{ contrato.milhagem_inicial or 0 }} miles</span></li>
         </ul>
 
@@ -335,11 +335,11 @@
                 {% if contrato.assinatura_cliente_inicial %}
                     <img src="{{ contrato.assinatura_cliente_inicial }}" alt="Renter Signature" class="sig-img">
                     <div class="sig-label">Signed by the Renter</div>
-                    <div style="font-size: 0.75rem; color: #0f172a; font-weight: 600; margin-top: 2px;">{{ cliente.nome }}</div>
+                    <div style="font-size: 0.75rem; color: #0f172a; font-weight: 600; margin-top: 2px;">{{ cliente_nome }}</div>
                     <div style="font-size: 0.7rem; color: #16a34a; font-weight: 600;">✓ Digitally Signed on {{ data_assinatura_inicial_uk or data_retirada_uk }}</div>
                 {% else %}
                     <div class="sig-line"></div>
-                    <div class="sig-label">Signed by the Renter ({{ cliente.nome }})</div>
+                    <div class="sig-label">Signed by the Renter ({{ cliente_nome }})</div>
                     <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Sign on screen or above line</div>
                 {% endif %}
             </div>
@@ -372,11 +372,11 @@
                 {% if contrato.assinatura_cliente_devolucao %}
                     <img src="{{ contrato.assinatura_cliente_devolucao }}" alt="Renter Return Signature" class="sig-img">
                     <div class="sig-label">Signed by the Renter (Vehicle Returned)</div>
-                    <div style="font-size: 0.75rem; color: #0f172a; font-weight: 600; margin-top: 2px;">{{ cliente.nome }}</div>
+                    <div style="font-size: 0.75rem; color: #0f172a; font-weight: 600; margin-top: 2px;">{{ cliente_nome }}</div>
                     <div style="font-size: 0.7rem; color: #16a34a; font-weight: 600;">✓ Digitally Signed on {{ data_assinatura_devolucao_uk or data_devolucao_uk }}</div>
                 {% else %}
                     <div class="sig-line"></div>
-                    <div class="sig-label">Signed by the Renter ({{ cliente.nome }})</div>
+                    <div class="sig-label">Signed by the Renter ({{ cliente_nome }})</div>
                     <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Sign on screen or above line upon vehicle return</div>
                 {% endif %}
             </div>

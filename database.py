@@ -164,6 +164,21 @@ class Contract(db.Model):
     status_seguro = db.Column(db.String(20), default='Valid', nullable=False) # Valid, Cancelled
     seguro_verificado_por = db.Column(db.String(100), nullable=True)
     
+    # Immutable Snapshots (Captured when Contract is Created)
+    cliente_nome = db.Column(db.String(100), nullable=True)
+    cliente_telefone = db.Column(db.String(20), nullable=True)
+    cliente_email = db.Column(db.String(120), nullable=True)
+    cliente_endereco = db.Column(db.String(255), nullable=True)
+    url_habilitacao = db.Column(db.String(255), nullable=True)
+    url_habilitacao_verso = db.Column(db.String(255), nullable=True)
+    url_cbt = db.Column(db.String(255), nullable=True)
+    url_comprovante_endereco = db.Column(db.String(255), nullable=True)
+    
+    moto_modelo = db.Column(db.String(100), nullable=True)
+    moto_cor = db.Column(db.String(50), nullable=True)
+    moto_placa = db.Column(db.String(10), nullable=True)
+    valor_deposito = db.Column(db.Numeric(10, 2), nullable=True)
+    
     vistorias = db.relationship('Inspection', backref='contrato', lazy=True)
     transacoes = db.relationship('FinancialTransaction', backref='contrato', lazy=True)
     anexos = db.relationship('ContractAttachment', backref='contrato', lazy=True, cascade='all, delete-orphan')
@@ -311,6 +326,61 @@ def init_db(app):
                     if 'data_assinatura_devolucao' not in cols_c:
                         conn.execute(db.text("ALTER TABLE contratos ADD COLUMN data_assinatura_devolucao DATETIME"))
                         conn.commit()
+
+                    # Immutable snapshot fields for contracts
+                    snapshot_cols = [
+                        ('cliente_nome', 'VARCHAR(100)'),
+                        ('cliente_telefone', 'VARCHAR(20)'),
+                        ('cliente_email', 'VARCHAR(120)'),
+                        ('cliente_endereco', 'VARCHAR(255)'),
+                        ('url_habilitacao', 'VARCHAR(255)'),
+                        ('url_habilitacao_verso', 'VARCHAR(255)'),
+                        ('url_cbt', 'VARCHAR(255)'),
+                        ('url_comprovante_endereco', 'VARCHAR(255)'),
+                        ('moto_modelo', 'VARCHAR(100)'),
+                        ('moto_cor', 'VARCHAR(50)'),
+                        ('moto_placa', 'VARCHAR(10)'),
+                        ('valor_deposito', 'NUMERIC(10, 2)'),
+                    ]
+                    for col_name, col_type in snapshot_cols:
+                        if col_name not in cols_c:
+                            conn.execute(db.text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+
+                    # Backfill existing contracts if snapshot fields are null
+                    try:
+                        conn.execute(db.text("""
+                            UPDATE contratos 
+                            SET 
+                                cliente_nome = (SELECT nome FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                cliente_telefone = (SELECT telefone FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                cliente_email = (SELECT email FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                cliente_endereco = (SELECT endereco FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                url_habilitacao = (SELECT url_habilitacao FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                url_habilitacao_verso = (SELECT url_habilitacao_verso FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                url_cbt = (SELECT url_cbt FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                url_comprovante_endereco = (SELECT url_comprovante_endereco FROM clientes WHERE clientes.id = contratos.id_cliente),
+                                moto_modelo = (SELECT modelo FROM motos WHERE motos.placa = contratos.placa),
+                                moto_cor = (SELECT cor FROM motos WHERE motos.placa = contratos.placa),
+                                moto_placa = contratos.placa
+                            WHERE cliente_nome IS NULL;
+                        """))
+                        conn.commit()
+
+                        conn.execute(db.text("""
+                            UPDATE contratos
+                            SET valor_deposito = (
+                                SELECT valor FROM financeiro_transacoes 
+                                WHERE financeiro_transacoes.id_contrato = contratos.id 
+                                  AND (financeiro_transacoes.tipo IN ('Deposit', 'Deposito', 'Depósito') 
+                                       OR LOWER(financeiro_transacoes.tipo) = 'deposit')
+                                LIMIT 1
+                            )
+                            WHERE valor_deposito IS NULL;
+                        """))
+                        conn.commit()
+                    except Exception as backfill_err:
+                        print(f"[DB Auto-Migration] Backfill info: {backfill_err}")
                     
                 # Vistorias
                 if 'vistorias' in existing_tables:
