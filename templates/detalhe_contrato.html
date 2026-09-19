@@ -608,6 +608,7 @@
                 Upload multiple photos (page 1, page 2, page 3) or a scanned PDF of the physically signed contract.
             </p>
             <form id="formUploadAnexos" class="modern-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="anexo_tipo">Attachment Category</label>
                     <select id="anexo_tipo" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.75rem 1rem; border-radius: 12px; width: 100%;">

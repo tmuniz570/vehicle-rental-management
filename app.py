@@ -17,7 +17,7 @@ from flask_login import (
 from database import (
     db, init_db, Contract, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
-    User, AuditLog, JobExecutionLock, Claim, ContractAttachment
+    User, AuditLog, JobExecutionLock, Claim, ContractAttachment, delete_file_if_exists
 )
 from sqlalchemy.orm import joinedload
 import werkzeug.utils
@@ -1969,74 +1969,99 @@ def assinar_contrato(id):
 @app.route('/api/contratos/<int:id>/anexos', methods=['POST'])
 @alugueis_required
 def upload_anexos_contrato(id):
-    contrato = db.session.get(Contract, id)
-    if not contrato:
-        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+    try:
+        contrato = db.session.get(Contract, id)
+        if not contrato:
+            return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
 
-    if 'arquivos' not in request.files:
-        return jsonify({'error': 'No files provided', 'erro': 'Nenhum arquivo enviado'}), 400
+        if 'arquivos' not in request.files:
+            return jsonify({'error': 'No files provided', 'erro': 'Nenhum arquivo enviado'}), 400
 
-    arquivos = request.files.getlist('arquivos')
-    if not arquivos or arquivos[0].filename == '':
-        return jsonify({'error': 'No files selected', 'erro': 'Nenhum arquivo selecionado'}), 400
+        arquivos = request.files.getlist('arquivos')
+        if not arquivos or arquivos[0].filename == '':
+            return jsonify({'error': 'No files selected', 'erro': 'Nenhum arquivo selecionado'}), 400
 
-    tipo_anexo = request.form.get('tipo', 'initial_contract')
-    
-    # Validar extensões
-    for arq in arquivos:
-        if arq.filename and not is_allowed_file(arq.filename):
-            return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+        tipo_anexo = request.form.get('tipo', 'initial_contract')
+        
+        # Validar extensões
+        for arq in arquivos:
+            if arq.filename and not is_allowed_file(arq.filename):
+                return jsonify({'error': f'Invalid file format for "{arq.filename}". Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': f'Formato inválido para "{arq.filename}". Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
 
-    salvos = []
-    timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
-    for i, arq in enumerate(arquivos):
-        if arq.filename:
-            sec_name = werkzeug.utils.secure_filename(arq.filename)
-            nome_arq = f"{timestamp}_anexo_{id}_{i}_{sec_name}"
-            nome_salvo = salvar_arquivo_otimizado(arq, nome_arq)
-            url_arquivo = f"/static/uploads/{nome_salvo}"
+        salvos = []
+        timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
+        for i, arq in enumerate(arquivos):
+            if arq.filename:
+                orig_name = arq.filename
+                ext = ''
+                if '.' in orig_name:
+                    ext = '.' + orig_name.rsplit('.', 1)[1].lower()
+                else:
+                    ext = '.webp' if (arq.content_type and 'webp' in arq.content_type) else ('.pdf' if (arq.content_type and 'pdf' in arq.content_type) else '.jpg')
 
-            novo_anexo = ContractAttachment(
-                id_contrato=id,
-                tipo=tipo_anexo,
-                url_arquivo=url_arquivo,
-                nome_original=sec_name
-            )
-            db.session.add(novo_anexo)
-            salvos.append(novo_anexo)
+                base_name = os.path.splitext(orig_name)[0]
+                sec_base = werkzeug.utils.secure_filename(base_name) or f"doc_{i}"
+                sec_name = f"{sec_base}{ext}"
+                nome_arq = f"{timestamp}_anexo_{id}_{i}_{sec_name}"
+                nome_salvo = salvar_arquivo_otimizado(arq, nome_arq)
+                url_arquivo = f"/static/uploads/{nome_salvo}"
 
-    db.session.commit()
-    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('ATTACHMENT_UPLOADED', 'Contract', id, f"{len(salvos)} anexo(s) ({tipo_anexo}) anexados ao Contrato #{id} por {operador}")
+                novo_anexo = ContractAttachment(
+                    id_contrato=id,
+                    tipo=tipo_anexo,
+                    url_arquivo=url_arquivo,
+                    nome_original=orig_name[:120] if orig_name else sec_name
+                )
+                db.session.add(novo_anexo)
+                salvos.append(novo_anexo)
 
-    return jsonify({
-        'success': True,
-        'message': f'{len(salvos)} attachment(s) uploaded successfully',
-        'anexos': [{
-            'id': a.id,
-            'tipo': a.tipo,
-            'url_arquivo': a.url_arquivo,
-            'nome_original': a.nome_original,
-            'data_criacao': a.data_criacao.strftime('%d/%m/%Y %H:%M')
-        } for a in salvos]
-    }), 201
+        db.session.commit()
+        operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+        registrar_log('ATTACHMENT_UPLOADED', 'Contract', id, f"{len(salvos)} anexo(s) ({tipo_anexo}) anexados ao Contrato #{id} por {operador}")
+
+        return jsonify({
+            'success': True,
+            'message': f'{len(salvos)} attachment(s) uploaded successfully',
+            'anexos': [{
+                'id': a.id,
+                'tipo': a.tipo,
+                'url_arquivo': a.url_arquivo,
+                'nome_original': a.nome_original,
+                'data_criacao': a.data_criacao.strftime('%d/%m/%Y %H:%M')
+            } for a in salvos]
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Upload Anexos Error] Falha ao processar anexos do contrato #{id}: {e}")
+        return jsonify({
+            'error': f'Failed to process upload: {str(e)}',
+            'erro': f'Erro ao processar envio de arquivos: {str(e)}'
+        }), 500
 
 @app.route('/api/contratos/anexos/<int:anexo_id>', methods=['DELETE'])
 @alugueis_required
 def deletar_anexo_contrato(anexo_id):
-    anexo = db.session.get(ContractAttachment, anexo_id)
-    if not anexo:
-        return jsonify({'error': 'Attachment not found', 'erro': 'Anexo não encontrado'}), 404
+    try:
+        anexo = db.session.get(ContractAttachment, anexo_id)
+        if not anexo:
+            return jsonify({'error': 'Attachment not found', 'erro': 'Anexo não encontrado'}), 404
 
-    id_contrato = anexo.id_contrato
-    delete_file_if_exists(anexo.url_arquivo)
-    db.session.delete(anexo)
-    db.session.commit()
+        id_contrato = anexo.id_contrato
+        delete_file_if_exists(anexo.url_arquivo)
+        db.session.delete(anexo)
+        db.session.commit()
 
-    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('ATTACHMENT_DELETED', 'Contract', id_contrato, f"Anexo #{anexo_id} excluído do Contrato #{id_contrato} por {operador}")
+        operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+        registrar_log('ATTACHMENT_DELETED', 'Contract', id_contrato, f"Anexo #{anexo_id} excluído do Contrato #{id_contrato} por {operador}")
 
-    return jsonify({'success': True, 'message': 'Attachment deleted successfully'}), 200
+        return jsonify({'success': True, 'message': 'Attachment deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Delete Anexo Error] Falha ao deletar anexo #{anexo_id}: {e}")
+        return jsonify({
+            'error': f'Failed to delete attachment: {str(e)}',
+            'erro': f'Erro ao deletar anexo: {str(e)}'
+        }), 500
 
 @app.route('/api/contratos', methods=['GET'])
 @alugueis_required

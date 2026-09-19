@@ -1500,19 +1500,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <span style="font-size:0.7rem; color:var(--text-secondary); margin-top:4px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(file.name)}</span>
                         </div>
                     `;
-                    anexoPreview.appendChild(div);
                 } else {
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        div.innerHTML = `
-                            <span class="photo-badge-idx">#${index + 1}</span>
-                            <button type="button" class="photo-remove-btn" title="Remove photo" onclick="removeAnexoFile(${index})">&times;</button>
-                            <img src="${e.target.result}" alt="Page ${index + 1}" style="width:100%; height:100%; object-fit:cover;">
-                        `;
-                        anexoPreview.appendChild(div);
-                    };
-                    reader.readAsDataURL(file);
+                    let objectUrl = '';
+                    try {
+                        objectUrl = URL.createObjectURL(file);
+                    } catch (e) {
+                        objectUrl = '';
+                    }
+                    div.innerHTML = `
+                        <span class="photo-badge-idx">#${index + 1}</span>
+                        <button type="button" class="photo-remove-btn" title="Remove photo" onclick="removeAnexoFile(${index})">&times;</button>
+                        <img src="${objectUrl}" alt="Page ${index + 1}" style="width:100%; height:100%; object-fit:cover;">
+                    `;
                 }
+                anexoPreview.appendChild(div);
             });
         } else {
             anexoPreview.style.display = 'none';
@@ -1548,6 +1549,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             const formData = new FormData();
             formData.append('tipo', document.getElementById('anexo_tipo').value);
 
+            // Obter token CSRF com múltiplos fallbacks
+            const csrfInput = document.querySelector('#formUploadAnexos input[name="csrf_token"]');
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = (csrfInput && csrfInput.value) || (csrfMeta ? csrfMeta.getAttribute('content') : '');
+            if (csrfToken) {
+                formData.append('csrf_token', csrfToken);
+            }
+
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const compOptions = {
                 maxSizeMB: 0.45,
@@ -1560,33 +1569,63 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             for (let i = 0; i < anexoSelectedFiles.length; i++) {
                 const file = anexoSelectedFiles[i];
+                let safeName = file.name || `doc_${i + 1}`;
                 if (file.type.startsWith('image/')) {
+                    if (safeName.includes('.')) {
+                        safeName = safeName.replace(/\.[^/.]+$/, extReplacement);
+                    } else {
+                        safeName = `${safeName}${extReplacement}`;
+                    }
                     try {
                         const compressed = await imageCompression(file, compOptions);
-                        formData.append('arquivos', compressed, file.name.replace(/\.[^/.]+$/, extReplacement));
+                        formData.append('arquivos', compressed, safeName);
                     } catch (err) {
-                        formData.append('arquivos', file);
+                        formData.append('arquivos', file, safeName);
                     }
                 } else {
-                    formData.append('arquivos', file);
+                    if (!safeName.toLowerCase().endsWith('.pdf') && !safeName.includes('.')) {
+                        safeName = `${safeName}.pdf`;
+                    }
+                    formData.append('arquivos', file, safeName);
                 }
             }
 
             try {
+                const headers = {};
+                if (csrfToken) {
+                    headers['X-CSRFToken'] = csrfToken;
+                }
+
                 const res = await fetch(`/api/contratos/${CONTRATO_ID}/anexos`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    headers: headers
                 });
-                if (res.ok) {
+
+                let data = null;
+                const contentType = res.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    data = await res.json();
+                } else {
+                    const text = await res.text();
+                    data = { error: `Server error (${res.status}): ${text.substring(0, 150)}` };
+                }
+
+                if (res.ok && data && data.success) {
                     fecharModal('modalAnexosContrato');
                     resetAnexoFiles();
-                    carregarDetalhesContrato();
+                    if (typeof carregarDetalhesContrato === 'function') {
+                        carregarDetalhesContrato();
+                    } else {
+                        location.reload();
+                    }
                 } else {
-                    const d = await res.json();
-                    alert(d.message || d.error || 'Failed to upload attachments.');
+                    const msg = (data && (data.message || data.error || data.erro)) || `Upload failed (Status ${res.status}).`;
+                    alert(msg);
                 }
             } catch (err) {
-                alert('Connection error while uploading attachments.');
+                console.error('Error uploading attachments:', err);
+                alert('Upload error: ' + (err.message || 'Connection interrupted. Please try again.'));
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -1598,15 +1637,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     window.deletarAnexoContrato = async function(anexoId) {
         if (!confirm('Are you sure you want to delete this contract attachment?')) return;
+
+        const csrfInput = document.querySelector('#formUploadAnexos input[name="csrf_token"]') || document.querySelector('input[name="csrf_token"]');
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = (csrfInput && csrfInput.value) || (csrfMeta ? csrfMeta.getAttribute('content') : '');
+
         try {
-            const res = await fetch(`/api/contratos/anexos/${anexoId}`, { method: 'DELETE' });
+            const headers = {};
+            if (csrfToken) {
+                headers['X-CSRFToken'] = csrfToken;
+            }
+
+            const res = await fetch(`/api/contratos/anexos/${anexoId}`, { 
+                method: 'DELETE',
+                headers: headers
+            });
+
+            let data = null;
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            }
+
             if (res.ok) {
-                location.reload();
+                if (typeof carregarDetalhesContrato === 'function') {
+                    carregarDetalhesContrato();
+                } else {
+                    location.reload();
+                }
             } else {
-                alert('Failed to delete attachment.');
+                const msg = (data && (data.message || data.error || data.erro)) || `Failed to delete attachment (Status ${res.status}).`;
+                alert(msg);
             }
         } catch (e) {
-            alert('Connection error.');
+            console.error('Error deleting attachment:', e);
+            alert('Connection error while deleting attachment.');
         }
     };
 
