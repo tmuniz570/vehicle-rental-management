@@ -547,6 +547,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (stLower === 'active' || stLower === 'ativo') statusBadge = '<span class="badge badge-success">ACTIVE</span>';
         else if (stLower === 'deposit_hold' || stLower === 'quarentena_deposito') statusBadge = '<span class="badge badge-warning">DEPOSIT HOLD</span>';
         else if (stLower === 'completed' || stLower === 'finalizado') statusBadge = '<span class="badge badge-secondary">COMPLETED</span>';
+        else if (stLower === 'cancelled' || stLower === 'cancelado') statusBadge = '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700;">CANCELLED</span>';
         else statusBadge = `<span class="badge badge-info">${(data.status || '').toUpperCase()}</span>`;
         document.getElementById('info_status').innerHTML = statusBadge;
 
@@ -574,14 +575,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (btnFinalizar) {
             if (stLower === 'active' || stLower === 'ativo') {
                 btnFinalizar.style.display = 'inline-flex';
-                btnFinalizar.addEventListener('click', () => {
+                btnFinalizar.onclick = () => {
                     document.getElementById('ocorrenciaModalTitle').textContent = 'Complete Contract (Check-in Inspection)';
                     document.getElementById('oc_tipo').value = 'Check-in';
                     if (typeof resetOcPhotos === 'function') resetOcPhotos();
                     abrirModal('ocorrenciaModal');
-                });
+                };
             } else {
                 btnFinalizar.style.display = 'none';
+            }
+        }
+
+        // Button Cancel Contract
+        const btnCancelar = document.getElementById('btnAbrirCancelarContrato');
+        if (btnCancelar) {
+            const canCancel = ['active', 'ativo', 'deposit_hold', 'quarentena_deposito'].includes(stLower);
+            if (canCancel) {
+                btnCancelar.style.display = 'inline-flex';
+            } else {
+                btnCancelar.style.display = 'none';
             }
         }
         
@@ -1408,7 +1420,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         ['closeDevolverDepositoModal', 'devolverDepositoModal'],
         ['closeAnexosModal', 'modalAnexosContrato'],
         ['closeDetalheSignatureModal', 'modalDetalheSignaturePad'],
-        ['btnDetalheCancelSig', 'modalDetalheSignaturePad']
+        ['btnDetalheCancelSig', 'modalDetalheSignaturePad'],
+        ['closeCancelarModal', 'modalCancelarContrato'],
+        ['btnCancelDismiss', 'modalCancelarContrato']
     ];
 
     closeMapping.forEach(([btnId, modalId]) => {
@@ -1674,6 +1688,102 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert('Connection error while deleting attachment.');
         }
     };
+
+    // --- Cancel Contract Modal & Action ---
+    const btnAbrirCancelar = document.getElementById('btnAbrirCancelarContrato');
+    const formCancelarContrato = document.getElementById('formCancelarContrato');
+    const btnConfirmarCancelar = document.getElementById('btnConfirmarCancelar');
+    const cancelMotivoInput = document.getElementById('cancel_motivo');
+    const cancelMotivoError = document.getElementById('cancel_motivo_error');
+
+    if (btnAbrirCancelar) {
+        btnAbrirCancelar.addEventListener('click', () => {
+            if (formCancelarContrato) formCancelarContrato.reset();
+            if (cancelMotivoInput) cancelMotivoInput.style.borderColor = 'var(--input-border)';
+            if (cancelMotivoError) cancelMotivoError.style.display = 'none';
+            abrirModal('modalCancelarContrato');
+        });
+    }
+
+    if (cancelMotivoInput) {
+        cancelMotivoInput.addEventListener('input', () => {
+            if (cancelMotivoInput.value.trim().length > 0) {
+                cancelMotivoInput.style.borderColor = 'var(--input-border)';
+                if (cancelMotivoError) cancelMotivoError.style.display = 'none';
+            }
+        });
+    }
+
+    async function executarCancelamentoContrato() {
+        const motivo = cancelMotivoInput ? cancelMotivoInput.value.trim() : '';
+        if (!motivo) {
+            if (cancelMotivoInput) {
+                cancelMotivoInput.style.borderColor = '#ef4444';
+                cancelMotivoInput.focus();
+            }
+            if (cancelMotivoError) cancelMotivoError.style.display = 'block';
+            return;
+        }
+
+        const btnConfirm = document.getElementById('btnConfirmarCancelar');
+        const origText = btnConfirm ? btnConfirm.textContent : 'Confirm Cancellation';
+        if (btnConfirm) {
+            btnConfirm.disabled = true;
+            btnConfirm.textContent = 'Cancelling...';
+        }
+
+        const csrfInput = document.querySelector('#formCancelarContrato input[name="csrf_token"]') || document.querySelector('input[name="csrf_token"]');
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        const csrfToken = (csrfInput && csrfInput.value) || (csrfMeta ? csrfMeta.getAttribute('content') : '');
+
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            if (csrfToken) headers['X-CSRFToken'] = csrfToken;
+
+            const res = await fetch(`/api/contratos/${CONTRATO_ID}/cancelar`, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify({ motivo: motivo, csrf_token: csrfToken })
+            });
+
+            let data = null;
+            const contentType = res.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                data = await res.json();
+            }
+
+            if (res.ok && data && data.success) {
+                fecharModal('modalCancelarContrato');
+                alert(`Contract #${CONTRATO_ID} has been successfully cancelled.`);
+                location.reload();
+            } else {
+                const msg = (data && (data.message || data.error || data.erro)) || `Failed to cancel contract (Status ${res.status}).`;
+                alert(msg);
+            }
+        } catch (err) {
+            console.error('Error cancelling contract:', err);
+            alert('Connection error while cancelling contract.');
+        } finally {
+            if (btnConfirm) {
+                btnConfirm.disabled = false;
+                btnConfirm.textContent = origText;
+            }
+        }
+    }
+
+    if (btnConfirmarCancelar) {
+        btnConfirmarCancelar.addEventListener('click', (e) => {
+            e.preventDefault();
+            executarCancelamentoContrato();
+        });
+    }
+
+    if (formCancelarContrato) {
+        formCancelarContrato.addEventListener('submit', (e) => {
+            e.preventDefault();
+            executarCancelamentoContrato();
+        });
+    }
 
     // --- Modal de Assinatura Digital Touch (Detalhe Contrato) ---
     let detalheSignaturePad = null;

@@ -44,6 +44,8 @@ async function carregarContratos() {
                 statusBadge = '<span class="badge badge-warning">Deposit Hold</span>';
             } else if (c.status === 'Completed' || c.status === 'Finalizado') {
                 statusBadge = '<span class="badge">Completed</span>';
+            } else if (c.status === 'Cancelled' || c.status === 'Cancelado') {
+                statusBadge = '<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 700;">Cancelled</span>';
             } else {
                 statusBadge = `<span class="badge">${escapeHtml(c.status)}</span>`;
             }
@@ -97,6 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
             filterStatus.value = 'Active';
         } else if (paramStatus.toLowerCase() === 'completed') {
             filterStatus.value = 'Completed';
+        } else if (paramStatus.toLowerCase() === 'cancelled') {
+            filterStatus.value = 'Cancelled';
         }
     }
 

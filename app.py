@@ -2063,6 +2063,72 @@ def deletar_anexo_contrato(anexo_id):
             'erro': f'Erro ao deletar anexo: {str(e)}'
         }), 500
 
+@app.route('/api/contratos/<int:id>/cancelar', methods=['POST'])
+@alugueis_required
+def cancelar_contrato(id):
+    """
+    Cancela um contrato em andamento (Active ou Deposit_Hold).
+    - Reverte o status da motocicleta para 'Available' (Disponível).
+    - Cancela todas as cobranças pendentes vinculadas ao contrato.
+    - Mantém pagamentos já realizados para histórico contábil.
+    - Registra a justificativa/motivo na trilha de auditoria.
+    """
+    try:
+        contrato = db.session.get(Contract, id)
+        if not contrato:
+            return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+
+        if contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
+            return jsonify({'error': 'Completed contracts cannot be cancelled', 'erro': 'Contratos finalizados não podem ser cancelados'}), 400
+
+        if contrato.status in [ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado']:
+            return jsonify({'error': 'Contract is already cancelled', 'erro': 'O contrato já está cancelado'}), 400
+
+        data = request.get_json(silent=True) or request.form
+        motivo = (data.get('motivo') or data.get('reason') or '').strip()
+        if not motivo:
+            return jsonify({'error': 'Cancellation reason is required', 'erro': 'O motivo do cancelamento é obrigatório'}), 400
+
+        # 1. Atualiza status do contrato
+        contrato.status = ContractStatus.CANCELLED.value
+        if not contrato.data_devolucao:
+            contrato.data_devolucao = get_local_now()
+
+        # 2. Libera a moto vinculada de volta para Disponível
+        placa = contrato.placa or contrato.moto_placa
+        moto = db.session.get(Motorcycle, placa) if placa else None
+        if moto and moto.status in [MotoStatus.ALUGADA.value, 'Rented', 'Alugada']:
+            moto.status = MotoStatus.DISPONIVEL.value
+
+        # 3. Cancela cobranças pendentes (Opção A)
+        transacoes = FinancialTransaction.query.filter_by(id_contrato=id).all()
+        canceladas_count = 0
+        for t in transacoes:
+            if t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente']:
+                t.status = TransactionStatus.CANCELLED.value
+                canceladas_count += 1
+
+        db.session.commit()
+
+        # 4. Trilha de auditoria
+        operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+        detalhes_log = f"Contrato #{id} (Placa: {placa or 'N/A'}) cancelado por {operador}. Motivo: '{motivo}'. {canceladas_count} cobrança(s) pendente(s) cancelada(s). Moto liberada para Disponível."
+        registrar_log('CONTRACT_CANCELLED', 'Contract', id, detalhes_log)
+
+        return jsonify({
+            'success': True,
+            'message': 'Contract cancelled successfully',
+            'status': ContractStatus.CANCELLED.value,
+            'transacoes_canceladas': canceladas_count
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"[Cancel Contract Error] Erro ao cancelar contrato #{id}: {e}")
+        return jsonify({
+            'error': f'Failed to cancel contract: {str(e)}',
+            'erro': f'Erro ao cancelar contrato: {str(e)}'
+        }), 500
+
 @app.route('/api/contratos', methods=['GET'])
 @alugueis_required
 def listar_contratos():
@@ -2093,6 +2159,8 @@ def listar_contratos():
             query = query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
         elif status_filter.lower() in ['completed', 'finalizado']:
             query = query.filter(Contract.status.in_([ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']))
+        elif status_filter.lower() in ['cancelled', 'cancelado']:
+            query = query.filter(Contract.status.in_([ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado']))
         else:
             query = query.filter(Contract.status == status_filter)
     else:

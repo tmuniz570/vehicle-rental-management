@@ -69,10 +69,12 @@ class ContractStatus(str, Enum):
     ACTIVE = "Active"
     DEPOSIT_HOLD = "Deposit_Hold"
     COMPLETED = "Completed"
+    CANCELLED = "Cancelled"
     # Legacy aliases
     ATIVO = "Active"
     QUARENTENA_DEPOSITO = "Deposit_Hold"
     FINALIZADO = "Completed"
+    CANCELADO = "Cancelled"
 
 class InspectionType(str, Enum):
     CHECK_OUT = "Check-out"
