@@ -100,7 +100,7 @@
 
 <!-- Inspection Details Modal -->
 <div id="viewVistoriaModal" class="modal-overlay">
-    <div class="modal-card">
+    <div class="modal-card" style="max-width: 680px;">
         <div class="modal-header">
             <div style="display: flex; align-items: center; gap: 0.75rem;">
                 <h3 id="modalTitle">Inspection Details</h3>
@@ -150,7 +150,7 @@
                     <span style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Attached Photos (<span id="modalFotoCount">0</span>)</span>
                     <span style="font-size: 0.75rem; color: var(--text-secondary);">Click photo to view full size</span>
                 </div>
-                <div id="modalGaleria" class="photo-grid">
+                <div id="modalGaleria">
                     <!-- Dynamic photos via JS -->
                 </div>
             </div>
@@ -160,6 +160,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/vistorias_lista.js?v=5"></script>
+<script src="/static/js/vistorias_lista.js?v=6"></script>
 {% endblock %}
 

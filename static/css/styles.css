@@ -1147,4 +1147,220 @@ th.sortable-th.sorted-desc .sort-indicator {
     font-weight: bold;
 }
 
+/* ==========================================================================
+   Inspection Photo Carousel (Carrossel de Fotos das Vistorias)
+   ========================================================================== */
+.inspection-carousel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+    margin-top: 0.5rem;
+}
+
+.carousel-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    max-height: 420px;
+    background: #090e17;
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: pan-y;
+}
+
+.carousel-main-link {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    cursor: zoom-in;
+    text-decoration: none;
+}
+
+.carousel-main-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    transition: opacity 0.2s ease, transform 0.25s ease;
+    background: #090e17;
+}
+
+.carousel-counter-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #f8fafc;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.5px;
+}
+
+.carousel-zoom-hint {
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #f8fafc;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s ease;
+    z-index: 2;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.carousel-main-link:hover .carousel-zoom-hint {
+    background: var(--accent);
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+}
+
+.carousel-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-size: 1.35rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 3;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    line-height: 1;
+    padding: 0;
+}
+
+.carousel-nav-btn:hover {
+    background: var(--accent);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
+}
+
+.carousel-prev {
+    left: 12px;
+}
+
+.carousel-next {
+    right: 12px;
+}
+
+.carousel-thumbs-track {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 6px 2px;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+}
+
+.carousel-thumbs-track::-webkit-scrollbar {
+    height: 5px;
+}
+
+.carousel-thumbs-track::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 4px;
+}
+
+.carousel-thumbs-track::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+}
+
+.carousel-thumb {
+    flex: 0 0 72px;
+    height: 52px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: #090e17;
+    cursor: pointer;
+    padding: 0;
+    opacity: 0.5;
+    transition: all 0.2s ease;
+}
+
+.carousel-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.carousel-thumb:hover {
+    opacity: 0.85;
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.carousel-thumb.active {
+    opacity: 1;
+    border-color: var(--accent, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+    transform: translateY(-2px);
+}
+
+.carousel-empty-state {
+    text-align: center;
+    padding: 2.25rem 1rem;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px dashed var(--border-color);
+    border-radius: 12px;
+}
+
+@media (max-width: 640px) {
+    .carousel-stage {
+        aspect-ratio: 4 / 3;
+        max-height: 280px;
+    }
+    .carousel-nav-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 1.1rem;
+    }
+    .carousel-prev {
+        left: 8px;
+    }
+    .carousel-next {
+        right: 8px;
+    }
+    .carousel-thumb {
+        flex: 0 0 60px;
+        height: 44px;
+    }
+}
+
+
 

@@ -253,3 +253,186 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
+
+/**
+ * Universal Inspection Photo Carousel Component
+ * @param {HTMLElement|string} container - The DOM element or ID where the carousel will be rendered
+ * @param {Array<string>|string} photos - Array of image URLs or comma-separated string
+ */
+function renderInspectionCarousel(container, photos) {
+    const el = typeof container === 'string' ? document.getElementById(container) : container;
+    if (!el) return;
+    el.innerHTML = '';
+
+    const photosList = Array.isArray(photos) 
+        ? photos.map(p => String(p).trim()).filter(Boolean)
+        : (photos ? String(photos).split(',').map(p => p.trim()).filter(Boolean) : []);
+
+    if (photosList.length === 0) {
+        el.innerHTML = `
+            <div class="carousel-empty-state">
+                <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.7;">📷</span>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 0.9rem;">No photos attached to this inspection.</p>
+            </div>
+        `;
+        return;
+    }
+
+    let currentIndex = 0;
+    const total = photosList.length;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'inspection-carousel';
+
+    // Main Stage
+    const stage = document.createElement('div');
+    stage.className = 'carousel-stage';
+
+    const link = document.createElement('a');
+    link.className = 'carousel-main-link';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.title = 'Click to open in full resolution (opens in new tab)';
+
+    const img = document.createElement('img');
+    img.className = 'carousel-main-img';
+    img.loading = 'lazy';
+    link.appendChild(img);
+
+    const zoomHint = document.createElement('span');
+    zoomHint.className = 'carousel-zoom-hint';
+    zoomHint.innerHTML = '🔍 Enlarge';
+    link.appendChild(zoomHint);
+
+    stage.appendChild(link);
+
+    // Counter Badge
+    const counterBadge = document.createElement('div');
+    counterBadge.className = 'carousel-counter-badge';
+    stage.appendChild(counterBadge);
+
+    // Prev / Next buttons (only if multiple photos)
+    let btnPrev = null;
+    let btnNext = null;
+    if (total > 1) {
+        btnPrev = document.createElement('button');
+        btnPrev.type = 'button';
+        btnPrev.className = 'carousel-nav-btn carousel-prev';
+        btnPrev.setAttribute('aria-label', 'Previous photo');
+        btnPrev.innerHTML = '&#10094;';
+
+        btnNext = document.createElement('button');
+        btnNext.type = 'button';
+        btnNext.className = 'carousel-nav-btn carousel-next';
+        btnNext.setAttribute('aria-label', 'Next photo');
+        btnNext.innerHTML = '&#10095;';
+
+        stage.appendChild(btnPrev);
+        stage.appendChild(btnNext);
+    }
+
+    wrapper.appendChild(stage);
+
+    // Thumbnails Track (only if multiple photos)
+    const thumbElements = [];
+    if (total > 1) {
+        const thumbsTrack = document.createElement('div');
+        thumbsTrack.className = 'carousel-thumbs-track';
+
+        photosList.forEach((url, idx) => {
+            const thumb = document.createElement('button');
+            thumb.type = 'button';
+            thumb.className = `carousel-thumb ${idx === 0 ? 'active' : ''}`;
+            thumb.setAttribute('aria-label', `Go to photo ${idx + 1}`);
+            thumb.innerHTML = `<img src="${url}" alt="Thumbnail ${idx + 1}" loading="lazy">`;
+            thumb.addEventListener('click', (e) => {
+                e.preventDefault();
+                goToSlide(idx);
+            });
+            thumbsTrack.appendChild(thumb);
+            thumbElements.push(thumb);
+        });
+
+        wrapper.appendChild(thumbsTrack);
+    }
+
+    function updateSlide() {
+        const url = photosList[currentIndex];
+        img.src = url;
+        img.alt = `Inspection Photo ${currentIndex + 1} of ${total}`;
+        link.href = url;
+        counterBadge.textContent = `Photo ${currentIndex + 1} / ${total}`;
+
+        if (thumbElements.length > 0) {
+            thumbElements.forEach((t, i) => {
+                if (i === currentIndex) {
+                    t.classList.add('active');
+                    t.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                } else {
+                    t.classList.remove('active');
+                }
+            });
+        }
+    }
+
+    function goToSlide(index) {
+        currentIndex = (index + total) % total;
+        updateSlide();
+    }
+
+    if (btnPrev) {
+        btnPrev.addEventListener('click', (e) => {
+            e.preventDefault();
+            goToSlide(currentIndex - 1);
+        });
+    }
+
+    if (btnNext) {
+        btnNext.addEventListener('click', (e) => {
+            e.preventDefault();
+            goToSlide(currentIndex + 1);
+        });
+    }
+
+    // Touch Swipe on mobile
+    let touchStartX = 0;
+    let touchStartY = 0;
+    stage.addEventListener('touchstart', (e) => {
+        if (e.touches && e.touches.length === 1) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }
+    }, { passive: true });
+
+    stage.addEventListener('touchend', (e) => {
+        if (total <= 1 || !e.changedTouches || e.changedTouches.length === 0) return;
+        const diffX = e.changedTouches[0].clientX - touchStartX;
+        const diffY = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(diffX) > 40 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
+            if (diffX < 0) {
+                goToSlide(currentIndex + 1);
+            } else {
+                goToSlide(currentIndex - 1);
+            }
+        }
+    }, { passive: true });
+
+    // Keyboard Arrow Keys navigation
+    const keyHandler = (e) => {
+        if (total <= 1) return;
+        const modal = el.closest('.modal-overlay');
+        if (!modal || !modal.classList.contains('active')) return;
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            goToSlide(currentIndex - 1);
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            goToSlide(currentIndex + 1);
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    updateSlide();
+    el.appendChild(wrapper);
+}
+

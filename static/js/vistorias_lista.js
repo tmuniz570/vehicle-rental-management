@@ -237,26 +237,11 @@ function abrirModalVistoria(v) {
 
     // Gallery
     const fotosContainer = document.getElementById('modalGaleria');
-    fotosContainer.innerHTML = '';
-    
     const fotosArray = v.foto_url ? v.foto_url.split(',').map(f => f.trim()).filter(Boolean) : [];
     document.getElementById('modalFotoCount').textContent = fotosArray.length;
 
-    if (fotosArray.length > 0) {
-        fotosArray.forEach((url, i) => {
-            const item = document.createElement('a');
-            item.href = url;
-            item.target = '_blank';
-            item.className = 'photo-item';
-            item.title = `Photo ${i + 1} - Click to open in full resolution`;
-            item.innerHTML = `
-                <img src="${url}" alt="Inspection Photo ${i + 1}" loading="lazy">
-                <span class="photo-zoom-icon">&#x1F50D; Enlarge</span>
-            `;
-            fotosContainer.appendChild(item);
-        });
-    } else {
-        fotosContainer.innerHTML = '<p style="color:var(--text-secondary); font-size:0.9rem; grid-column: 1 / -1; padding:1rem 0;">No photos attached to this inspection.</p>';
+    if (typeof renderInspectionCarousel === 'function') {
+        renderInspectionCarousel(fotosContainer, fotosArray);
     }
 
     modal.classList.add('active');

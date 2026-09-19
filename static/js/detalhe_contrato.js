@@ -1093,25 +1093,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                     
                     const galeria = document.getElementById('vistoria_galeria');
-                    galeria.innerHTML = '';
-                    
-                    if (fotosCsv) {
-                        const fotos = fotosCsv.split(',').map(f => f.trim()).filter(Boolean);
-                        if (fotos.length > 0) {
-                            fotos.forEach((url, i) => {
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.target = '_blank';
-                                a.className = 'photo-item';
-                                a.title = `Photo ${i + 1} - Click to enlarge`;
-                                a.innerHTML = `<img src="${url}" alt="Photo ${i + 1}"><span class="photo-zoom-icon">&#x1F50D; Enlarge</span>`;
-                                galeria.appendChild(a);
-                            });
-                        } else {
-                            galeria.innerHTML = '<p style="color:var(--text-secondary); font-size:0.85rem; grid-column:1/-1;">No photos attached.</p>';
-                        }
-                    } else {
-                        galeria.innerHTML = '<p style="color:var(--text-secondary); font-size:0.85rem; grid-column:1/-1;">No photos attached.</p>';
+                    if (typeof renderInspectionCarousel === 'function') {
+                        renderInspectionCarousel(galeria, fotosCsv);
                     }
                     
                     abrirModal('viewVistoriaModal');
