@@ -111,7 +111,7 @@ class Client(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False, index=True)
     telefone = db.Column(db.String(20), nullable=False, index=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
     endereco = db.Column(db.String(255), nullable=True)
     url_habilitacao = db.Column(db.String(255), nullable=True)
     url_habilitacao_verso = db.Column(db.String(255), nullable=True)
@@ -421,6 +421,42 @@ def init_db(app):
                     if 'url_cbt' not in cols_cl:
                         conn.execute(db.text("ALTER TABLE clientes ADD COLUMN url_cbt VARCHAR(255)"))
                         conn.commit()
+
+                    # Ensure email is nullable (Optional email)
+                    if db.engine.dialect.name == 'postgresql':
+                        try:
+                            conn.execute(db.text("ALTER TABLE clientes ALTER COLUMN email DROP NOT NULL;"))
+                            conn.commit()
+                        except Exception as e_pg:
+                            print(f"[DB Auto-Migration] Postgres drop not null email info: {e_pg}")
+                    elif db.engine.dialect.name == 'sqlite':
+                        try:
+                            col_email = next((col for col in inspector.get_columns('clientes') if col['name'] == 'email'), None)
+                            if col_email and not col_email.get('nullable', True):
+                                conn.execute(db.text("PRAGMA foreign_keys = OFF;"))
+                                conn.execute(db.text("""
+                                    CREATE TABLE IF NOT EXISTS clientes_migration_new (
+                                        id INTEGER NOT NULL PRIMARY KEY,
+                                        nome VARCHAR(100) NOT NULL,
+                                        telefone VARCHAR(20) NOT NULL,
+                                        email VARCHAR(120) UNIQUE,
+                                        endereco VARCHAR(255),
+                                        url_habilitacao VARCHAR(255),
+                                        url_comprovante_endereco VARCHAR(255),
+                                        url_habilitacao_verso VARCHAR(255),
+                                        url_cbt VARCHAR(255)
+                                    );
+                                """))
+                                conn.execute(db.text("""
+                                    INSERT INTO clientes_migration_new (id, nome, telefone, email, endereco, url_habilitacao, url_comprovante_endereco, url_habilitacao_verso, url_cbt)
+                                    SELECT id, nome, telefone, email, endereco, url_habilitacao, url_comprovante_endereco, url_habilitacao_verso, url_cbt FROM clientes;
+                                """))
+                                conn.execute(db.text("DROP TABLE clientes;"))
+                                conn.execute(db.text("ALTER TABLE clientes_migration_new RENAME TO clientes;"))
+                                conn.execute(db.text("PRAGMA foreign_keys = ON;"))
+                                conn.commit()
+                        except Exception as e_sql:
+                            print(f"[DB Auto-Migration] SQLite email nullable migration info: {e_sql}")
 
                 # Usuarios: Permissões Modulares Limpas
                 if 'usuarios' in existing_tables:

@@ -100,7 +100,7 @@ def test_contract_immutability():
             c_edit.nome = "CHANGED NAME - SHOULD NOT AFFECT CONTRACT"
             c_edit.telefone = "07999999999"
             c_edit.endereco = "99 Changed Street, Manchester"
-            c_edit.email = "changed@other.com"
+            c_edit.email = f"changed_{ts}@other.com"
             
             m_edit = db.session.get(Motorcycle, test_plate)
             m_edit.modelo = "CHANGED MODEL - YAMAHA TMAX 560"

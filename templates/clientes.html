@@ -37,54 +37,58 @@
     <button id="btnNextPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">Next &raquo;</button>
 </div>
 <!-- Edit Modal -->
-<div id="editClientModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-    <div class="glass-card" style="width:100%; max-width:500px; padding:2rem; position:relative;">
-        <button id="closeClientModal" style="position:absolute; top:15px; right:20px; background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;" aria-label="Close">&times;</button>
-        <h2>Edit Customer</h2>
-        <form id="editClientForm" class="modern-form" style="margin-top:1.5rem;">
-            <input type="hidden" id="edit_id">
-            <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" id="edit_nome" required>
-            </div>
-            <div class="form-row">
-                <div class="form-group half">
-                    <label>Phone</label>
-                    <input type="tel" id="edit_telefone" required>
+<div id="editClientModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalEditClientTitle">
+    <div class="modal-card" style="max-width: 520px;">
+        <div class="modal-header">
+            <h3 id="modalEditClientTitle">Edit Customer</h3>
+            <button type="button" id="closeClientModal" class="modal-close" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.25rem 1.5rem 1.5rem;">
+            <form id="editClientForm" class="modern-form">
+                <input type="hidden" id="edit_id">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="edit_nome" required>
                 </div>
-                <div class="form-group half">
-                    <label>Email</label>
-                    <input type="email" id="edit_email" required>
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>Phone</label>
+                        <input type="tel" id="edit_telefone" required>
+                    </div>
+                    <div class="form-group half">
+                        <label>Email <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Optional)</span></label>
+                        <input type="email" id="edit_email" placeholder="e.g. john@example.co.uk (optional)">
+                    </div>
                 </div>
-            </div>
-            <div class="form-group">
-                <label>Full Address</label>
-                <input type="text" id="edit_endereco" required>
-            </div>
-            <div class="form-row">
-                <div class="form-group half">
-                    <label>New Driving Licence (Front)</label>
-                    <input type="file" id="edit_habilitacao" accept="image/*,.pdf">
+                <div class="form-group">
+                    <label>Full Address</label>
+                    <input type="text" id="edit_endereco" required>
                 </div>
-                <div class="form-group half">
-                    <label>New Driving Licence (Back)</label>
-                    <input type="file" id="edit_habilitacao_verso" accept="image/*,.pdf">
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>New Driving Licence (Front)</label>
+                        <input type="file" id="edit_habilitacao" accept="image/*,.pdf">
+                    </div>
+                    <div class="form-group half">
+                        <label>New Driving Licence (Back)</label>
+                        <input type="file" id="edit_habilitacao_verso" accept="image/*,.pdf">
+                    </div>
                 </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group half">
-                    <label>New CBT Certificate <span style="font-size:0.75rem; color:var(--text-secondary);">(Optional)</span></label>
-                    <input type="file" id="edit_cbt" accept="image/*,.pdf">
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>New CBT Certificate <span style="font-size:0.75rem; color:var(--text-secondary);">(Optional)</span></label>
+                        <input type="file" id="edit_cbt" accept="image/*,.pdf">
+                    </div>
+                    <div class="form-group half">
+                        <label>New Proof of Address</label>
+                        <input type="file" id="edit_comprovante_endereco" accept="image/*,.pdf">
+                    </div>
                 </div>
-                <div class="form-group half">
-                    <label>New Proof of Address</label>
-                    <input type="file" id="edit_comprovante_endereco" accept="image/*,.pdf">
+                <div class="form-actions" style="margin-top:1.5rem; padding-bottom:0.25rem;">
+                    <button type="submit" class="btn-primary" id="btnSalvarCliente" style="width:100%; padding:0.875rem 1.25rem; font-size:0.95rem; font-weight:600;">Save Changes</button>
                 </div>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save Changes</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}

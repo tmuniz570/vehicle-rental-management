@@ -1362,12 +1362,18 @@ def criar_cliente():
     email = request.form.get('email')
     endereco = request.form.get('endereco')
     
-    if not nome or not telefone or not email:
-        return jsonify({'error': 'Missing required fields (full name, phone and email are required)', 'erro': 'Dados incompletos'}), 400
+    if not nome or not telefone:
+        return jsonify({'error': 'Missing required fields (full name and phone are required)', 'erro': 'Dados incompletos (nome e telefone são obrigatórios)'}), 400
     
-    # Check if email is already registered
-    if Client.query.filter_by(email=email).first():
-        return jsonify({'error': 'Email already registered', 'erro': 'Email já cadastrado'}), 400
+    nome = nome.strip()
+    telefone = telefone.strip()
+    endereco = endereco.strip() if endereco else None
+
+    # Optional email: check uniqueness only if provided
+    email_clean = email.strip() if (email and email.strip()) else None
+    if email_clean:
+        if Client.query.filter(db.func.lower(Client.email) == email_clean.lower()).first():
+            return jsonify({'error': 'Email already registered', 'erro': 'Email já cadastrado'}), 400
         
     # Security: Validate upload file extensions
     for campo_file in ['habilitacao', 'habilitacao_verso', 'cbt', 'comprovante_endereco']:
@@ -1412,7 +1418,7 @@ def criar_cliente():
     novo_cliente = Client(
         nome=nome,
         telefone=telefone,
-        email=email,
+        email=email_clean,
         endereco=endereco,
         url_habilitacao=url_hab,
         url_habilitacao_verso=url_hab_verso,
@@ -1527,14 +1533,17 @@ def atualizar_cliente(id):
         return jsonify({'error': 'Customer not found', 'erro': 'Cliente não encontrado'}), 404
         
     if request.is_json:
-        dados = request.get_json()
-        if 'nome' in dados: cliente.nome = dados['nome']
-        if 'telefone' in dados: cliente.telefone = dados['telefone']
+        dados = request.get_json() or {}
+        if 'nome' in dados: cliente.nome = dados['nome'].strip() if dados['nome'] else cliente.nome
+        if 'telefone' in dados: cliente.telefone = dados['telefone'].strip() if dados['telefone'] else cliente.telefone
         if 'email' in dados:
-            outro = Client.query.filter(Client.email == dados['email'], Client.id != id).first()
-            if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
-            cliente.email = dados['email']
-        if 'endereco' in dados: cliente.endereco = dados['endereco']
+            raw_email = dados['email']
+            email_clean = raw_email.strip() if (raw_email and raw_email.strip()) else None
+            if email_clean:
+                outro = Client.query.filter(db.func.lower(Client.email) == email_clean.lower(), Client.id != id).first()
+                if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
+            cliente.email = email_clean
+        if 'endereco' in dados: cliente.endereco = dados['endereco'].strip() if dados['endereco'] else None
     else:
         # Security: Validate upload file extensions
         for campo_file in ['habilitacao', 'habilitacao_verso', 'cbt', 'comprovante_endereco']:
@@ -1543,13 +1552,16 @@ def atualizar_cliente(id):
                 if f and f.filename and not is_allowed_file(f.filename):
                     return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
 
-        if 'nome' in request.form: cliente.nome = request.form['nome']
-        if 'telefone' in request.form: cliente.telefone = request.form['telefone']
-        if 'endereco' in request.form: cliente.endereco = request.form['endereco']
+        if 'nome' in request.form: cliente.nome = request.form['nome'].strip()
+        if 'telefone' in request.form: cliente.telefone = request.form['telefone'].strip()
+        if 'endereco' in request.form: cliente.endereco = request.form['endereco'].strip() if request.form['endereco'] else None
         if 'email' in request.form:
-            outro = Client.query.filter(Client.email == request.form['email'], Client.id != id).first()
-            if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
-            cliente.email = request.form['email']
+            raw_email = request.form['email']
+            email_clean = raw_email.strip() if (raw_email and raw_email.strip()) else None
+            if email_clean:
+                outro = Client.query.filter(db.func.lower(Client.email) == email_clean.lower(), Client.id != id).first()
+                if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
+            cliente.email = email_clean
             
         if 'habilitacao' in request.files:
             f = request.files['habilitacao']
