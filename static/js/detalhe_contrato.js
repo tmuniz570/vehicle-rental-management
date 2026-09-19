@@ -1424,11 +1424,107 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // --- Modal de Anexos (Upload de Fotos / Scans do Contrato Físico) ---
+    let anexoSelectedFiles = [];
+    const btnAnexoTakePhoto = document.getElementById('btnAnexoTakePhoto');
+    const anexoCameraInput = document.getElementById('anexoCameraInput');
+    const btnAnexoPickGallery = document.getElementById('btnAnexoPickGallery');
+    const anexoGalleryInput = document.getElementById('anexoGalleryInput');
+    const anexoPreview = document.getElementById('anexo_preview');
+    const anexoPhotoCountBadge = document.getElementById('anexoPhotoCountBadge');
+
+    function resetAnexoFiles() {
+        anexoSelectedFiles = [];
+        if (anexoCameraInput) anexoCameraInput.value = '';
+        if (anexoGalleryInput) anexoGalleryInput.value = '';
+        renderAnexoPreviews();
+    }
+
+    if (btnAnexoTakePhoto && anexoCameraInput) {
+        btnAnexoTakePhoto.addEventListener('click', () => anexoCameraInput.click());
+        anexoCameraInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => anexoSelectedFiles.push(file));
+                anexoCameraInput.value = '';
+                renderAnexoPreviews();
+            }
+        });
+    }
+
+    if (btnAnexoPickGallery && anexoGalleryInput) {
+        btnAnexoPickGallery.addEventListener('click', () => anexoGalleryInput.click());
+        anexoGalleryInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                Array.from(e.target.files).forEach(file => anexoSelectedFiles.push(file));
+                anexoGalleryInput.value = '';
+                renderAnexoPreviews();
+            }
+        });
+    }
+
+    window.removeAnexoFile = function(index) {
+        anexoSelectedFiles.splice(index, 1);
+        renderAnexoPreviews();
+    };
+
+    function renderAnexoPreviews() {
+        if (!anexoPreview) return;
+        anexoPreview.innerHTML = '';
+
+        if (anexoPhotoCountBadge) {
+            anexoPhotoCountBadge.textContent = `${anexoSelectedFiles.length} item${anexoSelectedFiles.length === 1 ? '' : 's'} added`;
+            if (anexoSelectedFiles.length > 0) {
+                anexoPhotoCountBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                anexoPhotoCountBadge.style.color = '#4ade80';
+                anexoPhotoCountBadge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+            } else {
+                anexoPhotoCountBadge.style.background = 'rgba(255, 102, 0, 0.15)';
+                anexoPhotoCountBadge.style.color = 'var(--accent)';
+                anexoPhotoCountBadge.style.borderColor = 'rgba(255, 102, 0, 0.3)';
+            }
+        }
+
+        if (anexoSelectedFiles.length > 0) {
+            anexoPreview.style.display = 'grid';
+            anexoSelectedFiles.forEach((file, index) => {
+                const div = document.createElement('div');
+                div.className = 'photo-item';
+                div.style.aspectRatio = '1 / 1';
+                div.style.position = 'relative';
+
+                if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                    div.innerHTML = `
+                        <span class="photo-badge-idx">#${index + 1}</span>
+                        <button type="button" class="photo-remove-btn" title="Remove file" onclick="removeAnexoFile(${index})">&times;</button>
+                        <div style="width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(15,23,42,0.8); padding:8px; text-align:center;">
+                            <span style="font-size:2rem;">📄</span>
+                            <span style="font-size:0.7rem; color:var(--text-secondary); margin-top:4px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(file.name)}</span>
+                        </div>
+                    `;
+                    anexoPreview.appendChild(div);
+                } else {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        div.innerHTML = `
+                            <span class="photo-badge-idx">#${index + 1}</span>
+                            <button type="button" class="photo-remove-btn" title="Remove photo" onclick="removeAnexoFile(${index})">&times;</button>
+                            <img src="${e.target.result}" alt="Page ${index + 1}" style="width:100%; height:100%; object-fit:cover;">
+                        `;
+                        anexoPreview.appendChild(div);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        } else {
+            anexoPreview.style.display = 'none';
+        }
+    }
+
     const btnAbrirAnexar = document.getElementById('btnAbrirAnexarContrato');
     if (btnAbrirAnexar) {
         btnAbrirAnexar.addEventListener('click', () => {
             const formAnexos = document.getElementById('formUploadAnexos');
             if (formAnexos) formAnexos.reset();
+            resetAnexoFiles();
             abrirModal('modalAnexosContrato');
         });
     }
@@ -1437,20 +1533,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (formUploadAnexos) {
         formUploadAnexos.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const inputFiles = document.getElementById('inputContratoAnexos');
-            if (!inputFiles || !inputFiles.files || inputFiles.files.length === 0) {
-                alert('Please select at least one photo or PDF document.');
+            if (anexoSelectedFiles.length === 0) {
+                alert('Please take or select at least one photo or PDF document.');
                 return;
             }
 
             const btn = document.getElementById('btnSalvarAnexos');
-            btn.disabled = true;
-            btn.textContent = 'Uploading attachments...';
+            const originalText = btn ? btn.textContent : 'Upload Attachments';
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = `Optimizing & uploading ${anexoSelectedFiles.length} file(s)...`;
+            }
 
             const formData = new FormData();
             formData.append('tipo', document.getElementById('anexo_tipo').value);
-            for (let i = 0; i < inputFiles.files.length; i++) {
-                formData.append('arquivos', inputFiles.files[i]);
+
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const compOptions = {
+                maxSizeMB: 0.45,
+                maxWidthOrHeight: 1800,
+                useWebWorker: !isIOS,
+                fileType: isIOS ? 'image/jpeg' : 'image/webp',
+                initialQuality: 0.8
+            };
+            const extReplacement = isIOS ? '.jpg' : '.webp';
+
+            for (let i = 0; i < anexoSelectedFiles.length; i++) {
+                const file = anexoSelectedFiles[i];
+                if (file.type.startsWith('image/')) {
+                    try {
+                        const compressed = await imageCompression(file, compOptions);
+                        formData.append('arquivos', compressed, file.name.replace(/\.[^/.]+$/, extReplacement));
+                    } catch (err) {
+                        formData.append('arquivos', file);
+                    }
+                } else {
+                    formData.append('arquivos', file);
+                }
             }
 
             try {
@@ -1459,8 +1578,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     body: formData
                 });
                 if (res.ok) {
-                    alert('Attachments uploaded successfully!');
-                    location.reload();
+                    fecharModal('modalAnexosContrato');
+                    resetAnexoFiles();
+                    carregarDetalhesContrato();
                 } else {
                     const d = await res.json();
                     alert(d.message || d.error || 'Failed to upload attachments.');
@@ -1468,8 +1588,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch (err) {
                 alert('Connection error while uploading attachments.');
             } finally {
-                btn.disabled = false;
-                btn.textContent = 'Upload Attachments';
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
             }
         });
     }
