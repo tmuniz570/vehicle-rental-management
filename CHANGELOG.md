@@ -4,6 +4,17 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.7.0] — 2026-09-20 — *Vehicle Sales System, Itemized Extras & Insurance Exemption*
+
+### 🏍️ Sistema de Venda de Motos (Sale Contracts)
+* **Venda à Vista (`Sale_Full`) e Parcelada (`Sale_Installment`)**: Suporte completo à formalização de venda de veículos com transações separadas de aluguel e status `Sold` atribuído à motocicleta.
+* **Construtor de Acessórios & Extras**: Criação itemizada de extras e acessórios com botões de atalho rápido e cálculo dinâmico somando valores ao preço do veículo em tempo real.
+* **Isenção de Monitoramento de Seguro (15 dias askMID)**: Motos vendidas registram o certificado na venda, mas estão 100% isentas da rotina quinzenal do askMID. Tela de contrato adaptada para exibir documento arquivado sem alarmes nem contadores.
+* **Emissão Formal do Contrato de Venda**: Contrato formalizado por **J&F Motorcycles LTD** com assinatura fixa da loja, cronograma de parcelas e logo com fundo branco para impressão perfeita.
+* **Segregação Financeira e Recibos Detalhados**: Entrada registrada como `Sale_Deposit` e parcelas como `Sale_Installment`, mantendo `Pending` na criação e gerando recibos enriquecidos (`Vehicle Sale - Instalment X of Y`).
+* **Proteção contra Vistorias Incompatíveis**: Vistorias de devolução (`Check-in`) rejeitadas para veículos vendidos, autorizando vistorias de avaria/garantia (`Incident`).
+* **Harmonização de Terminologia**: Textos de interface atualizados para "Contract / Agreement" em todas as telas.
+
 ## [1.6.0] — 2026-09-20 — *Performance Engine, Maintenance Scripts & Data Agility*
 
 ### ⚡ Performance & Otimizações de Banco de Dados (Backend)
