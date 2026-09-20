@@ -48,6 +48,7 @@ async function carregarMotos() {
             if (st === 'available' || st === 'disponível') statusBadge = '<span class="badge badge-success">Available</span>';
             else if (st === 'maintenance' || st === 'manutenção') statusBadge = '<span class="badge badge-warning">Maintenance</span>';
             else if (st === 'rented' || st === 'alugada') statusBadge = '<span class="badge badge-info">Rented</span>';
+            else if (st === 'sold' || st === 'vendida') statusBadge = '<span class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4);">Sold</span>';
             else statusBadge = `<span class="badge badge-danger">${escapeHtml(m.status)}</span>`;
             
             const milhagemFormatada = Number(m.milhagem_atual || 0).toLocaleString('en-GB') + ' mi';

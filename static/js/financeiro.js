@@ -91,6 +91,9 @@ async function carregarFinanceiro() {
             const tipoLower = (t.tipo || '').toLowerCase();
             if (tipoLower === 'rent' || tipoLower === 'aluguel') tipoBadge = '<span class="badge badge-info">Rent</span>';
             else if (tipoLower === 'deposit' || tipoLower === 'deposito') tipoBadge = '<span class="badge" style="background:rgba(168, 85, 247, 0.2); color:#c084fc;">Deposit</span>';
+            else if (tipoLower === 'sale_full' || tipoLower === 'venda_vista') tipoBadge = '<span class="badge" style="background:rgba(16, 185, 129, 0.2); color:#34d399; border:1px solid rgba(16, 185, 129, 0.4);">Sale: Full Payment</span>';
+            else if (tipoLower === 'sale_deposit' || tipoLower === 'venda_entrada') tipoBadge = '<span class="badge" style="background:rgba(217, 119, 6, 0.2); color:#fbbf24; border:1px solid rgba(217, 119, 6, 0.4);">Sale: Down Payment</span>';
+            else if (tipoLower === 'sale_installment' || tipoLower === 'venda_parcela') tipoBadge = '<span class="badge" style="background:rgba(59, 130, 246, 0.2); color:#60a5fa; border:1px solid rgba(59, 130, 246, 0.4);">Sale: Installment</span>';
             else if (tipoLower === 'fine' || tipoLower === 'multa') tipoBadge = '<span class="badge badge-danger">Fine</span>';
             else if (tipoLower === 'damage' || tipoLower === 'dano') tipoBadge = '<span class="badge badge-warning">Damage</span>';
             else if (tipoLower === 'deposit_refund' || tipoLower === 'devolucao_deposito') tipoBadge = '<span class="badge badge-success">Deposit Refund</span>';
@@ -247,6 +250,21 @@ function fecharModalPagamento() {
     if (modal) modal.classList.remove('active');
 }
 
+function formatarDescricaoTransacao(tipo) {
+    if (!tipo) return '-';
+    const t = tipo.toLowerCase();
+    if (t === 'sale_full' || t === 'venda_vista') return 'Vehicle Sale - Full Payment';
+    if (t === 'sale_deposit' || t === 'venda_entrada') return 'Vehicle Sale - Down Payment (Deposit)';
+    if (t === 'sale_installment' || t === 'venda_parcela') return 'Vehicle Sale - Instalment Payment';
+    if (t === 'rent' || t === 'aluguel') return 'Vehicle Rental Payment';
+    if (t === 'deposit' || t === 'deposito') return 'Rental Security Deposit (Refundable)';
+    if (t === 'deposit_refund' || t === 'devolucao_deposito') return 'Security Deposit Refund';
+    if (t === 'fine' || t === 'multa') return 'Traffic / Parking Fine';
+    if (t === 'damage' || t === 'dano') return 'Vehicle Damage Charge';
+    if (t === 'other' || t === 'outro') return 'Additional Charge';
+    return tipo.replace(/_/g, ' ');
+}
+
 // Receipt Modal
 function abrirModalRecibo(t) {
     if (!t) return;
@@ -259,7 +277,7 @@ function abrirModalRecibo(t) {
     document.getElementById('rec_contrato_id').textContent = `Contract #${t.id_contrato}`;
     document.getElementById('rec_cliente').textContent = t.cliente || '-';
     document.getElementById('rec_placa').textContent = t.placa || '-';
-    document.getElementById('rec_tipo').textContent = t.tipo;
+    document.getElementById('rec_tipo').textContent = t.descricao || formatarDescricaoTransacao(t.tipo);
     document.getElementById('rec_data').textContent = dataPag;
     document.getElementById('rec_forma').textContent = t.forma_pagamento || 'Not specified';
     document.getElementById('rec_valor').textContent = formatoMoeda.format(t.valor);

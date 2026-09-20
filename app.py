@@ -1,4 +1,5 @@
 import os
+import json
 import secrets
 import hmac
 import time
@@ -15,7 +16,7 @@ from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
 )
 from database import (
-    db, init_db, Contract, FinancialTransaction, TransactionType, 
+    db, init_db, Contract, ContractType, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
     User, AuditLog, JobExecutionLock, Claim, ContractAttachment, delete_file_if_exists
 )
@@ -583,21 +584,18 @@ def imprimir_contrato(id):
     if not contrato:
         return render_template('404.html'), 404
         
-    cliente = db.session.get(Client, contrato.id_cliente)
-    moto = db.session.get(Motorcycle, contrato.placa)
+    cliente = db.session.get(Client, contrato.id_cliente) if contrato.id_cliente else None
+    if not cliente and contrato.cliente:
+        cliente = contrato.cliente
+        
+    moto = db.session.get(Motorcycle, contrato.placa) if contrato.placa else None
+    if not moto and contrato.moto:
+        moto = contrato.moto
+    if not moto and contrato.placa:
+        moto = Motorcycle.query.filter(db.func.lower(Motorcycle.placa) == contrato.placa.strip().lower()).first()
     
-    dias_nomes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    dia_pagamento_nome = dias_nomes[contrato.dia_pagamento_semanal] if 0 <= contrato.dia_pagamento_semanal <= 6 else 'Monday'
-    
-    # Depósito original registrado (prioriza valor_deposito congelado no contrato)
-    dep_tx = FinancialTransaction.query.filter_by(
-        id_contrato=id, 
-        tipo=TransactionType.DEPOSIT.value
-    ).first()
-    deposito_valor = float(contrato.valor_deposito) if contrato.valor_deposito is not None else (float(dep_tx.valor) if dep_tx else 500.00)
-    
-    # Dados imutáveis congelados no momento do contrato (com fallback seguro)
-    cliente_nome = contrato.cliente_nome or (cliente.nome if cliente else 'Unknown')
+    # Dados imutáveis congelados no momento do contrato (com fallback seguro para tabela de clientes/motos)
+    cliente_nome = contrato.cliente_nome or (cliente.nome if cliente else 'Customer')
     cliente_telefone = contrato.cliente_telefone or (cliente.telefone if cliente else '-')
     cliente_endereco = contrato.cliente_endereco or (cliente.endereco if cliente else 'Not provided')
     cliente_email = contrato.cliente_email or (cliente.email if cliente else None)
@@ -613,8 +611,76 @@ def imprimir_contrato(id):
     data_devolucao_uk = contrato.data_devolucao.strftime('%d/%m/%Y') if contrato.data_devolucao else None
     hora_devolucao_uk = contrato.data_devolucao.strftime('%H:%M') if contrato.data_devolucao else None
     
-    data_assinatura_inicial_uk = contrato.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_inicial else None
+    data_assinatura_inicial_uk = contrato.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_inicial else get_local_now().strftime('%d/%m/%Y %H:%M')
     data_assinatura_devolucao_uk = contrato.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_devolucao else None
+
+    # Se for Contrato de Venda (Full ou Installment), utiliza o template Vehicle Sale Agreement da J&F Motorcycles LTD
+    if getattr(contrato, 'tipo_contrato', None) in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+        is_installment = (contrato.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment'])
+        
+        cronograma = []
+        if contrato.cronograma_parcelas_json:
+            try:
+                cronograma_raw = json.loads(contrato.cronograma_parcelas_json)
+                for idx, item in enumerate(cronograma_raw, 1):
+                    raw_date = item.get('vencimento') or item.get('data_vencimento') or ''
+                    formatted_date = str(raw_date)
+                    if raw_date and '-' in str(raw_date):
+                        try:
+                            clean_d = str(raw_date).split('T')[0].strip()
+                            parts = clean_d.split('-')
+                            if len(parts) == 3:
+                                formatted_date = f"{parts[2]}/{parts[1]}/{parts[0]}"
+                        except Exception:
+                            formatted_date = str(raw_date)
+                    cronograma.append({
+                        'numero': item.get('numero') or item.get('parcela') or idx,
+                        'valor': float(item.get('valor', 0.0)),
+                        'vencimento': formatted_date
+                    })
+            except Exception as e:
+                print(f"[Print Error] Falha ao decodificar cronograma_parcelas_json: {e}")
+                cronograma = []
+
+        # Fallback para transações caso o json esteja vazio
+        if not cronograma and is_installment:
+            inst_txs = [t for t in (contrato.transacoes or []) if t.tipo in [TransactionType.SALE_INSTALLMENT.value, 'Sale_Installment']]
+            inst_txs.sort(key=lambda x: x.data_vencimento if x.data_vencimento else datetime.min)
+            for idx, t in enumerate(inst_txs, 1):
+                cronograma.append({
+                    'numero': idx,
+                    'valor': float(t.valor),
+                    'vencimento': t.data_vencimento.strftime('%d/%m/%Y') if t.data_vencimento else '-'
+                })
+                
+        return render_template(
+            'contrato_venda_print.html',
+            contrato=contrato,
+            cliente=cliente,
+            moto=moto,
+            cliente_nome=cliente_nome,
+            cliente_telefone=cliente_telefone,
+            cliente_endereco=cliente_endereco,
+            cliente_email=cliente_email,
+            moto_modelo=moto_modelo,
+            moto_cor=moto_cor,
+            moto_placa=moto_placa,
+            is_installment=is_installment,
+            cronograma=cronograma,
+            data_assinatura_uk=data_assinatura_inicial_uk,
+            hoje_uk=get_local_now().strftime('%d/%m/%Y %H:%M')
+        )
+
+    # Contrato de Aluguel (Motorcycle Rental Agreement)
+    dias_nomes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    dia_pagamento_nome = dias_nomes[contrato.dia_pagamento_semanal] if (contrato.dia_pagamento_semanal is not None and 0 <= contrato.dia_pagamento_semanal <= 6) else 'Monday'
+    
+    # Depósito original registrado (prioriza valor_deposito congelado no contrato)
+    dep_tx = FinancialTransaction.query.filter_by(
+        id_contrato=id, 
+        tipo=TransactionType.DEPOSIT.value
+    ).first()
+    deposito_valor = float(contrato.valor_deposito) if contrato.valor_deposito is not None else (float(dep_tx.valor) if dep_tx else 500.00)
 
     return render_template(
         'contrato_print.html',
@@ -1151,7 +1217,7 @@ def criar_usuario():
     
     perm_textos = []
     if is_admin: perm_textos.append('Admin')
-    if perm_alugueis: perm_textos.append('Aluguéis')
+    if perm_alugueis: perm_textos.append('Aluguel / Venda')
     if perm_claims: perm_textos.append('Claims')
     registrar_log('USER_CREATE', 'User', novo_user.id, f"Novo usuário cadastrado: {novo_user.nome} ({novo_user.email}) com permissões: {', '.join(perm_textos)}")
 
@@ -1197,7 +1263,7 @@ def atualizar_usuario(user_id):
     if 'perm_alugueis' in data:
         nova_perm_alug = bool(data['perm_alugueis'])
         if user.perm_alugueis != nova_perm_alug:
-            alteracoes.append(f"modulo_alugueis={'Ativado' if nova_perm_alug else 'Desativado'}")
+            alteracoes.append(f"aluguel_venda={'Ativado' if nova_perm_alug else 'Desativado'}")
             user.perm_alugueis = nova_perm_alug
 
     if 'perm_claims' in data:
@@ -1722,10 +1788,42 @@ def atualizar_moto(placa):
 def criar_contrato():
     id_cliente = request.form.get('id_cliente')
     placa = request.form.get('placa')
-    dia_pagamento_semanal = int(request.form.get('dia_pagamento_semanal'))
-    valor_aluguel_semanal = float(request.form.get('valor_aluguel_semanal', 250.0))
-    valor_deposito = float(request.form.get('valor_deposito'))
+    tipo_contrato = request.form.get('tipo_contrato', ContractType.RENT.value)
+    if tipo_contrato not in [ContractType.RENT.value, ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]:
+        tipo_contrato = ContractType.RENT.value
+
+    dia_pagamento_semanal = int(request.form.get('dia_pagamento_semanal', 0)) if request.form.get('dia_pagamento_semanal') else 0
+    valor_aluguel_semanal = float(request.form.get('valor_aluguel_semanal', 250.0)) if request.form.get('valor_aluguel_semanal') else 0.0
+    valor_deposito = float(request.form.get('valor_deposito', 0.0)) if request.form.get('valor_deposito') else 0.0
     observacoes = request.form.get('observacoes')
+    
+    # Specific Sale Fields
+    categoria_historico = request.form.get('categoria_historico', 'Clear')
+    valor_venda_veiculo = float(request.form.get('valor_venda_veiculo') or 0.0) if request.form.get('valor_venda_veiculo') else None
+    acessorios_extras = (request.form.get('acessorios_extras') or '').strip() or 'None'
+    valor_total_extras = float(request.form.get('valor_total_extras') or 0.0)
+    valor_admin_fee = float(request.form.get('valor_admin_fee') or 0.0)
+    valor_total_venda = float(request.form.get('valor_total_venda') or 0.0) if request.form.get('valor_total_venda') else None
+    valor_entrada = float(request.form.get('valor_entrada') or 0.0)
+    saldo_devedor = float(request.form.get('saldo_devedor') or 0.0)
+    cronograma_parcelas_raw = request.form.get('cronograma_parcelas', '[]')
+    
+    # Calculate or validate valor_total_venda with extras
+    if tipo_contrato == ContractType.SALE_FULL.value:
+        if not valor_total_venda or valor_total_venda <= 0.0:
+            valor_total_venda = (valor_venda_veiculo or 0.0) + valor_total_extras
+    elif tipo_contrato == ContractType.SALE_INSTALLMENT.value:
+        if not valor_total_venda or valor_total_venda <= 0.0:
+            valor_total_venda = (valor_venda_veiculo or 0.0) + valor_admin_fee + valor_total_extras
+        if not saldo_devedor or saldo_devedor <= 0.0:
+            saldo_devedor = max(0.0, valor_total_venda - valor_entrada)
+    
+    cronograma_parcelas = []
+    if cronograma_parcelas_raw:
+        try:
+            cronograma_parcelas = json.loads(cronograma_parcelas_raw) if isinstance(cronograma_parcelas_raw, str) else cronograma_parcelas_raw
+        except Exception:
+            cronograma_parcelas = []
     
     if 'fotos' not in request.files:
         return jsonify({'error': 'Initial check-out inspection photos are required', 'erro': 'A vistoria de saída (foto) é obrigatória'}), 400
@@ -1752,7 +1850,7 @@ def criar_contrato():
 
     moto = db.session.get(Motorcycle, placa)
     if not moto or moto.status not in [MotoStatus.AVAILABLE.value, 'Disponível']:
-        return jsonify({'error': 'Motorbike is not available for rental', 'erro': 'Moto não está disponível'}), 400
+        return jsonify({'error': 'Motorbike is not available', 'erro': 'Moto não está disponível'}), 400
         
     # Save inspection photos
     urls_fotos = []
@@ -1785,9 +1883,18 @@ def criar_contrato():
     novo_contrato = Contract(
         id_cliente=id_cliente,
         placa=placa,
+        tipo_contrato=tipo_contrato,
         dia_pagamento_semanal=dia_pagamento_semanal,
-        valor_aluguel_semanal=valor_aluguel_semanal,
-        valor_deposito=valor_deposito,
+        valor_aluguel_semanal=valor_aluguel_semanal if tipo_contrato == ContractType.RENT.value else 0.0,
+        valor_deposito=valor_deposito if tipo_contrato == ContractType.RENT.value else valor_entrada,
+        categoria_historico=categoria_historico if tipo_contrato != ContractType.RENT.value else None,
+        valor_venda_veiculo=valor_venda_veiculo,
+        acessorios_extras=acessorios_extras if tipo_contrato != ContractType.RENT.value else None,
+        valor_admin_fee=valor_admin_fee if tipo_contrato == ContractType.SALE_INSTALLMENT.value else 0.0,
+        valor_total_venda=valor_total_venda,
+        valor_entrada=valor_entrada if tipo_contrato == ContractType.SALE_INSTALLMENT.value else 0.0,
+        saldo_devedor=saldo_devedor if tipo_contrato == ContractType.SALE_INSTALLMENT.value else 0.0,
+        cronograma_parcelas_json=json.dumps(cronograma_parcelas) if (tipo_contrato == ContractType.SALE_INSTALLMENT.value and cronograma_parcelas) else None,
         url_seguro=url_seguro,
         status=ContractStatus.ACTIVE.value,
         criado_por_nome=operador_atual,
@@ -1811,47 +1918,98 @@ def criar_contrato():
     )
     db.session.add(novo_contrato)
     
-    # Update motorbike status to Rented
-    moto.status = MotoStatus.RENTED.value
+    # Update motorbike status according to contract type
+    if tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]:
+        moto.status = MotoStatus.SOLD.value
+    else:
+        moto.status = MotoStatus.RENTED.value
     
     db.session.flush() # Retrieve generated contract ID
     
     hoje = get_local_now()
     
-    # Security deposit transaction
-    deposito = FinancialTransaction(
-        id_contrato=novo_contrato.id,
-        tipo=TransactionType.DEPOSIT.value,
-        data_vencimento=hoje,
-        valor=valor_deposito,
-        status=TransactionStatus.PENDING.value
-    )
-    db.session.add(deposito)
-    
-    # Week 1 rent (due today upon collection)
-    aluguel_semana_1 = FinancialTransaction(
-        id_contrato=novo_contrato.id,
-        tipo=TransactionType.RENT.value,
-        data_vencimento=hoje,
-        valor=valor_aluguel_semanal,
-        status=TransactionStatus.PENDING.value
-    )
-    db.session.add(aluguel_semana_1)
-    
-    # Week 2 rent (due on next recurring payment day)
-    days_ahead = dia_pagamento_semanal - hoje.weekday()
-    if days_ahead <= 0:
-        days_ahead += 7
-    proximo_vencimento = hoje + timedelta(days=days_ahead)
-    
-    aluguel_semana_2 = FinancialTransaction(
-        id_contrato=novo_contrato.id,
-        tipo=TransactionType.RENT.value,
-        data_vencimento=proximo_vencimento,
-        valor=valor_aluguel_semanal,
-        status=TransactionStatus.PENDING.value
-    )
-    db.session.add(aluguel_semana_2)
+    # Financial Transactions Provisioning (All transactions start PENDING upon contract creation)
+    if tipo_contrato == ContractType.RENT.value:
+        # 1. Security deposit transaction for rental
+        deposito = FinancialTransaction(
+            id_contrato=novo_contrato.id,
+            tipo=TransactionType.DEPOSIT.value,
+            data_vencimento=hoje,
+            valor=valor_deposito,
+            status=TransactionStatus.PENDING.value
+        )
+        db.session.add(deposito)
+        
+        # 2. Week 1 rent (due today upon collection)
+        aluguel_semana_1 = FinancialTransaction(
+            id_contrato=novo_contrato.id,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=hoje,
+            valor=valor_aluguel_semanal,
+            status=TransactionStatus.PENDING.value
+        )
+        db.session.add(aluguel_semana_1)
+        
+        # 3. Week 2 rent (due on next recurring payment day)
+        days_ahead = dia_pagamento_semanal - hoje.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        proximo_vencimento = hoje + timedelta(days=days_ahead)
+        
+        aluguel_semana_2 = FinancialTransaction(
+            id_contrato=novo_contrato.id,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=proximo_vencimento,
+            valor=valor_aluguel_semanal,
+            status=TransactionStatus.PENDING.value
+        )
+        db.session.add(aluguel_semana_2)
+
+    elif tipo_contrato == ContractType.SALE_FULL.value:
+        # Full payment at once (pending upon contract creation)
+        tx_venda = FinancialTransaction(
+            id_contrato=novo_contrato.id,
+            tipo=TransactionType.SALE_FULL.value,
+            data_vencimento=hoje,
+            valor=valor_total_venda or valor_venda_veiculo or 0.0,
+            status=TransactionStatus.PENDING.value
+        )
+        db.session.add(tx_venda)
+
+    elif tipo_contrato == ContractType.SALE_INSTALLMENT.value:
+        # 1. Sale Down Payment / Deposit (pending upon contract creation, clearly distinct from rental deposit)
+        if valor_entrada > 0:
+            tx_entrada = FinancialTransaction(
+                id_contrato=novo_contrato.id,
+                tipo=TransactionType.SALE_DEPOSIT.value,
+                data_vencimento=hoje,
+                valor=valor_entrada,
+                status=TransactionStatus.PENDING.value
+            )
+            db.session.add(tx_entrada)
+
+        # 2. Installments schedule transactions (all pending with respective due dates)
+        for i, parcela in enumerate(cronograma_parcelas):
+            p_valor = float(parcela.get('valor', 0.0))
+            p_venc_str = parcela.get('vencimento') or parcela.get('data_vencimento')
+            p_venc = hoje
+            if p_venc_str:
+                try:
+                    clean_d = str(p_venc_str).split('T')[0].strip()
+                    p_venc = datetime.strptime(clean_d, '%Y-%m-%d')
+                except Exception:
+                    p_venc = hoje + timedelta(days=30 * (i + 1))
+            else:
+                p_venc = hoje + timedelta(days=30 * (i + 1))
+                
+            tx_parcela = FinancialTransaction(
+                id_contrato=novo_contrato.id,
+                tipo=TransactionType.SALE_INSTALLMENT.value,
+                data_vencimento=p_venc,
+                valor=p_valor,
+                status=TransactionStatus.PENDING.value
+            )
+            db.session.add(tx_parcela)
     
     # Create Check-out Inspection with mileage
     nova_vistoria = Inspection(
@@ -1866,9 +2024,21 @@ def criar_contrato():
     
     db.session.commit()
     
-    registrar_log('CREATE_CONTRACT', 'Contract', novo_contrato.id, f"Contrato #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Milhagem: {milhagem_inicial} mi, Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f})")
+    if tipo_contrato == ContractType.RENT.value:
+        detalhes_log = f"Contrato de Aluguel #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Milhagem: {milhagem_inicial} mi, Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f})"
+    elif tipo_contrato == ContractType.SALE_FULL.value:
+        detalhes_log = f"Contrato de Venda à Vista #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Preço: £{valor_total_venda:.2f}, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold)."
+    else:
+        detalhes_log = f"Contrato de Venda Parcelada #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Total: £{valor_total_venda:.2f}, Entrada: £{valor_entrada:.2f}, Saldo: £{saldo_devedor:.2f}, {len(cronograma_parcelas)} parcelas, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold)."
+
+    registrar_log('CREATE_CONTRACT', 'Contract', novo_contrato.id, detalhes_log)
     
-    return jsonify({'message': 'Contract and initial inspection created successfully', 'mensagem': 'Contrato e vistoria criados com sucesso', 'id': novo_contrato.id}), 201
+    return jsonify({
+        'message': 'Contract and initial inspection created successfully', 
+        'mensagem': 'Contrato e vistoria criados com sucesso', 
+        'id': novo_contrato.id,
+        'tipo_contrato': tipo_contrato
+    }), 201
 
 @app.route('/api/contratos/<int:id>/seguro', methods=['PUT'])
 @alugueis_required
@@ -2114,7 +2284,7 @@ def cancelar_contrato(id):
         # 2. Libera a moto vinculada de volta para Disponível
         placa = contrato.placa or contrato.moto_placa
         moto = db.session.get(Motorcycle, placa) if placa else None
-        if moto and moto.status in [MotoStatus.ALUGADA.value, 'Rented', 'Alugada']:
+        if moto and moto.status in [MotoStatus.ALUGADA.value, 'Rented', 'Alugada', MotoStatus.SOLD.value, 'Sold', 'Vendida']:
             moto.status = MotoStatus.DISPONIVEL.value
 
         # 3. Cancela cobranças pendentes (Opção A)
@@ -2152,6 +2322,7 @@ def listar_contratos():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
+    tipo_filter = request.args.get('tipo', '', type=str).strip()
     sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
@@ -2165,8 +2336,17 @@ def listar_contratos():
             Contract.placa.ilike(search_plate_term),
             Contract.placa.ilike(search_term),
             Contract.status.ilike(search_term),
+            Contract.tipo_contrato.ilike(search_term),
             Client.nome.ilike(search_term)
         ))
+
+    if tipo_filter:
+        if tipo_filter.lower() in ['sale', 'venda']:
+            query = query.filter(Contract.tipo_contrato.in_([ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]))
+        elif tipo_filter.lower() in ['rent', 'aluguel']:
+            query = query.filter(db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None))
+        else:
+            query = query.filter(Contract.tipo_contrato == tipo_filter)
         
     status_filter = request.args.get('status', '', type=str)
     if status_filter:
@@ -2203,6 +2383,8 @@ def listar_contratos():
         'data_devolucao': Contract.data_devolucao,
         'return': Contract.data_devolucao,
         'status': Contract.status,
+        'tipo': Contract.tipo_contrato,
+        'tipo_contrato': Contract.tipo_contrato,
         'status_seguro': Contract.status_seguro
     }
     target_col = sort_map.get(sort_by, Contract.id)
@@ -2214,6 +2396,11 @@ def listar_contratos():
         'id_cliente': c.id_cliente, 
         'cliente_nome': c.cliente_nome or (c.cliente.nome if c.cliente else 'Customer'), 
         'placa': c.moto_placa or c.placa,
+        'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
+        'categoria_historico': c.categoria_historico,
+        'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
+        'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
+        'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
         'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
         'valor_aluguel_semanal': c.valor_aluguel_semanal,
@@ -2237,7 +2424,14 @@ def detalhe_contrato(id):
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
     cliente = db.session.get(Client, c.id_cliente) if c.id_cliente else None
+    if not cliente and c.cliente:
+        cliente = c.cliente
+        
     moto = db.session.get(Motorcycle, c.placa) if c.placa else None
+    if not moto and c.moto:
+        moto = c.moto
+    if not moto and c.placa:
+        moto = Motorcycle.query.filter(db.func.lower(Motorcycle.placa) == c.placa.strip().lower()).first()
     
     transacoes = FinancialTransaction.query.filter_by(id_contrato=id).all()
     vistorias = Inspection.query.filter_by(id_contrato=id).all()
@@ -2256,36 +2450,64 @@ def detalhe_contrato(id):
                     'id': t.id,
                     'tipo': t.tipo,
                     'valor': float(t.valor),
-                    'data_pagamento': t.data_pagamento.strftime('%d/%m/%Y') if t.data_pagamento else None
+                    'forma_pagamento': t.forma_pagamento
                 })
-    is_completed = c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']
-    valor_restituido = max(0.0, deposito_pago - deducoes_deposito) if is_completed else 0.0
-    saldo_deposito = 0.0 if is_completed else max(0.0, deposito_pago - deducoes_deposito)
+                
+    saldo_deposito = max(0.0, deposito_pago - deducoes_deposito)
     
-    # Filter out any deposit refund transactions from customer statement
-    transacoes_cliente = [t for t in transacoes if t.tipo.lower() not in ['deposit_refund', 'devolucao_deposito', 'deposit refund']]
+    # Identificar restituição de depósito concluída
+    tx_restituicao = next((t for t in transacoes if t.tipo in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'] and t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']), None)
+    valor_restituido = float(tx_restituicao.valor) if tx_restituicao else 0.0
     
-    # 15-Day Insurance Check calculation
-    hoje_date = get_local_now().date()
-    ultima_checagem = c.data_ultima_checagem_seguro or (c.data_retirada.date() if c.data_retirada else hoje_date)
-    dias_desde_checagem = (hoje_date - ultima_checagem).days
+    # Transações filtradas para o extrato do cliente (não exibe a devolução de caução como cobrança devida)
+    transacoes_cliente = [t for t in transacoes if t.tipo not in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']]
+    
+    # 15-Day Insurance Compliance (askMID Verification)
+    hoje = get_local_now().date()
+    ultima_checagem = c.data_ultima_checagem_seguro or (c.data_retirada.date() if c.data_retirada else hoje)
+    dias_desde_checagem = (hoje - ultima_checagem).days
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
-    checagem_seguro_devida = (dias_desde_checagem >= 15) or (c.status_seguro == 'Cancelled')
+    checagem_seguro_devida = (dias_desde_checagem >= 15)
     
+    is_completed = (c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado', ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
+    
+    # Parse cronograma se existir
+    cronograma_parsed = []
+    if c.cronograma_parcelas_json:
+        try:
+            cronograma_parsed = json.loads(c.cronograma_parcelas_json)
+        except Exception:
+            cronograma_parsed = []
+
     return jsonify({
         'id': c.id,
-        'cliente': c.cliente_nome or (cliente.nome if cliente else f'ID {c.id_cliente}'),
+        'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
+        'categoria_historico': c.categoria_historico,
+        'valor_venda_veiculo': float(c.valor_venda_veiculo) if c.valor_venda_veiculo is not None else None,
+        'acessorios_extras': c.acessorios_extras,
+        'valor_admin_fee': float(c.valor_admin_fee) if c.valor_admin_fee is not None else 0.0,
+        'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
+        'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
+        'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
+        'cronograma_parcelas': cronograma_parsed,
         'id_cliente': c.id_cliente,
-        'telefone': c.cliente_telefone or (cliente.telefone if cliente else '-'),
-        'email': c.cliente_email or (cliente.email if cliente else '-'),
+        'cliente': c.cliente_nome or (cliente.nome if cliente else 'Customer'),
+        'cliente_nome': c.cliente_nome or (cliente.nome if cliente else 'Customer'),
+        'telefone': c.cliente_telefone or (cliente.telefone if cliente else None),
+        'cliente_telefone': c.cliente_telefone or (cliente.telefone if cliente else None),
         'endereco': c.cliente_endereco or (cliente.endereco if cliente else None),
+        'cliente_endereco': c.cliente_endereco or (cliente.endereco if cliente else None),
+        'email': c.cliente_email or (cliente.email if cliente else None),
+        'cliente_email': c.cliente_email or (cliente.email if cliente else None),
         'url_habilitacao': c.url_habilitacao or (cliente.url_habilitacao if cliente else None),
         'url_habilitacao_verso': c.url_habilitacao_verso or (cliente.url_habilitacao_verso if cliente else None),
         'url_cbt': c.url_cbt or (cliente.url_cbt if cliente else None),
         'url_comprovante_endereco': c.url_comprovante_endereco or (cliente.url_comprovante_endereco if cliente else None),
         'placa': c.moto_placa or c.placa,
         'modelo': c.moto_modelo or (moto.modelo if moto else '-'),
+        'moto_modelo': c.moto_modelo or (moto.modelo if moto else '-'),
         'cor': c.moto_cor or (moto.cor if moto else '-'),
+        'moto_cor': c.moto_cor or (moto.cor if moto else '-'),
         'milhagem_atual_moto': int(moto.milhagem_atual or 0) if moto else 0,
         'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
         'milhagem_final': c.milhagem_final,
@@ -2328,6 +2550,11 @@ def detalhe_contrato(id):
         'transacoes': [{
             'id': t.id,
             'tipo': t.tipo,
+            'descricao': (
+                f"Vehicle Sale - Instalment {[tx.id for tx in sorted([p for p in transacoes_cliente if str(p.tipo).lower() in ['sale_installment', 'venda_parcela']], key=lambda x: (x.data_vencimento or datetime.min, x.id))].index(t.id) + 1} of {len([p for p in transacoes_cliente if str(p.tipo).lower() in ['sale_installment', 'venda_parcela']])}"
+                if str(t.tipo).lower() in ['sale_installment', 'venda_parcela'] and t.id in [p.id for p in transacoes_cliente if str(p.tipo).lower() in ['sale_installment', 'venda_parcela']]
+                else obter_descricao_recibo_simples(t.tipo)
+            ),
             'valor': float(t.valor),
             'status': t.status,
             'forma_pagamento': t.forma_pagamento,
@@ -2365,9 +2592,21 @@ def criar_cobranca(id):
     except ValueError:
         return jsonify({'error': 'Invalid due date format', 'erro': 'Data de vencimento inválida'}), 400
         
+    tipo_map = {
+        'sale_installment': TransactionType.SALE_INSTALLMENT.value,
+        'sale_deposit': TransactionType.SALE_DEPOSIT.value,
+        'sale_full': TransactionType.SALE_FULL.value,
+        'rent': TransactionType.RENT.value,
+        'deposit': TransactionType.DEPOSIT.value,
+        'fine': TransactionType.FINE.value,
+        'damage': TransactionType.DAMAGE.value,
+        'other': 'Other'
+    }
+    tipo_final = tipo_map.get(str(tipo).strip().lower(), str(tipo).strip())
+
     nova_cobranca = FinancialTransaction(
         id_contrato=c.id,
-        tipo=tipo,
+        tipo=tipo_final,
         data_vencimento=data_vencimento,
         valor=float(valor),
         status=TransactionStatus.PENDING.value
@@ -2376,7 +2615,7 @@ def criar_cobranca(id):
     db.session.commit()
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo}) gerada por {operador_atual} para o Contrato #{c.id}")
+    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo_final}) gerada por {operador_atual} para o Contrato #{c.id}")
 
     return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
 
@@ -2408,6 +2647,20 @@ def criar_vistoria():
     tipo = request.form.get('tipo')
     observacoes = request.form.get('observacoes')
     
+    contrato = db.session.get(Contract, id_contrato) if id_contrato else None
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+
+    moto = db.session.get(Motorcycle, contrato.placa) if contrato.placa else None
+    is_venda = contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']
+    is_moto_sold = moto and moto.status == MotoStatus.SOLD.value
+
+    if (is_venda or is_moto_sold) and str(tipo).strip().lower() in ['check-in', 'entrada', 'checkin']:
+        return jsonify({
+            'error': 'Check-in inspections (return) are not allowed for sold motorcycles / sale contracts.',
+            'erro': 'Vistorias de devolução (Check-in) não são permitidas para motos vendidas ou contratos de venda.'
+        }), 400
+
     if 'fotos' not in request.files:
         return jsonify({'error': 'No photos uploaded', 'erro': 'Nenhuma foto enviada'}), 400
         
@@ -2641,6 +2894,7 @@ def listar_financeiro():
         'id': t.id,
         'id_contrato': t.id_contrato,
         'tipo': t.tipo,
+        'descricao': obter_descricao_recibo_simples(t.tipo),
         'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
         'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None,
         'valor': float(t.valor),
@@ -2715,6 +2969,67 @@ def reverter_pagamento(id):
         'status': t.status
     }), 200
 
+def obter_descricao_recibo(t, contrato=None):
+    if not t:
+        return ""
+    tipo = str(t.tipo or '').strip()
+    tipo_lower = tipo.lower()
+    
+    if tipo_lower in ['sale_full', 'venda_vista']:
+        return "Vehicle Sale - Full Payment"
+    elif tipo_lower in ['sale_deposit', 'venda_entrada']:
+        return "Vehicle Sale - Down Payment (Deposit)"
+    elif tipo_lower in ['sale_installment', 'venda_parcela']:
+        if t.id_contrato:
+            try:
+                parcelas = FinancialTransaction.query.filter(
+                    FinancialTransaction.id_contrato == t.id_contrato,
+                    FinancialTransaction.tipo.in_([TransactionType.SALE_INSTALLMENT.value, 'Sale_Installment', 'Venda_Parcela'])
+                ).order_by(FinancialTransaction.data_vencimento.asc(), FinancialTransaction.id.asc()).all()
+                total = len(parcelas)
+                for idx, p in enumerate(parcelas, 1):
+                    if p.id == t.id:
+                        return f"Vehicle Sale - Instalment {idx} of {total}"
+            except Exception:
+                pass
+        return "Vehicle Sale - Instalment Payment"
+    elif tipo_lower in ['rent', 'aluguel']:
+        return "Vehicle Rental Payment"
+    elif tipo_lower in ['deposit', 'deposito']:
+        return "Rental Security Deposit (Refundable)"
+    elif tipo_lower in ['deposit_refund', 'devolucao_deposito']:
+        return "Security Deposit Refund"
+    elif tipo_lower in ['fine', 'multa']:
+        return "Traffic / Penalty Charge Notice (PCN)"
+    elif tipo_lower in ['damage', 'dano']:
+        return "Vehicle Damage Repair Charge"
+    elif tipo_lower in ['other', 'outro']:
+        return "Additional Charge"
+    
+    return tipo.replace('_', ' ').title()
+
+def obter_descricao_recibo_simples(tipo):
+    tipo_lower = (tipo or '').strip().lower()
+    if tipo_lower in ['sale_full', 'venda_vista']:
+        return "Vehicle Sale - Full Payment"
+    elif tipo_lower in ['sale_deposit', 'venda_entrada']:
+        return "Vehicle Sale - Down Payment (Deposit)"
+    elif tipo_lower in ['sale_installment', 'venda_parcela']:
+        return "Vehicle Sale - Instalment Payment"
+    elif tipo_lower in ['rent', 'aluguel']:
+        return "Vehicle Rental Payment"
+    elif tipo_lower in ['deposit', 'deposito']:
+        return "Rental Security Deposit (Refundable)"
+    elif tipo_lower in ['deposit_refund', 'devolucao_deposito']:
+        return "Security Deposit Refund"
+    elif tipo_lower in ['fine', 'multa']:
+        return "Traffic / Penalty Charge Notice (PCN)"
+    elif tipo_lower in ['damage', 'dano']:
+        return "Vehicle Damage Repair Charge"
+    elif tipo_lower in ['other', 'outro']:
+        return "Additional Charge"
+    return (tipo or '').replace('_', ' ').title()
+
 @app.route('/recibo/<int:id>')
 @alugueis_required
 def pagina_recibo(id):
@@ -2723,7 +3038,8 @@ def pagina_recibo(id):
         return render_template('404.html'), 404
     contrato = db.session.get(Contract, t.id_contrato) if t.id_contrato else None
     cliente = db.session.get(Client, contrato.id_cliente) if (contrato and contrato.id_cliente) else None
-    return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente)
+    descricao = obter_descricao_recibo(t, contrato)
+    return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente, descricao=descricao)
 
 @app.route('/api/financeiro/<int:id>', methods=['DELETE'])
 @alugueis_required
@@ -3084,7 +3400,8 @@ def _gerar_cobrancas_semanais_logic():
     
     contratos_ativos = Contract.query.filter(
         Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
-        Contract.dia_pagamento_semanal == dia_semana_atual
+        Contract.dia_pagamento_semanal == dia_semana_atual,
+        db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None, Contract.tipo_contrato == 'Rent')
     ).all()
     
     transacoes_geradas = 0

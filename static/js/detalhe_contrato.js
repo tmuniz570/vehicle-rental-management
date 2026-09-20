@@ -33,6 +33,21 @@ function formatWhatsAppNumber(phone) {
     return digits;
 }
 
+function formatarDescricaoTransacao(tipo) {
+    if (!tipo) return '-';
+    const t = tipo.toLowerCase();
+    if (t === 'sale_full' || t === 'venda_vista') return 'Vehicle Sale - Full Payment';
+    if (t === 'sale_deposit' || t === 'venda_entrada') return 'Vehicle Sale - Down Payment (Deposit)';
+    if (t === 'sale_installment' || t === 'venda_parcela') return 'Vehicle Sale - Instalment Payment';
+    if (t === 'rent' || t === 'aluguel') return 'Vehicle Rental Payment';
+    if (t === 'deposit' || t === 'deposito') return 'Rental Security Deposit (Refundable)';
+    if (t === 'deposit_refund' || t === 'devolucao_deposito') return 'Security Deposit Refund';
+    if (t === 'fine' || t === 'multa') return 'Traffic / Parking Fine';
+    if (t === 'damage' || t === 'dano') return 'Vehicle Damage Charge';
+    if (t === 'other' || t === 'outro') return 'Additional Charge';
+    return tipo.replace(/_/g, ' ');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
     const diasSemana = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -51,14 +66,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (elClienteId) {
             elClienteId.textContent = data.id_cliente ? `ID #${data.id_cliente}` : 'ID -';
         }
-        document.getElementById('info_cliente').textContent = data.cliente || '-';
+        const elCliente = document.getElementById('info_cliente');
+        if (elCliente) {
+            elCliente.textContent = data.cliente || data.cliente_nome || '-';
+        }
         
         const elTel = document.getElementById('info_tel');
+        const telVal = data.telefone || data.cliente_telefone;
         if (elTel) {
-            if (data.telefone) {
+            if (telVal) {
                 elTel.innerHTML = `
-                    <a href="tel:${encodeURIComponent(data.telefone)}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${escapeHtml(data.telefone)}">
-                        <span>📞</span> <span style="text-decoration:underline;">${escapeHtml(data.telefone)}</span>
+                    <a href="tel:${encodeURIComponent(telVal)}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${escapeHtml(telVal)}">
+                        <span>📞</span> <span style="text-decoration:underline;">${escapeHtml(telVal)}</span>
                     </a>
                 `;
             } else {
@@ -67,11 +86,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         const elEmail = document.getElementById('info_email');
+        const emailVal = data.email || data.cliente_email;
         if (elEmail) {
-            if (data.email) {
+            if (emailVal) {
                 elEmail.innerHTML = `
-                    <a href="mailto:${encodeURIComponent(data.email)}" style="color:#60a5fa; text-decoration:underline; word-break:break-all; display:inline-flex; align-items:center; gap:6px;" title="Send email to ${escapeHtml(data.email)}">
-                        <span>✉️</span> <span>${escapeHtml(data.email)}</span>
+                    <a href="mailto:${encodeURIComponent(emailVal)}" style="color:#60a5fa; text-decoration:underline; word-break:break-all; display:inline-flex; align-items:center; gap:6px;" title="Send email to ${escapeHtml(emailVal)}">
+                        <span>✉️</span> <span>${escapeHtml(emailVal)}</span>
                     </a>
                 `;
             } else {
@@ -80,12 +100,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         const elEndereco = document.getElementById('info_endereco');
+        const endVal = data.endereco || data.cliente_endereco;
         if (elEndereco) {
-            if (data.endereco) {
-                const mapQuery = encodeURIComponent(data.endereco);
+            if (endVal) {
+                const mapQuery = encodeURIComponent(endVal);
                 elEndereco.innerHTML = `
                     <a href="https://www.google.com/maps/search/?api=1&query=${mapQuery}" target="_blank" style="color:var(--text-primary); text-decoration:none; display:flex; justify-content:space-between; align-items:flex-start; gap:8px;" title="Open in Google Maps">
-                        <span>${escapeHtml(data.endereco)}</span>
+                        <span>${escapeHtml(endVal)}</span>
                         <span style="color:var(--accent); font-size:0.75rem; font-weight:600; white-space:nowrap; background:rgba(217,119,6,0.1); border:1px solid rgba(217,119,6,0.25); padding:2px 6px; border-radius:4px;">Maps ↗</span>
                     </a>
                 `;
@@ -189,8 +210,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // 2. Vehicle Card
-        document.getElementById('info_placa').textContent = data.placa || '-';
-        document.getElementById('info_modelo_cor').textContent = `${data.modelo || '-'} • ${data.cor || '-'}`;
+        const placaVal = data.placa || data.moto_placa || '-';
+        const modeloVal = data.modelo || data.moto_modelo || '-';
+        const corVal = data.cor || data.moto_cor || '-';
+        document.getElementById('info_placa').textContent = placaVal;
+        document.getElementById('info_modelo_cor').textContent = `${modeloVal} • ${corVal}`;
         
         if (data.data_retirada) {
             document.getElementById('info_data_retirada').textContent = 'Collection: ' + new Date(data.data_retirada).toLocaleDateString('en-GB');
@@ -541,7 +565,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
-        // 3. Contract Card
+        // 3. Contract Card & Header Type Badges
+        const elHeaderTipo = document.getElementById('header_tipo_badge');
+        const elInfoTipo = document.getElementById('info_tipo_badge');
+        
+        if (data.tipo_contrato === 'Sale_Full') {
+            if (elHeaderTipo) {
+                elHeaderTipo.className = 'badge';
+                elHeaderTipo.style.cssText = 'background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 700; font-size: 0.85rem; padding: 4px 12px; border-radius: 9999px;';
+                elHeaderTipo.textContent = '💰 Sale: Full Payment';
+            }
+            if (elInfoTipo) {
+                elInfoTipo.className = 'badge';
+                elInfoTipo.style.cssText = 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-weight: 700;';
+                elInfoTipo.textContent = 'Sale: Full Payment';
+            }
+        } else if (data.tipo_contrato === 'Sale_Installment') {
+            if (elHeaderTipo) {
+                elHeaderTipo.className = 'badge';
+                elHeaderTipo.style.cssText = 'background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 700; font-size: 0.85rem; padding: 4px 12px; border-radius: 9999px;';
+                elHeaderTipo.textContent = '📊 Sale: Instalment';
+            }
+            if (elInfoTipo) {
+                elInfoTipo.className = 'badge';
+                elInfoTipo.style.cssText = 'background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700;';
+                elInfoTipo.textContent = 'Sale: Instalment';
+            }
+        } else {
+            if (elHeaderTipo) {
+                elHeaderTipo.className = 'badge';
+                elHeaderTipo.style.cssText = 'background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); font-weight: 700; font-size: 0.85rem; padding: 4px 12px; border-radius: 9999px;';
+                elHeaderTipo.textContent = '🛵 Rental Agreement';
+            }
+            if (elInfoTipo) {
+                elInfoTipo.className = 'badge';
+                elInfoTipo.style.cssText = 'background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35); font-weight: 700;';
+                elInfoTipo.textContent = 'Rental Agreement';
+            }
+        }
+
         let statusBadge = '';
         const stLower = (data.status || '').toLowerCase();
         if (stLower === 'active' || stLower === 'ativo') statusBadge = '<span class="badge badge-success">ACTIVE</span>';
@@ -551,13 +613,87 @@ document.addEventListener('DOMContentLoaded', async () => {
         else statusBadge = `<span class="badge badge-info">${(data.status || '').toUpperCase()}</span>`;
         document.getElementById('info_status').innerHTML = statusBadge;
 
-        const valAluguel = data.valor_aluguel_semanal ? formatoMoeda.format(data.valor_aluguel_semanal) : '-';
-        document.getElementById('info_aluguel').textContent = `${valAluguel} / week`;
+        const isVenda = data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment';
+        const blocoAluguel = document.getElementById('bloco_termos_aluguel');
+        const blocoVenda = document.getElementById('bloco_termos_venda');
 
-        const diaVencTexto = (data.dia_pagamento_semanal !== undefined && data.dia_pagamento_semanal !== null) 
-            ? (diasSemana[data.dia_pagamento_semanal] || `Day ${data.dia_pagamento_semanal}`)
-            : '-';
-        document.getElementById('info_dia_venc').textContent = diaVencTexto;
+        if (isVenda) {
+            if (blocoAluguel) blocoAluguel.style.display = 'none';
+            if (blocoVenda) {
+                blocoVenda.style.display = 'block';
+                const elTotal = document.getElementById('info_venda_total');
+                const elCat = document.getElementById('info_venda_categoria');
+                const elPreco = document.getElementById('info_venda_preco');
+                const elExtras = document.getElementById('info_venda_extras');
+                const rowEntrada = document.getElementById('row_venda_entrada');
+                const elEntrada = document.getElementById('info_venda_entrada');
+                const rowSaldo = document.getElementById('row_venda_saldo');
+                const elSaldo = document.getElementById('info_venda_saldo');
+
+                if (elTotal) elTotal.textContent = formatoMoeda.format(data.valor_total_venda || 0);
+                if (elCat) elCat.textContent = data.categoria_historico || 'Clear';
+                if (elPreco) elPreco.textContent = formatoMoeda.format(data.valor_venda_veiculo || 0);
+                
+                let extrasStr = '-';
+                if (data.acessorios_extras || data.valor_admin_fee) {
+                    const parts = [];
+                    if (data.acessorios_extras) parts.push(data.acessorios_extras);
+                    if (data.valor_admin_fee) parts.push(`Admin Fee: ${formatoMoeda.format(data.valor_admin_fee)}`);
+                    extrasStr = parts.join(' | ');
+                }
+                if (elExtras) elExtras.textContent = extrasStr;
+
+                if (data.tipo_contrato === 'Sale_Installment') {
+                    if (rowEntrada) rowEntrada.style.display = 'block';
+                    if (elEntrada) elEntrada.textContent = formatoMoeda.format(data.valor_entrada || 0);
+                    if (rowSaldo) rowSaldo.style.display = 'block';
+                    if (elSaldo) elSaldo.textContent = formatoMoeda.format(data.saldo_devedor || 0);
+                } else {
+                    if (rowEntrada) rowEntrada.style.display = 'none';
+                    if (rowSaldo) rowSaldo.style.display = 'none';
+                }
+            }
+
+            // Sale contracts: tailor manual charges and inspection link
+            const selectCobTipo = document.getElementById('cob_tipo');
+            if (selectCobTipo) {
+                selectCobTipo.innerHTML = `
+                    <option value="Sale_Installment">Sale Instalment / Parcela de Venda</option>
+                    <option value="Sale_Deposit">Sale Down Payment (Deposit) / Entrada de Venda</option>
+                    <option value="Fine">Fine / Penalty</option>
+                    <option value="Damage">Damage / Repair</option>
+                    <option value="Other">Other</option>
+                `;
+            }
+            const btnNovaVistoriaLink = document.getElementById('btnNovaVistoriaLink');
+            if (btnNovaVistoriaLink) {
+                btnNovaVistoriaLink.href = `/vistorias/nova?contrato_id=${CONTRATO_ID}&tipo=Incident`;
+            }
+        } else {
+            const selectCobTipo = document.getElementById('cob_tipo');
+            if (selectCobTipo) {
+                selectCobTipo.innerHTML = `
+                    <option value="Fine">Fine / Penalty</option>
+                    <option value="Damage">Damage / Repair</option>
+                    <option value="Rent">Extra Rent</option>
+                    <option value="Deposit">Deposit</option>
+                    <option value="Other">Other</option>
+                `;
+            }
+
+            if (blocoAluguel) blocoAluguel.style.display = 'block';
+            if (blocoVenda) blocoVenda.style.display = 'none';
+
+            const valAluguel = data.valor_aluguel_semanal ? formatoMoeda.format(data.valor_aluguel_semanal) : '-';
+            const elAluguel = document.getElementById('info_aluguel');
+            if (elAluguel) elAluguel.textContent = `${valAluguel} / week`;
+
+            const diaVencTexto = (data.dia_pagamento_semanal !== undefined && data.dia_pagamento_semanal !== null) 
+                ? (diasSemana[data.dia_pagamento_semanal] || `Day ${data.dia_pagamento_semanal}`)
+                : '-';
+            const elDiaVenc = document.getElementById('info_dia_venc');
+            if (elDiaVenc) elDiaVenc.textContent = diaVencTexto;
+        }
         
         const boxCriado = document.getElementById('box_criado_por');
         const infoCriado = document.getElementById('info_criado_por');
@@ -570,10 +706,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // Button Complete Contract
+        // Button Complete Contract (Only for rentals, not sales)
         const btnFinalizar = document.getElementById('btnFinalizarContrato');
         if (btnFinalizar) {
-            if (stLower === 'active' || stLower === 'ativo') {
+            if ((stLower === 'active' || stLower === 'ativo') && !isVenda) {
                 btnFinalizar.style.display = 'inline-flex';
                 btnFinalizar.onclick = () => {
                     document.getElementById('ocorrenciaModalTitle').textContent = 'Complete Contract (Check-in Inspection)';
@@ -690,7 +826,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // 3. Rental Agreement & Signatures Rendering
+        // 3. Agreement & Signatures Rendering
+        const contratoTituloTipo = document.getElementById('contrato_titulo_tipo');
+        const labelSigIni = document.getElementById('label_sig_inicial');
+        if (isVenda) {
+            if (contratoTituloTipo) contratoTituloTipo.textContent = '📄 Vehicle Sale Agreement & Signatures';
+            if (labelSigIni) labelSigIni.textContent = '1. Buyer Agreement Signature';
+        }
+
         const badgeSigIni = document.getElementById('badge_sig_inicial');
         const boxSigIniContent = document.getElementById('box_sig_inicial_content');
         const btnAssinarIni = document.getElementById('btnAssinarInicialTouch');
@@ -715,10 +858,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             if (boxSigIniContent) {
                 boxSigIniContent.innerHTML = `
-                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Client signature pending for start of rental.</span>
+                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Client signature pending for ${isVenda ? 'vehicle purchase agreement' : 'start of rental'}.</span>
                 `;
             }
             if (btnAssinarIni) btnAssinarIni.style.display = 'inline-flex';
+        }
+
+        const cardSigDev = document.getElementById('card_sig_devolucao');
+        if (cardSigDev) {
+            cardSigDev.style.display = isVenda ? 'none' : 'block';
         }
 
         const badgeSigDev = document.getElementById('badge_sig_devolucao');
@@ -862,6 +1010,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let tipoBadge = '';
                 if (tipoLower === 'rent' || tipoLower === 'aluguel') tipoBadge = '<span class="badge badge-info">Rent</span>';
                 else if (tipoLower === 'deposit' || tipoLower === 'deposito') tipoBadge = '<span class="badge" style="background:rgba(168, 85, 247, 0.2); color:#c084fc;">Deposit</span>';
+                else if (tipoLower === 'sale_full') tipoBadge = '<span class="badge" style="background:rgba(16, 185, 129, 0.2); color:#34d399; border:1px solid rgba(16, 185, 129, 0.4);">Sale: Full Payment</span>';
+                else if (tipoLower === 'sale_deposit') tipoBadge = '<span class="badge" style="background:rgba(217, 119, 6, 0.2); color:#fbbf24; border:1px solid rgba(217, 119, 6, 0.4);">Sale: Down Payment</span>';
+                else if (tipoLower === 'sale_installment') tipoBadge = '<span class="badge" style="background:rgba(59, 130, 246, 0.2); color:#60a5fa; border:1px solid rgba(59, 130, 246, 0.4);">Sale: Installment</span>';
                 else if (tipoLower === 'fine' || tipoLower === 'multa') tipoBadge = '<span class="badge badge-danger">Fine</span>';
                 else if (tipoLower === 'damage' || tipoLower === 'dano') tipoBadge = '<span class="badge badge-warning">Damage</span>';
                 else if (tipoLower === 'deposit_refund' || tipoLower === 'devolucao_deposito') tipoBadge = '<span class="badge badge-success">Deposit Refund</span>';
@@ -880,9 +1031,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>
                     `;
                 } else if (isPaid) {
+                    const descFinal = t.descricao || formatarDescricaoTransacao(t.tipo);
                     acoesHtml = `
                         <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
-                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
+                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
                                 🧾 Receipt
                             </button>
                             <button class="btn-action btn-reverter-pagamento" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 9px; font-size:0.8rem; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
@@ -948,6 +1100,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const b = e.target.closest('button');
                     const id = b.getAttribute('data-id');
                     const tipo = b.getAttribute('data-tipo');
+                    const descricao = b.getAttribute('data-descricao') || formatarDescricaoTransacao(tipo);
                     const valor = parseFloat(b.getAttribute('data-valor')) || 0;
                     const forma = b.getAttribute('data-forma') || 'Not specified';
                     const dataStr = b.getAttribute('data-data');
@@ -956,7 +1109,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('rec_contrato_id').textContent = `Contract #${CONTRATO_ID}`;
                     document.getElementById('rec_cliente').textContent = data.cliente || '-';
                     document.getElementById('rec_placa').textContent = data.placa || '-';
-                    document.getElementById('rec_tipo').textContent = tipo;
+                    document.getElementById('rec_tipo').textContent = descricao;
                     document.getElementById('rec_valor').textContent = formatoMoeda.format(valor);
                     document.getElementById('rec_forma').textContent = forma;
                     document.getElementById('rec_data').textContent = dataStr && dataStr !== '-' ? new Date(dataStr).toLocaleString('en-GB') : '-';
@@ -1801,11 +1954,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     function abrirAssinaturaTouch(tipo) {
         if (inputSigTipo) inputSigTipo.value = tipo;
         if (tipo === 'devolucao') {
-            if (titleSig) titleSig.textContent = 'Renter Return Signature';
+            if (titleSig) titleSig.textContent = 'Return Signature';
             if (subTitleSig) subTitleSig.textContent = 'Sign to confirm motorbike return and deposit hold terms.';
         } else {
-            if (titleSig) titleSig.textContent = 'Renter Agreement Signature';
-            if (subTitleSig) subTitleSig.textContent = 'Sign to confirm start of rental and vehicle collection.';
+            if (titleSig) titleSig.textContent = 'Agreement Signature';
+            if (subTitleSig) subTitleSig.textContent = 'Sign to confirm and vehicle collection.';
         }
         abrirModal('modalDetalheSignaturePad');
         setTimeout(() => initDetalheSignaturePad(), 50);

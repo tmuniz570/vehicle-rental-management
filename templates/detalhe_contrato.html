@@ -5,8 +5,11 @@
 {% block content %}
 <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
     <div>
-        <h1>Contract #<span id="header_id">{{ contrato_id }}</span></h1>
-        <p style="color: var(--text-secondary); margin-top: 0.25rem;">Rental agreement management, financial transactions statement and inspections.</p>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <h1 style="margin: 0;">Contract #<span id="header_id">{{ contrato_id }}</span></h1>
+            <span id="header_tipo_badge" class="badge" style="font-size: 0.85rem; padding: 0.35rem 0.85rem; font-weight: 700; border-radius: 9999px;">-</span>
+        </div>
+        <p style="color: var(--text-secondary); margin-top: 0.35rem;">Rental and vehicle sale agreement management, financial transactions statement and inspections.</p>
     </div>
     <div style="display: flex; gap: 0.75rem; align-items: center;">
         <button id="btnFinalizarContrato" class="btn-primary" style="background: #ef4444; width: auto; display: none; padding: 0.75rem 1.25rem; align-items: center; gap: 0.5rem;">
@@ -73,6 +76,7 @@
             </div>
             <div id="info_modelo_cor" style="color: var(--text-primary); font-weight: 500; font-size: 1rem; margin-bottom: 0.25rem;">-</div>
             <div id="info_data_retirada" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Collection Date: -</div>
+
             <!-- Mileage Tracker in Vehicle Card -->
             <div id="box_mileage_info" style="margin-top: 0.85rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); font-size: 0.82rem;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
@@ -147,13 +151,39 @@
                 <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Contract & Status</span>
                 <span id="info_status">-</span>
             </div>
-            <div style="margin-bottom: 0.5rem;">
-                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; display: block;">Weekly Rent</span>
-                <strong id="info_aluguel" style="font-size: 1.35rem; color: var(--accent);">-</strong>
+
+            <!-- Agreement Type Badge Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 8px;">
+                <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Agreement Type</span>
+                <span id="info_tipo_badge" class="badge" style="font-size: 0.82rem; font-weight: 700;">-</span>
             </div>
-            <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                Due Day: <strong id="info_dia_venc" style="color: var(--text-primary);">-</strong>
+
+            <!-- Block for Rental Terms -->
+            <div id="bloco_termos_aluguel">
+                <div style="margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; display: block;">Weekly Rent</span>
+                    <strong id="info_aluguel" style="font-size: 1.35rem; color: var(--accent);">-</strong>
+                </div>
+                <div style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Due Day: <strong id="info_dia_venc" style="color: var(--text-primary);">-</strong>
+                </div>
             </div>
+
+            <!-- Block for Vehicle Sale Terms -->
+            <div id="bloco_termos_venda" style="display: none;">
+                <div style="margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; display: block;">Total Sale Price</span>
+                    <strong id="info_venda_total" style="font-size: 1.35rem; color: #4ade80;">-</strong>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px;">
+                    <div>Category: <strong id="info_venda_categoria" style="color: var(--text-primary);">-</strong></div>
+                    <div>Vehicle Price: <strong id="info_venda_preco" style="color: var(--text-primary);">-</strong></div>
+                    <div id="row_venda_extras">Extras: <strong id="info_venda_extras" style="color: var(--text-primary);">-</strong></div>
+                    <div id="row_venda_entrada" style="display: none;">Deposit / Down Payment: <strong id="info_venda_entrada" style="color: #fbbf24;">-</strong></div>
+                    <div id="row_venda_saldo" style="display: none;">Outstanding Balance: <strong id="info_venda_saldo" style="color: #4ade80;">-</strong></div>
+                </div>
+            </div>
+
             <div id="box_criado_por" style="display:none; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
                 Staff / Created by: <strong id="info_criado_por" style="color: #c084fc;">-</strong>
             </div>
@@ -200,7 +230,7 @@
                     <span style="font-size: 1.1rem;">📷</span>
                 </div>
                 <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-                    <a href="/vistorias/nova?contrato_id={{ contrato_id }}" class="btn-primary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; width: auto; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none;">
+                    <a id="btnNovaVistoriaLink" href="/vistorias/nova?contrato_id={{ contrato_id }}" class="btn-primary" style="padding: 0.45rem 0.75rem; font-size: 0.78rem; width: auto; display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none;">
                         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
                         Inspection
                     </a>
@@ -229,7 +259,7 @@
     <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
         <div>
             <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
-                <span>📄 Rental Agreement & Signatures</span>
+                <span id="contrato_titulo_tipo">📄 Rental Agreement & Signatures</span>
                 <span style="font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 8px; border-radius: 6px; font-weight: 700;">
                     J&F / FF Motors UK
                 </span>
@@ -250,10 +280,10 @@
 
     <!-- Signatures Status Grid (Start & Return) -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
-        <!-- 1. Start of Rental Signature -->
+        <!-- 1. Start of Rental / Buyer Agreement Signature -->
         <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+                <span id="label_sig_inicial" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
                     1. Start of Rental Signature
                 </span>
                 <span id="badge_sig_inicial" class="badge" style="font-size: 0.72rem;">-</span>
@@ -271,7 +301,7 @@
         </div>
 
         <!-- 2. Termination of Rental Signature -->
-        <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
+        <div id="card_sig_devolucao" style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                 <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
                     2. Termination / Return Signature
@@ -660,8 +690,8 @@
     <div class="modal-card" style="max-width: 540px;">
         <div class="modal-header">
             <div>
-                <h3 id="detalheSignatureTitle" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">Renter Signature</h3>
-                <p id="detalheSignatureSubtitle" style="margin: 2px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Ask the client to sign using finger, stylus or mouse.</p>
+                <h3 id="detalheSignatureTitle" style="margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">Agreement Signature</h3>
+                <p id="detalheSignatureSubtitle" style="margin: 2px 0 0; font-size: 0.8rem; color: var(--text-secondary);">Sign to confirm and vehicle collection.</p>
             </div>
             <button id="closeDetalheSignatureModal" class="modal-close">&times;</button>
         </div>

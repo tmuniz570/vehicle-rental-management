@@ -60,10 +60,12 @@ class MotoStatus(str, Enum):
     AVAILABLE = "Available"
     RENTED = "Rented"
     MAINTENANCE = "Maintenance"
+    SOLD = "Sold"
     # Legacy aliases
     DISPONIVEL = "Available"
     ALUGADA = "Rented"
     MANUTENCAO = "Maintenance"
+    VENDIDA = "Sold"
 
 class ContractStatus(str, Enum):
     ACTIVE = "Active"
@@ -75,6 +77,15 @@ class ContractStatus(str, Enum):
     QUARENTENA_DEPOSITO = "Deposit_Hold"
     FINALIZADO = "Completed"
     CANCELADO = "Cancelled"
+
+class ContractType(str, Enum):
+    RENT = "Rent"
+    SALE_FULL = "Sale_Full"
+    SALE_INSTALLMENT = "Sale_Installment"
+    # Legacy aliases
+    ALUGUEL = "Rent"
+    VENDA_VISTA = "Sale_Full"
+    VENDA_PARCELADA = "Sale_Installment"
 
 class InspectionType(str, Enum):
     CHECK_OUT = "Check-out"
@@ -91,12 +102,18 @@ class TransactionType(str, Enum):
     FINE = "Fine"
     DAMAGE = "Damage"
     DEPOSIT_REFUND = "Deposit_Refund"
+    SALE_FULL = "Sale_Full"
+    SALE_DEPOSIT = "Sale_Deposit"
+    SALE_INSTALLMENT = "Sale_Installment"
     # Legacy aliases
     ALUGUEL = "Rent"
     DEPOSITO = "Deposit"
     MULTA = "Fine"
     DANO = "Damage"
     DEVOLUCAO_DEPOSITO = "Deposit_Refund"
+    VENDA_VISTA = "Sale_Full"
+    VENDA_ENTRADA = "Sale_Deposit"
+    VENDA_PARCELA = "Sale_Installment"
 
 class TransactionStatus(str, Enum):
     PENDING = "Pending"
@@ -142,14 +159,25 @@ class Contract(db.Model):
     id_cliente = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False, index=True)
     placa = db.Column(db.String(10), db.ForeignKey('motos.placa'), nullable=False, index=True)
     
+    tipo_contrato = db.Column(db.String(30), default=ContractType.RENT.value, nullable=False, index=True) # Rent, Sale_Full, Sale_Installment
     data_retirada = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
-    dia_pagamento_semanal = db.Column(db.Integer, nullable=False, index=True) # 0-6 (Segunda-Domingo)
-    valor_aluguel_semanal = db.Column(db.Float, nullable=False, default=250.00)
+    dia_pagamento_semanal = db.Column(db.Integer, nullable=True, default=0, index=True) # 0-6 (Segunda-Domingo, relevante para Rent)
+    valor_aluguel_semanal = db.Column(db.Float, nullable=True, default=0.0)
     data_devolucao = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default=ContractStatus.ATIVO.value, nullable=False, index=True)
     url_seguro = db.Column(db.String(255), nullable=True)
     url_comprovante_deposito = db.Column(db.String(255), nullable=True)
     criado_por_nome = db.Column(db.String(100), nullable=True)
+
+    # Specific Vehicle Sale Fields & UK Category
+    categoria_historico = db.Column(db.String(50), nullable=True) # Clear, Cat N, Cat S, Cat C, Cat D, Cat B
+    valor_venda_veiculo = db.Column(db.Numeric(10, 2), nullable=True)
+    acessorios_extras = db.Column(db.Text, nullable=True)
+    valor_admin_fee = db.Column(db.Numeric(10, 2), default=0.0, nullable=True)
+    valor_total_venda = db.Column(db.Numeric(10, 2), nullable=True)
+    valor_entrada = db.Column(db.Numeric(10, 2), default=0.0, nullable=True) # Down payment / Deposit da venda
+    saldo_devedor = db.Column(db.Numeric(10, 2), default=0.0, nullable=True) # Outstanding balance
+    cronograma_parcelas_json = db.Column(db.Text, nullable=True) # JSON list with installments schedule
     
     # Mileage Tracker (UK Miles)
     milhagem_inicial = db.Column(db.Integer, default=0, nullable=True)
@@ -353,6 +381,29 @@ def init_db(app):
                             conn.execute(db.text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_type}"))
                             conn.commit()
 
+                    # Vehicle Sale & UK Category Columns
+                    sale_cols = [
+                        ('tipo_contrato', "VARCHAR(30) DEFAULT 'Rent'"),
+                        ('categoria_historico', 'VARCHAR(50)'),
+                        ('valor_venda_veiculo', 'NUMERIC(10, 2)'),
+                        ('acessorios_extras', 'TEXT'),
+                        ('valor_admin_fee', 'NUMERIC(10, 2) DEFAULT 0.0'),
+                        ('valor_total_venda', 'NUMERIC(10, 2)'),
+                        ('valor_entrada', 'NUMERIC(10, 2) DEFAULT 0.0'),
+                        ('saldo_devedor', 'NUMERIC(10, 2) DEFAULT 0.0'),
+                        ('cronograma_parcelas_json', 'TEXT'),
+                    ]
+                    for col_name, col_type in sale_cols:
+                        if col_name not in cols_c:
+                            conn.execute(db.text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+
+                    try:
+                        conn.execute(db.text("CREATE INDEX IF NOT EXISTS idx_contratos_tipo ON contratos (tipo_contrato);"))
+                        conn.commit()
+                    except Exception as idx_err:
+                        print(f"[DB Auto-Migration] Index idx_contratos_tipo info: {idx_err}")
+
                     # Backfill existing contracts if snapshot fields are null
                     try:
                         conn.execute(db.text("""
@@ -383,6 +434,13 @@ def init_db(app):
                                 LIMIT 1
                             )
                             WHERE valor_deposito IS NULL;
+                        """))
+                        conn.commit()
+
+                        conn.execute(db.text("""
+                            UPDATE contratos
+                            SET tipo_contrato = 'Rent'
+                            WHERE tipo_contrato IS NULL;
                         """))
                         conn.commit()
                     except Exception as backfill_err:

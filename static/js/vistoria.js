@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             contratoInfoFixed.innerHTML = `Loading Contract #${idUrl}...`;
         }
         if (!tipoUrl) {
-            selectTipo.value = 'Check-in'; // Default when returning a bike
+            selectTipo.value = 'Incident'; // Safe initial default until contract type is known
         }
 
         // Update back navigation button
@@ -42,15 +42,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         fetch(`/api/contratos/${idUrl}`)
             .then(r => r.ok ? r.json() : null)
             .then(c => {
-                if (c && contratoInfoFixed) {
-                    const st = (c.status || '').toLowerCase();
-                    const badgeClass = (st === 'active' || st === 'ativo') ? 'badge-success' : 'badge-warning';
-                    contratoInfoFixed.innerHTML = `
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                            <span>Contract #${idUrl} &bull; <strong style="color: #60a5fa;">${c.placa || '-'}</strong> (${c.cliente || c.cliente_nome || '-'})</span>
-                            <span class="badge ${badgeClass}">${c.status || ''}</span>
-                        </div>
-                    `;
+                if (c) {
+                    const isVenda = c.tipo_contrato === 'Sale_Full' || c.tipo_contrato === 'Sale_Installment';
+                    const checkinOpt = selectTipo.querySelector('option[value="Check-in"]');
+                    if (isVenda) {
+                        if (checkinOpt) checkinOpt.remove();
+                        if (!tipoUrl || selectTipo.value === 'Check-in') {
+                            selectTipo.value = 'Incident';
+                        }
+                    } else {
+                        if (!tipoUrl) {
+                            selectTipo.value = 'Check-in';
+                        }
+                    }
+
+                    if (contratoInfoFixed) {
+                        const st = (c.status || '').toLowerCase();
+                        const badgeClass = (st === 'active' || st === 'ativo') ? 'badge-success' : 'badge-warning';
+                        contratoInfoFixed.innerHTML = `
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                                <span>Contract #${idUrl} &bull; <strong style="color: #60a5fa;">${c.placa || '-'}</strong> (${c.cliente || c.cliente_nome || '-'})</span>
+                                <span class="badge ${badgeClass}">${c.status || ''}</span>
+                            </div>
+                        `;
+                    }
                 }
             })
             .catch(err => console.error("Error fetching contract info:", err));
@@ -74,7 +89,25 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             contratoSelect.addEventListener('change', () => {
-                idContratoInput.value = contratoSelect.value;
+                const selId = contratoSelect.value;
+                idContratoInput.value = selId;
+                if (selId) {
+                    fetch(`/api/contratos/${selId}`)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(c => {
+                            if (c) {
+                                const isVenda = c.tipo_contrato === 'Sale_Full' || c.tipo_contrato === 'Sale_Installment';
+                                const checkinOpt = selectTipo.querySelector('option[value="Check-in"]');
+                                if (isVenda) {
+                                    if (checkinOpt) checkinOpt.style.display = 'none';
+                                    if (selectTipo.value === 'Check-in') selectTipo.value = 'Incident';
+                                } else {
+                                    if (checkinOpt) checkinOpt.style.display = '';
+                                }
+                            }
+                        })
+                        .catch(err => console.error("Error checking contract type:", err));
+                }
             });
         } catch (err) {
             console.error("Error loading contracts:", err);

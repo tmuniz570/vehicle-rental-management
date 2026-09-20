@@ -11,20 +11,51 @@
     <a href="/contratos" class="btn-secondary btn-back" data-back="true">&larr; Back to Contracts</a>
 </div>
 
-<div class="glass-card" style="max-width: 700px; margin: 0 auto;">
+<div class="glass-card" style="max-width: 760px; margin: 0 auto;">
     
     <form id="contratoForm" class="modern-form" enctype="multipart/form-data">
+        
+        <!-- Contract Type Selector Tabs -->
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">Contract Agreement Type *</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+                <label class="contract-type-card" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 0.85rem 1rem; border-radius: 12px; border: 1.5px solid var(--accent); background: rgba(255, 102, 0, 0.08); transition: all 0.2s ease;">
+                    <input type="radio" name="tipo_contrato" value="Rent" checked style="accent-color: var(--accent); width: 18px; height: 18px;">
+                    <div>
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">🛵 Rental</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Weekly rental agreement</div>
+                    </div>
+                </label>
+
+                <label class="contract-type-card" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--input-border); background: var(--card-bg); transition: all 0.2s ease;">
+                    <input type="radio" name="tipo_contrato" value="Sale_Full" style="accent-color: var(--accent); width: 18px; height: 18px;">
+                    <div>
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">💰 Sale (Full)</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Full payment at once</div>
+                    </div>
+                </label>
+
+                <label class="contract-type-card" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 0.85rem 1rem; border-radius: 12px; border: 1px solid var(--input-border); background: var(--card-bg); transition: all 0.2s ease;">
+                    <input type="radio" name="tipo_contrato" value="Sale_Installment" style="accent-color: var(--accent); width: 18px; height: 18px;">
+                    <div>
+                        <div style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">📅 Sale (Installment)</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">Deposit & payment schedule</div>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <div class="form-row">
             <div class="form-group half">
-                <label for="id_cliente">Customer</label>
-                <select id="id_cliente" name="id_cliente" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
+                <label for="id_cliente">Customer *</label>
+                <select id="id_cliente" name="id_cliente" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
                     <option value="">Loading customers...</option>
                 </select>
             </div>
             
             <div class="form-group half">
                 <label for="placa">Available Motorbike *</label>
-                <select id="placa" name="placa" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
+                <select id="placa" name="placa" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
                     <option value="">Loading motorbikes...</option>
                 </select>
             </div>
@@ -34,31 +65,180 @@
             <div class="form-group half">
                 <label for="milhagem_inicial">Start Mileage (Miles) *</label>
                 <input type="number" id="milhagem_inicial" name="milhagem_inicial" placeholder="e.g. 12450" min="0" step="1" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
-                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Odometer reading at collection. Pre-filled from fleet records.</small>
-            </div>
-            <div class="form-group half">
-                <label for="dia_pagamento_semanal">Weekly Payment Due Day *</label>
-                <select id="dia_pagamento_semanal" name="dia_pagamento_semanal" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;">
-                    <option value="0">Monday</option>
-                    <option value="1">Tuesday</option>
-                    <option value="2">Wednesday</option>
-                    <option value="3">Thursday</option>
-                    <option value="4">Friday</option>
-                    <option value="5">Saturday</option>
-                    <option value="6">Sunday</option>
-                </select>
+                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Odometer reading at delivery/collection.</small>
             </div>
         </div>
-        
-        <div class="form-row">
-            <div class="form-group half">
-                <label for="valor_aluguel_semanal">Weekly Rent (£) *</label>
-                <input type="number" inputmode="decimal" id="valor_aluguel_semanal" name="valor_aluguel_semanal" placeholder="e.g. 250.00" step="0.01" required>
+
+        <!-- ================= RENTAL FIELDS BLOCK ================= -->
+        <div id="blocoAluguel">
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="dia_pagamento_semanal">Weekly Payment Due Day *</label>
+                    <select id="dia_pagamento_semanal" name="dia_pagamento_semanal" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                        <option value="0">Monday</option>
+                        <option value="1">Tuesday</option>
+                        <option value="2">Wednesday</option>
+                        <option value="3">Thursday</option>
+                        <option value="4">Friday</option>
+                        <option value="5">Saturday</option>
+                        <option value="6">Sunday</option>
+                    </select>
+                </div>
+                <div class="form-group half">
+                    <label for="valor_aluguel_semanal">Weekly Rent (£) *</label>
+                    <input type="number" inputmode="decimal" id="valor_aluguel_semanal" name="valor_aluguel_semanal" placeholder="e.g. 250.00" step="0.01" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                </div>
             </div>
-            
-            <div class="form-group half">
-                <label for="valor_deposito">Security Deposit (£) *</label>
-                <input type="number" inputmode="decimal" id="valor_deposito" name="valor_deposito" placeholder="e.g. 500.00" step="0.01" required>
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="valor_deposito">Security Deposit (£) *</label>
+                    <input type="number" inputmode="decimal" id="valor_deposito" name="valor_deposito" placeholder="e.g. 500.00" step="0.01" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= VEHICLE SALE FIELDS BLOCK ================= -->
+        <div id="blocoVenda" style="display: none;">
+            <div class="form-row">
+                <div class="form-group half">
+                    <label for="categoria_historico">Vehicle Category (UK Salvage History) *</label>
+                    <select id="categoria_historico" name="categoria_historico" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                        <option value="Clear">Clear (No accident history)</option>
+                        <option value="Cat N">Cat N (Non-structural damage)</option>
+                        <option value="Cat S">Cat S (Structural damage)</option>
+                        <option value="Cat C">Cat C (Historical write-off)</option>
+                        <option value="Cat D">Cat D (Historical write-off)</option>
+                        <option value="Cat B">Cat B (Breaker / Parts only)</option>
+                    </select>
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Accident/salvage classification in the UK.</small>
+                </div>
+
+                <div class="form-group half">
+                    <label for="valor_venda_veiculo">Vehicle Sale Price (£) *</label>
+                    <input type="number" inputmode="decimal" id="valor_venda_veiculo" name="valor_venda_veiculo" placeholder="e.g. 2800.00" step="0.01" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                </div>
+            </div>
+
+            <!-- Accessories & Extras Itemized Builder -->
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--input-border); border-radius: 14px; padding: 1.25rem; margin-bottom: 1.25rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <label style="font-weight: 700; color: var(--text-primary); margin: 0; font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                            <span>📦</span> Accessories & Extras (Itemized)
+                        </label>
+                        <span style="font-size: 0.78rem; color: var(--text-secondary); display: block; margin-top: 2px;">Enter description and price for each extra item. Total is automatically calculated and added to the vehicle sale price.</span>
+                    </div>
+                    <span id="badgeTotalExtras" class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.9rem; font-weight: 800; padding: 5px 12px; border-radius: 8px;">
+                        Total Extras: £0.00
+                    </span>
+                </div>
+
+                <!-- Quick-Add Popular Extras Chips -->
+                <div style="margin-bottom: 0.85rem; padding: 0.65rem 0.85rem; background: rgba(0,0,0,0.15); border-radius: 10px; border: 1px dashed var(--input-border);">
+                    <span style="font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; display: block; margin-bottom: 6px;">⚡ Quick-Add Popular Extras:</span>
+                    <div id="quickExtrasChips" style="display: flex; flex-wrap: wrap; gap: 6px;">
+                        <button type="button" class="btn-extra-chip" data-desc="Easyblok" data-price="180" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Easyblok (£180)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="W. Charger" data-price="45" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ W. Charger (£45)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Leg Cover" data-price="140" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Leg Cover (£140)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Muff Tucano" data-price="70" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Muff Tucano (£70)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Rack" data-price="100" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Rack (£100)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Hotgrip Oxford" data-price="100" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Hotgrip Oxford (£100)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Windscreen Rex" data-price="100" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Windscreen Rex (£100)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="GPS Rewire" data-price="100" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ GPS Rewire (£100)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Helmet" data-price="60" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Helmet (£60)</button>
+                        <button type="button" class="btn-extra-chip" data-desc="Top Box" data-price="80" style="font-size: 0.76rem; padding: 4px 10px; border-radius: 9999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; transition: all 0.15s;">+ Top Box (£80)</button>
+                    </div>
+                </div>
+
+                <!-- Dynamic Itemized Rows List -->
+                <div id="extrasItemsContainer" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 0.85rem;">
+                    <!-- Populated via JavaScript -->
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                    <button type="button" id="btnAddExtraRow" class="btn-secondary" style="padding: 6px 14px; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>➕</span> Add Custom Extra
+                    </button>
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); text-align: right;">
+                        Contract Text Preview: <strong id="extrasStringPreview" style="color: #4ade80; font-family: monospace;">None</strong>
+                    </div>
+                </div>
+
+                <!-- Hidden inputs for backend submission -->
+                <input type="hidden" id="acessorios_extras" name="acessorios_extras" value="None">
+                <input type="hidden" id="valor_total_extras" name="valor_total_extras" value="0.00">
+            </div>
+
+            <!-- Installment Details -->
+            <div id="blocoParcelamento" style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--input-border); border-radius: 16px; padding: 1.25rem; margin-top: 1rem;">
+                <h4 style="margin: 0 0 1rem 0; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+                    <span>📊</span> Purchase Price & Installment Schedule
+                </h4>
+
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label for="valor_admin_fee">Admin Fee (£)</label>
+                        <input type="number" inputmode="decimal" id="valor_admin_fee" name="valor_admin_fee" value="0.00" step="0.01" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                    </div>
+                    <div class="form-group half">
+                        <label for="valor_entrada">Deposit / Down Payment (£) *</label>
+                        <input type="number" inputmode="decimal" id="valor_entrada" name="valor_entrada" placeholder="Due upon signing (e.g. 500.00)" step="0.01" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; background: rgba(0,0,0,0.2); padding: 0.85rem 1rem; border-radius: 10px;">
+                    <div>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Total Purchase Price:</span>
+                        <div id="lblTotalPurchasePrice" style="font-size: 1.2rem; font-weight: 800; color: var(--text-primary);">£0.00</div>
+                        <input type="hidden" id="valor_total_venda" name="valor_total_venda" value="0.00">
+                    </div>
+                    <div>
+                        <span style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Outstanding Balance:</span>
+                        <div id="lblOutstandingBalance" style="font-size: 1.2rem; font-weight: 800; color: #4ade80;">£0.00</div>
+                        <input type="hidden" id="saldo_devedor" name="saldo_devedor" value="0.00">
+                    </div>
+                </div>
+
+                <!-- Schedule Builder -->
+                <div style="margin-top: 1rem; border-top: 1px dashed var(--input-border); padding-top: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+                        <label style="font-weight: 700; color: var(--text-primary); margin: 0;">Installment Schedule *</label>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" id="quickNumInstallments" min="1" max="24" value="3" style="width: 60px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); text-align: center;">
+                            <select id="quickInterval" style="padding: 4px 8px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.8rem;">
+                                <option value="30">Monthly (30 days)</option>
+                                <option value="14">Bi-weekly (14 days)</option>
+                                <option value="7">Weekly (7 days)</option>
+                            </select>
+                            <button type="button" id="btnGenerateSchedule" class="btn-secondary" style="padding: 5px 10px; font-size: 0.8rem; font-weight: 600;">
+                                ⚡ Auto Split
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="scheduleContainer" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Dynamic Installment Rows -->
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+                        <button type="button" id="btnAddInstallmentRow" class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;">
+                            + Add Installment
+                        </button>
+                        <div id="scheduleValidationSummary" style="font-size: 0.8rem; font-weight: 600;"></div>
+                    </div>
+                    <input type="hidden" id="cronograma_parcelas" name="cronograma_parcelas" value="[]">
+                </div>
+            </div>
+
+            <!-- Full Payment Summary -->
+            <div id="blocoVendaVista" style="display: none; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 12px; padding: 1rem; margin-top: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 700; color: #4ade80;">Total Amount Due (Upon Signing)</div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary);">Full payment registered as single pending charge upon contract creation.</div>
+                    </div>
+                    <div id="lblFullPaymentTotal" style="font-size: 1.4rem; font-weight: 800; color: #4ade80;">£0.00</div>
+                </div>
             </div>
         </div>
         

@@ -151,7 +151,7 @@
     <div class="receipt-card">
         <div class="receipt-header">
             <h1>FF Motors</h1>
-            <p>Payment Receipt &bull; Birmingham UK</p>
+            <p>J&amp;F Motorcycles LTD &bull; Birmingham UK</p>
             <span class="receipt-badge">Payment Confirmed</span>
         </div>
 
@@ -169,12 +169,12 @@
                 <span>{{ cliente.nome if cliente else '-' }}</span>
             </div>
             <div class="receipt-row">
-                <span>Vehicle (Reg Plate):</span>
-                <span>{{ contrato.placa if contrato else '-' }}</span>
+                <span>Vehicle:</span>
+                <span>{% if contrato and (contrato.moto_modelo or (contrato.moto and contrato.moto.modelo)) %}{{ contrato.moto_modelo or contrato.moto.modelo }} ({{ contrato.placa }}){% elif contrato %}{{ contrato.placa }}{% else %}-{% endif %}</span>
             </div>
             <div class="receipt-row">
                 <span>Description:</span>
-                <span>{{ transacao.tipo }}</span>
+                <span style="font-weight: 600; color: #1e293b;">{{ descricao or transacao.tipo }}</span>
             </div>
             <div class="receipt-row">
                 <span>Payment Date:</span>
@@ -192,7 +192,7 @@
         </div>
 
         <div class="receipt-footer">
-            <p>FF Motors Fleet Management &bull; Thank you for choosing us!</p>
+            <p>FF Motors &bull; J&amp;F Motorcycles LTD &bull; Thank you for your business!</p>
         </div>
 
         <div class="receipt-actions">

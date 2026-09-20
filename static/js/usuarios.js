@@ -220,7 +220,7 @@ function renderizarTabela(usuarios) {
             roleBadge = '<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3);">Administrator</span>';
         } else {
             const perms = [];
-            if (user.perm_alugueis) perms.push('Aluguéis');
+            if (user.perm_alugueis) perms.push('Aluguel / Venda');
             if (user.perm_claims) perms.push('Claims');
             const permText = perms.length > 0 ? perms.join(' + ') : 'Sem Acesso';
             roleBadge = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">${escapeHtml(permText)}</span>`;

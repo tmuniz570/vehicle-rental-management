@@ -9,13 +9,25 @@
 </div>
 
 <div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-    <input type="text" id="searchInput" placeholder="Search by ID, reg plate, customer, status..." style="flex: 1; min-width: 200px; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+    <input type="text" id="searchInput" placeholder="Search by ID, reg plate, customer, type, status..." style="flex: 1; min-width: 200px; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+    
+    <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem 0.75rem; border-radius: 12px; border: 1px solid var(--border-color);">
+        <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Type:</span>
+        <select id="filterTipo" style="padding: 0.5rem 0.75rem; border-radius: 8px; border: none; background: transparent; color: var(--text-primary); font-weight: 500; cursor: pointer; outline: none;">
+            <option value="" selected style="background: #1e293b; color: white;">All Types</option>
+            <option value="Rent" style="background: #1e293b; color: white;">🛵 Rental Only</option>
+            <option value="Sale" style="background: #1e293b; color: white;">💰 Sales (All)</option>
+            <option value="Sale_Full" style="background: #1e293b; color: white;">Sale: Full</option>
+            <option value="Sale_Installment" style="background: #1e293b; color: white;">Sale: Installment</option>
+        </select>
+    </div>
+
     <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem 0.75rem; border-radius: 12px; border: 1px solid var(--border-color);">
         <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Status:</span>
         <select id="filterStatus" style="padding: 0.5rem 0.75rem; border-radius: 8px; border: none; background: transparent; color: var(--text-primary); font-weight: 500; cursor: pointer; outline: none;">
             <option value="open" selected style="background: #1e293b; color: white;">Open / In Progress (Non-finalized)</option>
-            <option value="all" style="background: #1e293b; color: white;">All Contracts</option>
-            <option value="Active" style="background: #1e293b; color: white;">Active Rentals Only</option>
+            <option value="all" style="background: #1e293b; color: white;">All Statuses</option>
+            <option value="Active" style="background: #1e293b; color: white;">Active</option>
             <option value="Deposit_Hold" style="background: #1e293b; color: white;">Deposit Holds Only</option>
             <option value="Completed" style="background: #1e293b; color: white;">Completed Only</option>
             <option value="Cancelled" style="background: #1e293b; color: white;">Cancelled Only</option>
@@ -28,12 +40,12 @@
         <thead>
             <tr>
                 <th data-sort-field="id" style="width: 70px;">ID</th>
+                <th data-sort-field="tipo">Type</th>
                 <th data-sort-field="cliente">Customer</th>
                 <th data-sort-field="placa">Reg Plate</th>
-                <th data-sort-field="data_retirada">Collection</th>
-                <th data-sort-field="dia_pagamento_semanal">Due Day</th>
-                <th data-sort-field="valor_aluguel_semanal">Weekly Rent</th>
-                <th data-sort-field="data_devolucao">Return Date</th>
+                <th data-sort-field="data_retirada">Date</th>
+                <th data-sort-field="dia_pagamento_semanal">Due / Terms</th>
+                <th data-sort-field="valor_aluguel_semanal">Amount</th>
                 <th data-sort-field="status">Status</th>
                 <th>Actions</th>
             </tr>

@@ -122,15 +122,421 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderPhotoPreviews();
     };
 
+    // --- Gestão de Tipo de Contrato (Rent, Sale_Full, Sale_Installment) ---
+    const radioTipos = document.querySelectorAll('input[name="tipo_contrato"]');
+    const blocoAluguel = document.getElementById('blocoAluguel');
+    const blocoVenda = document.getElementById('blocoVenda');
+    const blocoParcelamento = document.getElementById('blocoParcelamento');
+    const blocoVendaVista = document.getElementById('blocoVendaVista');
+
+    const inputDiaPagamento = document.getElementById('dia_pagamento_semanal');
+    const inputValorAluguel = document.getElementById('valor_aluguel_semanal');
+    const inputValorDeposito = document.getElementById('valor_deposito');
+
+    const inputValorVenda = document.getElementById('valor_venda_veiculo');
+    const inputAdminFee = document.getElementById('valor_admin_fee');
+    const inputValorEntrada = document.getElementById('valor_entrada');
+    const lblTotalPurchase = document.getElementById('lblTotalPurchasePrice');
+    const hiddenTotalVenda = document.getElementById('valor_total_venda');
+    const lblOutstanding = document.getElementById('lblOutstandingBalance');
+    const hiddenSaldoDevedor = document.getElementById('saldo_devedor');
+    const lblFullTotal = document.getElementById('lblFullPaymentTotal');
+
+    const scheduleContainer = document.getElementById('scheduleContainer');
+    const btnGenerateSchedule = document.getElementById('btnGenerateSchedule');
+    const btnAddInstallment = document.getElementById('btnAddInstallmentRow');
+    const quickNumInstallments = document.getElementById('quickNumInstallments');
+    const quickInterval = document.getElementById('quickInterval');
+    const validationSummary = document.getElementById('scheduleValidationSummary');
+    const hiddenCronograma = document.getElementById('cronograma_parcelas');
+
+    let scheduleItems = []; // [{ numero: 1, valor: 300.00, vencimento: '2026-10-20' }]
+
+    function getSelectedContractType() {
+        const checked = document.querySelector('input[name="tipo_contrato"]:checked');
+        return checked ? checked.value : 'Rent';
+    }
+
+    function updateContractTypeUI() {
+        const type = getSelectedContractType();
+
+        // Atualiza bordas e estilos dos cards de seleção
+        radioTipos.forEach(radio => {
+            const card = radio.closest('.contract-type-card');
+            if (card) {
+                if (radio.checked) {
+                    card.style.borderColor = 'var(--accent)';
+                    card.style.background = 'rgba(255, 102, 0, 0.08)';
+                } else {
+                    card.style.borderColor = 'var(--input-border)';
+                    card.style.background = 'var(--card-bg)';
+                }
+            }
+        });
+
+        if (type === 'Rent') {
+            if (blocoAluguel) blocoAluguel.style.display = 'block';
+            if (blocoVenda) blocoVenda.style.display = 'none';
+            if (blocoParcelamento) blocoParcelamento.style.display = 'none';
+            if (blocoVendaVista) blocoVendaVista.style.display = 'none';
+
+            if (inputDiaPagamento) inputDiaPagamento.required = true;
+            if (inputValorAluguel) inputValorAluguel.required = true;
+            if (inputValorDeposito) inputValorDeposito.required = true;
+
+            if (inputValorVenda) inputValorVenda.required = false;
+            if (inputValorEntrada) inputValorEntrada.required = false;
+        } else if (type === 'Sale_Full') {
+            if (blocoAluguel) blocoAluguel.style.display = 'none';
+            if (blocoVenda) blocoVenda.style.display = 'block';
+            if (blocoParcelamento) blocoParcelamento.style.display = 'none';
+            if (blocoVendaVista) blocoVendaVista.style.display = 'block';
+
+            if (inputDiaPagamento) inputDiaPagamento.required = false;
+            if (inputValorAluguel) inputValorAluguel.required = false;
+            if (inputValorDeposito) inputValorDeposito.required = false;
+
+            if (inputValorVenda) inputValorVenda.required = true;
+            if (inputValorEntrada) inputValorEntrada.required = false;
+            recalculateSaleTotals();
+        } else if (type === 'Sale_Installment') {
+            if (blocoAluguel) blocoAluguel.style.display = 'none';
+            if (blocoVenda) blocoVenda.style.display = 'block';
+            if (blocoParcelamento) blocoParcelamento.style.display = 'block';
+            if (blocoVendaVista) blocoVendaVista.style.display = 'none';
+
+            if (inputDiaPagamento) inputDiaPagamento.required = false;
+            if (inputValorAluguel) inputValorAluguel.required = false;
+            if (inputValorDeposito) inputValorDeposito.required = false;
+
+            if (inputValorVenda) inputValorVenda.required = true;
+            if (inputValorEntrada) inputValorEntrada.required = true;
+            recalculateSaleTotals();
+        }
+    }
+
+    radioTipos.forEach(radio => {
+        radio.addEventListener('change', updateContractTypeUI);
+    });
+
+    // --- Accessories & Extras Dynamic Builder ---
+    const extrasContainer = document.getElementById('extrasItemsContainer');
+    const badgeTotalExtras = document.getElementById('badgeTotalExtras');
+    const btnAddExtraRow = document.getElementById('btnAddExtraRow');
+    const extrasStringPreview = document.getElementById('extrasStringPreview');
+    const hiddenAcessoriosExtras = document.getElementById('acessorios_extras');
+    const hiddenValorTotalExtras = document.getElementById('valor_total_extras');
+    const quickChips = document.querySelectorAll('.btn-extra-chip');
+
+    let extrasItems = []; // [{ desc: 'Easyblok', price: 180 }]
+
+    function getExtrasTotal() {
+        return extrasItems.reduce((acc, it) => acc + (parseFloat(it.price) || 0), 0);
+    }
+
+    function formatExtrasString() {
+        if (!extrasItems || extrasItems.length === 0) return 'None';
+        const parts = [];
+        extrasItems.forEach(it => {
+            const desc = (it.desc || '').trim();
+            const val = parseFloat(it.price || 0);
+            if (desc || val > 0) {
+                const formattedVal = (val % 1 === 0) ? val.toFixed(0) : val.toFixed(2);
+                parts.push(`£${formattedVal} ${desc}`.trim());
+            }
+        });
+        return parts.length > 0 ? parts.join(', ') : 'None';
+    }
+
+    function updateExtrasOutput() {
+        const total = getExtrasTotal();
+        const str = formatExtrasString();
+
+        if (badgeTotalExtras) badgeTotalExtras.textContent = `Total Extras: £${total.toFixed(2)}`;
+        if (extrasStringPreview) extrasStringPreview.textContent = str;
+        if (hiddenAcessoriosExtras) hiddenAcessoriosExtras.value = str;
+        if (hiddenValorTotalExtras) hiddenValorTotalExtras.value = total.toFixed(2);
+
+        recalculateSaleTotals();
+    }
+
+    function renderExtrasTable() {
+        if (!extrasContainer) return;
+        extrasContainer.innerHTML = '';
+
+        if (extrasItems.length === 0) {
+            const emptyNotice = document.createElement('div');
+            emptyNotice.style.cssText = 'padding: 10px 14px; font-size: 0.8rem; color: var(--text-secondary); background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px dashed var(--input-border); text-align: center;';
+            emptyNotice.textContent = 'No extra accessories added yet. Click "+ Easyblok", "+ Leg Cover", etc. above or "+ Add Custom Extra".';
+            extrasContainer.appendChild(emptyNotice);
+            updateExtrasOutput();
+            return;
+        }
+
+        extrasItems.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.style.cssText = 'display: grid; grid-template-columns: 1fr 120px 36px; gap: 8px; align-items: center; background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color);';
+            row.innerHTML = `
+                <div>
+                    <input type="text" class="extra-desc-input" data-idx="${index}" value="${escapeHtml(item.desc || '')}" placeholder="Description (e.g. Easyblok)" style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div>
+                    <input type="number" step="0.01" class="extra-price-input" data-idx="${index}" value="${parseFloat(item.price || 0)}" placeholder="Price (£)" style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.85rem;">
+                </div>
+                <div style="text-align: center;">
+                    <button type="button" class="btn-remove-extra" data-idx="${index}" title="Remove Extra" style="background: transparent; border: none; color: #ef4444; font-size: 1.25rem; cursor: pointer; padding: 2px 6px; line-height: 1;">&times;</button>
+                </div>
+            `;
+            extrasContainer.appendChild(row);
+        });
+
+        extrasContainer.querySelectorAll('.extra-desc-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                extrasItems[idx].desc = e.target.value;
+                updateExtrasOutput();
+            });
+        });
+
+        extrasContainer.querySelectorAll('.extra-price-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                extrasItems[idx].price = parseFloat(e.target.value || 0);
+                updateExtrasOutput();
+            });
+        });
+
+        extrasContainer.querySelectorAll('.btn-remove-extra').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                extrasItems.splice(idx, 1);
+                renderExtrasTable();
+            });
+        });
+
+        updateExtrasOutput();
+    }
+
+    if (btnAddExtraRow) {
+        btnAddExtraRow.addEventListener('click', () => {
+            extrasItems.push({ desc: '', price: 0 });
+            renderExtrasTable();
+            setTimeout(() => {
+                const inputs = extrasContainer.querySelectorAll('.extra-desc-input');
+                if (inputs.length > 0) inputs[inputs.length - 1].focus();
+            }, 50);
+        });
+    }
+
+    quickChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            const desc = chip.dataset.desc;
+            const price = parseFloat(chip.dataset.price || 0);
+            extrasItems.push({ desc: desc, price: price });
+            renderExtrasTable();
+        });
+    });
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Cálculos em tempo real de Venda
+    function recalculateSaleTotals() {
+        const preco = parseFloat(inputValorVenda?.value || 0);
+        const adminFee = parseFloat(inputAdminFee?.value || 0);
+        const entrada = parseFloat(inputValorEntrada?.value || 0);
+        const totalExtras = getExtrasTotal();
+
+        const totalVenda = preco + adminFee + totalExtras;
+        const saldoDevedor = Math.max(0, totalVenda - entrada);
+
+        if (lblTotalPurchase) lblTotalPurchase.textContent = `£${totalVenda.toFixed(2)}`;
+        if (hiddenTotalVenda) hiddenTotalVenda.value = totalVenda.toFixed(2);
+        if (lblOutstanding) lblOutstanding.textContent = `£${saldoDevedor.toFixed(2)}`;
+        if (hiddenSaldoDevedor) hiddenSaldoDevedor.value = saldoDevedor.toFixed(2);
+        
+        const totalVendaVista = preco + totalExtras;
+        if (lblFullTotal) lblFullTotal.textContent = `£${totalVendaVista.toFixed(2)}`;
+
+        const type = getSelectedContractType();
+        if (type === 'Sale_Full') {
+            if (hiddenTotalVenda) hiddenTotalVenda.value = totalVendaVista.toFixed(2);
+        }
+
+        validateScheduleSum();
+    }
+
+    if (inputValorVenda) inputValorVenda.addEventListener('input', recalculateSaleTotals);
+    if (inputAdminFee) inputAdminFee.addEventListener('input', recalculateSaleTotals);
+    if (inputValorEntrada) inputValorEntrada.addEventListener('input', recalculateSaleTotals);
+
+    // Construtor e Validador de Parcelas
+    function renderScheduleTable() {
+        if (!scheduleContainer) return;
+        scheduleContainer.innerHTML = '';
+
+        scheduleItems.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.style.display = 'grid';
+            row.style.gridTemplateColumns = '80px 1fr 1fr 40px';
+            row.style.gap = '8px';
+            row.style.alignItems = 'center';
+            row.innerHTML = `
+                <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); padding-left: 4px;">Inst. #${index + 1}</div>
+                <div>
+                    <input type="number" step="0.01" value="${parseFloat(item.valor || 0).toFixed(2)}" class="schedule-amount-input" data-idx="${index}" placeholder="Amount (£)" style="width:100%; padding:6px 10px; border-radius:8px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-primary); font-size:0.85rem;">
+                </div>
+                <div>
+                    <input type="date" value="${item.vencimento || ''}" class="schedule-date-input" data-idx="${index}" style="width:100%; padding:6px 10px; border-radius:8px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-primary); font-size:0.85rem;">
+                </div>
+                <div>
+                    <button type="button" class="btn-remove-installment" data-idx="${index}" title="Remove" style="background:transparent; border:none; color:#ef4444; font-size:1.2rem; cursor:pointer; padding:2px 6px;">&times;</button>
+                </div>
+            `;
+            scheduleContainer.appendChild(row);
+        });
+
+        // Listeners para edição inline
+        scheduleContainer.querySelectorAll('.schedule-amount-input').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                scheduleItems[idx].valor = parseFloat(e.target.value || 0);
+                validateScheduleSum();
+            });
+        });
+
+        scheduleContainer.querySelectorAll('.schedule-date-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                scheduleItems[idx].vencimento = e.target.value;
+                validateScheduleSum();
+            });
+        });
+
+        scheduleContainer.querySelectorAll('.btn-remove-installment').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.idx);
+                scheduleItems.splice(idx, 1);
+                scheduleItems.forEach((it, i) => it.numero = i + 1);
+                renderScheduleTable();
+                validateScheduleSum();
+            });
+        });
+
+        validateScheduleSum();
+    }
+
+    function validateScheduleSum() {
+        const saldo = parseFloat(hiddenSaldoDevedor?.value || 0);
+        const sum = scheduleItems.reduce((acc, cur) => acc + parseFloat(cur.valor || 0), 0);
+        const diff = Math.abs(sum - saldo);
+
+        if (hiddenCronograma) {
+            hiddenCronograma.value = JSON.stringify(scheduleItems);
+        }
+
+        if (!validationSummary) return;
+
+        if (scheduleItems.length === 0) {
+            validationSummary.innerHTML = '<span style="color: var(--text-secondary);">No installments generated yet</span>';
+            return;
+        }
+
+        if (diff < 0.05) {
+            validationSummary.innerHTML = `<span style="color: #4ade80;">✓ Total: £${sum.toFixed(2)} (Matches 100%)</span>`;
+        } else {
+            validationSummary.innerHTML = `<span style="color: #f87171;">⚠️ Total: £${sum.toFixed(2)} / Expected: £${saldo.toFixed(2)} (Diff: £${(saldo - sum).toFixed(2)})</span>`;
+        }
+    }
+
+    if (btnGenerateSchedule) {
+        btnGenerateSchedule.addEventListener('click', () => {
+            const saldo = parseFloat(hiddenSaldoDevedor?.value || 0);
+            const num = Math.max(1, parseInt(quickNumInstallments?.value || 3));
+            const daysInterval = parseInt(quickInterval?.value || 30);
+
+            if (saldo <= 0) {
+                showFeedback('Please set the Vehicle Price and Deposit before generating installments.', 'error');
+                return;
+            }
+
+            const baseAmount = Math.floor((saldo / num) * 100) / 100;
+            const remainder = Math.round((saldo - (baseAmount * num)) * 100) / 100;
+
+            scheduleItems = [];
+            const today = new Date();
+
+            for (let i = 1; i <= num; i++) {
+                const dueDate = new Date(today);
+                dueDate.setDate(dueDate.getDate() + (daysInterval * i));
+                const yyyy = dueDate.getFullYear();
+                const mm = String(dueDate.getMonth() + 1).padStart(2, '0');
+                const dd = String(dueDate.getDate()).padStart(2, '0');
+
+                let amount = baseAmount;
+                if (i === num) {
+                    amount = Math.round((amount + remainder) * 100) / 100;
+                }
+
+                scheduleItems.push({
+                    numero: i,
+                    valor: amount,
+                    vencimento: `${yyyy}-${mm}-${dd}`
+                });
+            }
+
+            renderScheduleTable();
+        });
+    }
+
+    if (btnAddInstallment) {
+        btnAddInstallment.addEventListener('click', () => {
+            const nextIdx = scheduleItems.length + 1;
+            const today = new Date();
+            today.setDate(today.getDate() + (30 * nextIdx));
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+
+            scheduleItems.push({
+                numero: nextIdx,
+                valor: 0.00,
+                vencimento: `${yyyy}-${mm}-${dd}`
+            });
+            renderScheduleTable();
+        });
+    }
+
+    // Inicialização do estado de UI
+    renderExtrasTable();
+    updateContractTypeUI();
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
         feedbackMsg.classList.add('hidden');
         feedbackMsg.className = 'feedback-message hidden';
 
+        const contractType = getSelectedContractType();
+
         if (selectedPhotos.length === 0) {
             showFeedback('Please take or select at least one check-out photo of the motorbike.', 'error');
             return;
+        }
+
+        if (contractType === 'Sale_Installment') {
+            const saldo = parseFloat(hiddenSaldoDevedor?.value || 0);
+            if (scheduleItems.length === 0 && saldo > 0) {
+                showFeedback('Please generate or add the installment schedule for this sale.', 'error');
+                return;
+            }
+            const sum = scheduleItems.reduce((acc, cur) => acc + parseFloat(cur.valor || 0), 0);
+            if (Math.abs(sum - saldo) > 0.05) {
+                showFeedback(`Installment schedule sum (£${sum.toFixed(2)}) must equal the Outstanding Balance (£${saldo.toFixed(2)}).`, 'error');
+                return;
+            }
         }
         
         submitBtn.disabled = true;
@@ -141,9 +547,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         formData.append('id_cliente', document.getElementById('id_cliente').value);
         formData.append('placa', document.getElementById('placa').value);
         formData.append('milhagem_inicial', document.getElementById('milhagem_inicial').value || '0');
-        formData.append('dia_pagamento_semanal', document.getElementById('dia_pagamento_semanal').value);
-        formData.append('valor_aluguel_semanal', document.getElementById('valor_aluguel_semanal').value);
-        formData.append('valor_deposito', document.getElementById('valor_deposito').value);
+        formData.append('tipo_contrato', contractType);
+        
+        if (contractType === 'Rent') {
+            formData.append('dia_pagamento_semanal', document.getElementById('dia_pagamento_semanal').value);
+            formData.append('valor_aluguel_semanal', document.getElementById('valor_aluguel_semanal').value);
+            formData.append('valor_deposito', document.getElementById('valor_deposito').value);
+        } else {
+            formData.append('categoria_historico', document.getElementById('categoria_historico').value);
+            formData.append('valor_venda_veiculo', document.getElementById('valor_venda_veiculo').value);
+            formData.append('acessorios_extras', document.getElementById('acessorios_extras').value);
+            formData.append('valor_total_extras', document.getElementById('valor_total_extras')?.value || '0.00');
+            
+            if (contractType === 'Sale_Installment') {
+                formData.append('valor_admin_fee', document.getElementById('valor_admin_fee').value || '0.00');
+                formData.append('valor_total_venda', document.getElementById('valor_total_venda').value);
+                formData.append('valor_entrada', document.getElementById('valor_entrada').value || '0.00');
+                formData.append('saldo_devedor', document.getElementById('saldo_devedor').value || '0.00');
+                formData.append('cronograma_parcelas', JSON.stringify(scheduleItems));
+            } else {
+                formData.append('valor_total_venda', document.getElementById('valor_total_venda')?.value || document.getElementById('valor_venda_veiculo').value);
+            }
+        }
         
         // Check-out inspection
         formData.append('observacoes', document.getElementById('observacoes').value);
