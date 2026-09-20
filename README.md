@@ -1,16 +1,17 @@
-# 🏍️ FF Motors — Motorcycle Fleet & Rental Operations System
+# 🏍️ FF Motors — Motorcycle Fleet, Rental & Sales Operations System
 
 <div align="center">
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.5.0--Hardened-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.7.0--Sales%20Ready-success?style=for-the-badge)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
 ![License](https://img.shields.io/badge/License-All%20Rights%20Reserved-red?style=for-the-badge)
 ![Location](https://img.shields.io/badge/Location-Birmingham%2C%20UK-red?style=for-the-badge)
 
-**A modern, mobile-first Fleet Operations, Rental Agreement, and Financial Management platform tailored for motorcycle rental businesses in the UK.**
+**A modern, mobile-first Fleet Operations, Rental & Sales Agreements, and Financial Management platform tailored for motorcycle businesses in the UK.**
 
 </div>
 
@@ -40,17 +41,23 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
 * **1-Tap WhatsApp Integration:** Automatic normalization and international formatting of UK phone numbers (`+447...`) allowing instant WhatsApp chat links from any contract or customer card.
 
-### 📁 4. Claims & Storage Management (McAms / ALS / 365)
-* **Accident Claim Lifecycle:** Comprehensive tracking of insurance claims referred to partner companies (**McAms**, **ALS**, **365**), from approval date to payout.
+### 📁 4. Claims & Storage Management (Accident & Insurance Referrals)
+* **Accident Claim Lifecycle:** Comprehensive tracking of insurance claims referred to specialist accident management partners, from approval date to final settlement.
 * **Referral Fee Deadlines (14 Days):** Automatic calculation of the 14-day referral commission deadline following claim approval, with overdue alerts and settlement logging.
 * **Yard Storage Limits (28 Days):** Automated monitoring of bikes stored on the yard awaiting insurer inspection, with 28-day release threshold alerts.
 * **Storage Invoicing (14 Days):** Instant calculation of storage duration `(Days × £15/day)` upon bike release, dedicated printable and branded Storage Invoices, and 14-day insurer payment due dates.
 * **Server-Side Pagination, Sorting & Date Period Filters:** Fast pagination (20 items/page), multi-column sorting, and multi-field date range filtering (Accident, Approval, Storage In, Release, Invoice Sent, Created).
 
-### 📋 5. Contract & Security Deposit Accounting
-* **Automated Initial Billing:** Creating a contract instantly provisions Week 1 rent (due upon collection) and Week 2 recurring rent (scheduled for the client's chosen weekday payment cycle).
-* **Deposit Lifecycle Management:** Security deposit holding, balance calculation, and automated deductions when damages or fines occur.
-* **Contract Completion Workflow:** Return inspection mandatory review, deposit refund processing, and proof of bank transfer attachment.
+### 📋 5. Contract Agreements & Lifecycle (Rentals & Vehicle Sales)
+* **Dual Contract Modes (Rentals & Vehicle Sales):**
+  - **Rental Agreements (`Rent`):** Provisions Week 1 collection rent and Week 2 recurring rent scheduled for the client's chosen weekday payment cycle, with security deposit holding.
+  - **Full Vehicle Sales (`Sale_Full`):** Outright vehicle sale provisioned with pending transaction and immediate transition of motorcycle status to `Sold`.
+  - **Instalment Vehicle Sales (`Sale_Installment`):** Financed purchase provisioned with segregated down payment (`Sale_Deposit`), administrative fee, itemized accessories, and scheduled instalment payment dates (`Sale_Installment`).
+* **Interactive Itemized Accessories & Extras Builder:** Real-time selector and custom accessory adder (e.g., security trackers, locks, heated grips, weather covers) with dynamic cost summation applied directly to the agreement total.
+* **Printable Formal Agreements:** Dedicated print templates for both rental agreements and vehicle sales agreements featuring dealership credentials, fixed seller authorization signature, instalment schedule tables, and UK vehicle history categorization (`Clear`, `Cat N`, etc.).
+* **Smart Insurance Compliance & Exemption:** 15-day recurring government database verification (askMID) for active rentals, with automatic exemption for sold vehicles while preserving the collected insurance policy on file.
+* **Protection Against Incompatible Operations:** Sold motorbikes are automatically protected against rental return inspections (`Check-in`) and excluded from recurring rental billing batches, while allowing warranty and damage logs (`Incident`).
+* **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.
 
 ### 🔍 6. Digital Mobile Inspections & Incident Logging
 * **Multi-Angle Camera Capture:** Tailored for yard operators using smartphones to snap vehicle photos at check-out, return check-in, or road incidents.
@@ -212,6 +219,8 @@ FF Motors APP/
 ├── docs/                      # Architectural and operational documentation
 │   ├── DEPLOY_E_BANCO_DE_DADOS.md # Zero-downtime deploy & database migration manual
 │   └── plano_claims_modular.md   # Claims module architecture and permissions design
+├── tests/
+│   └── test_vendas_contratos.py# Automated tests for sales workflow, extras & insurance rules
 ├── static/
 │   ├── css/
 │   │   └── styles.css         # Glassmorphism design system & responsive rules
@@ -230,11 +239,13 @@ FF Motors APP/
     ├── layout.html            # Base master layout with modular permissions sidebar
     ├── login.html             # Glassmorphism dark authentication screen
     ├── index.html             # Executive operational dashboard (filtered by module access)
-    ├── claims.html            # Claims & Storage management (McAms/ALS/365)
+    ├── claims.html            # Claims & Storage management (insurance claims & yard storage)
     ├── claim_invoice.html     # Dedicated printable Storage Invoice template
     ├── usuarios.html          # User management & audit log dashboard
     ├── contratos.html         # Contracts list & status filtering
+    ├── novo_contrato.html     # Agreement wizard (Rentals, Full Sales & Instalments with Extras)
     ├── detalhe_contrato.html  # Comprehensive agreement view & financial statement
+    ├── contrato_venda_print.html # Printable vehicle sale agreement template
     ├── financeiro.html        # Central finance statement & transaction ledger
     ├── relatorio_vencidos.html# Fleet-wide overdue receivables & collection hub
     ├── motos.html             # Fleet inventory & maintenance board
