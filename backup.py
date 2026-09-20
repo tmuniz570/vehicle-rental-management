@@ -2,6 +2,7 @@ import os
 import zipfile
 import subprocess
 import re
+import sqlite3
 from datetime import datetime
 
 def create_backup():
@@ -16,23 +17,43 @@ def create_backup():
     ignore_dirs = {'venv', 'env', '__pycache__', '.git', 'backups'}
     ignore_exts = {'.pyc', '.pyo'}
     
+    # 1. Detect Database Type (PostgreSQL vs SQLite)
     db_dump_file = None
-    env_path = os.path.join(base_dir, '.env')
-    if os.path.exists(env_path):
-        with open(env_path, 'r') as f:
-            env_content = f.read()
-        db_match = re.search(r'^DATABASE_URL=(postgresql[^\s]+)', env_content, re.MULTILINE)
-        if db_match:
-            db_url = db_match.group(1)
-            print("PostgreSQL connection detected in .env! Generating database dump...")
-            db_dump_file = os.path.join(base_dir, 'database_dump.sql')
+    db_url = os.environ.get('DATABASE_URL')
+    
+    if not db_url:
+        env_path = os.path.join(base_dir, '.env')
+        if os.path.exists(env_path):
+            with open(env_path, 'r', encoding='utf-8') as f:
+                env_content = f.read()
+            db_match = re.search(r'^DATABASE_URL=(postgres(?:ql)?:\/\/[^\s]+)', env_content, re.MULTILINE)
+            if db_match:
+                db_url = db_match.group(1)
+                
+    if db_url and (db_url.startswith('postgres://') or db_url.startswith('postgresql://')):
+        print("PostgreSQL connection detected! Generating database dump...")
+        db_dump_file = os.path.join(base_dir, 'database_dump.sql')
+        # Normalize url for pg_dump if needed
+        pg_url = db_url.replace("postgres://", "postgresql://", 1) if db_url.startswith("postgres://") else db_url
+        try:
+            subprocess.run(['pg_dump', pg_url, '-f', db_dump_file], check=True)
+            print("PostgreSQL dump successfully generated (database_dump.sql).")
+        except Exception as e:
+            print(f"Warning: Failed to create PostgreSQL dump: {e}")
+            if os.path.exists(db_dump_file):
+                os.remove(db_dump_file)
+            db_dump_file = None
+    else:
+        # SQLite: checkpoint WAL file so database file is 100% up-to-date
+        sqlite_file = os.path.join(base_dir, 'ffmotors.db')
+        if os.path.exists(sqlite_file):
             try:
-                subprocess.run(['pg_dump', db_url, '-f', db_dump_file], check=True)
+                conn = sqlite3.connect(sqlite_file)
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                conn.close()
+                print("SQLite WAL checkpoint completed.")
             except Exception as e:
-                print(f"Warning: Failed to create PostgreSQL dump: {e}")
-                if os.path.exists(db_dump_file):
-                    os.remove(db_dump_file)
-                db_dump_file = None
+                print(f"Notice: SQLite checkpoint skipped: {e}")
     
     print(f"Creating restore point: {backup_filename} ...")
     

@@ -19,7 +19,7 @@ from database import (
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
     User, AuditLog, JobExecutionLock, Claim, ContractAttachment, delete_file_if_exists
 )
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, contains_eager
 import werkzeug.utils
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
@@ -40,10 +40,17 @@ else:
 app.config['SQLALCHEMY_DATABASE_URI'] = db_uri
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# SQLite 30-second timeout to prevent database locks under concurrent load
+# Database Engine Options: SQLite timeout vs PostgreSQL production pool
 if "sqlite" in db_uri.lower():
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'connect_args': {'timeout': 30}
+    }
+else:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 10,
+        'max_overflow': 20,
+        'pool_recycle': 1800,
+        'pool_pre_ping': True
     }
 
 app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER') or os.path.join(basedir, 'static', 'uploads')
@@ -470,7 +477,7 @@ def salvar_arquivo_otimizado(file_storage, nome_arquivo):
             
         nome_webp = os.path.splitext(nome_arquivo)[0] + '.webp'
         caminho_webp = os.path.join(uploads_dir, nome_webp)
-        img.save(caminho_webp, 'WEBP', quality=80, method=6)
+        img.save(caminho_webp, 'WEBP', quality=80, method=4)
         return nome_webp
     except Exception:
         try:
@@ -714,8 +721,18 @@ def listar_claims():
         except Exception:
             pass
 
-    # KPIs Globais do Módulo (visão geral permanente e estável, independente dos filtros da tabela)
-    all_claims_global = Claim.query.all()
+    # KPIs Globais do Módulo (otimizado: apenas colunas necessárias em vez do modelo ORM completo)
+    all_claims_global = db.session.query(
+        Claim.status,
+        Claim.prazo_liberacao_storage,
+        Claim.status_storage,
+        Claim.prazo_indicacao,
+        Claim.status_indicacao,
+        Claim.prazo_pagamento_invoice,
+        Claim.status_pagamento_storage,
+        Claim.valor_indicacao,
+        Claim.valor_total_storage
+    ).all()
     total_indicacao_pendente = 0.0
     total_storage_pendente = 0.0
     motos_no_storage = 0
@@ -2512,7 +2529,9 @@ def listar_vistorias():
     }
     target_col = sort_map.get(sort_by, Inspection.data)
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
-    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+    paginated = query.options(
+        contains_eager(Inspection.contrato).contains_eager(Contract.cliente)
+    ).order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': v.id,
@@ -2614,7 +2633,9 @@ def listar_financeiro():
     }
     target_col = sort_map.get(sort_by, FinancialTransaction.data_vencimento)
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
-    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+    paginated = query.options(
+        contains_eager(FinancialTransaction.contrato).contains_eager(Contract.cliente)
+    ).order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': t.id,
@@ -2756,9 +2777,12 @@ def get_dashboard():
                     'cliente_nome': cliente_nome
                 })
             
-        contratos_ativos_lista = Contract.query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
-        contratos_ativos = len(contratos_ativos_lista)
-        receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_lista)
+        # Performance: Single query for active contracts with eager-loaded clients (reused in askMID compliance)
+        contratos_ativos_objs = db.session.query(Contract).options(
+            joinedload(Contract.cliente)
+        ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+        contratos_ativos = len(contratos_ativos_objs)
+        receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_objs)
         
         total_clientes = Client.query.count()
         
@@ -2834,9 +2858,13 @@ def get_dashboard():
                 'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
             })
         
-        # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias)
+        # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias - query colunas necessárias)
         hoje_date = get_london_date()
-        todas_motos = Motorcycle.query.all()
+        todas_motos = db.session.query(
+            Motorcycle.placa,
+            Motorcycle.vencimento_tax,
+            Motorcycle.vencimento_mot
+        ).all()
         tax_mot_warnings = 0
         tax_warnings = 0
         mot_warnings = 0
@@ -2875,10 +2903,7 @@ def get_dashboard():
                 else:
                     tax_mot_expiring_soon += 1
                     
-        # Compliance: Checagem Quinzenal de Seguro no askMID (15 em 15 dias)
-        contratos_ativos_objs = db.session.query(Contract).options(
-            joinedload(Contract.cliente)
-        ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+        # Compliance: Checagem Quinzenal de Seguro no askMID (reaproveita contratos_ativos_objs carregados acima)
         seguros_pendentes_count = 0
         seguros_cancelados_count = 0
         contratos_seguro_alerta = []

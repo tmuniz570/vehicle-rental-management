@@ -143,7 +143,7 @@ class Contract(db.Model):
     placa = db.Column(db.String(10), db.ForeignKey('motos.placa'), nullable=False, index=True)
     
     data_retirada = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
-    dia_pagamento_semanal = db.Column(db.Integer, nullable=False) # 0-6 (Segunda-Domingo)
+    dia_pagamento_semanal = db.Column(db.Integer, nullable=False, index=True) # 0-6 (Segunda-Domingo)
     valor_aluguel_semanal = db.Column(db.Float, nullable=False, default=250.00)
     data_devolucao = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), default=ContractStatus.ATIVO.value, nullable=False, index=True)
@@ -219,6 +219,10 @@ class FinancialTransaction(db.Model):
     status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False, index=True)
     forma_pagamento = db.Column(db.String(50), nullable=True)
     registrado_por_nome = db.Column(db.String(100), nullable=True)
+
+    __table_args__ = (
+        db.Index('idx_ft_status_vencimento', 'status', 'data_vencimento'),
+    )
 
 class AuditLog(db.Model):
     __tablename__ = 'logs_auditoria'
@@ -501,6 +505,8 @@ def init_db(app):
                     ("idx_claims_status", "claims", "status"),
                     ("idx_claims_empresa", "claims", "empresa_parceira"),
                     ("idx_anexos_contrato", "contrato_anexos", "id_contrato"),
+                    ("idx_ft_status_vencimento", "financeiro_transacoes", "status, data_vencimento"),
+                    ("idx_contratos_dia_pgto", "contratos", "dia_pagamento_semanal"),
                 ]
                 for idx_name, tbl, col in indexes_to_create:
                     if tbl in existing_tables:

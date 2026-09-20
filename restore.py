@@ -3,6 +3,7 @@ import sys
 import zipfile
 import subprocess
 import re
+import sqlite3
 
 def list_backups():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,23 +49,41 @@ def restore_backup(backup_file=None):
     db_dump_file = os.path.join(base_dir, 'database_dump.sql')
     if os.path.exists(db_dump_file):
         print("\nPostgreSQL dump found in backup. Restoring database...")
-        env_path = os.path.join(base_dir, '.env')
-        if os.path.exists(env_path):
-            with open(env_path, 'r') as f:
-                env_content = f.read()
-            db_match = re.search(r'^DATABASE_URL=(postgresql[^\s]+)', env_content, re.MULTILINE)
-            if db_match:
-                db_url = db_match.group(1)
-                try:
-                    subprocess.run(['psql', db_url, '-f', db_dump_file], check=True)
-                    print("PostgreSQL database restored successfully.")
-                except Exception as e:
-                    print(f"Warning: Failed to restore PostgreSQL database: {e}")
-            else:
-                print("Warning: .env does not contain a valid DATABASE_URL for Postgres, but a dump exists.")
+        db_url = os.environ.get('DATABASE_URL')
+        if not db_url:
+            env_path = os.path.join(base_dir, '.env')
+            if os.path.exists(env_path):
+                with open(env_path, 'r', encoding='utf-8') as f:
+                    env_content = f.read()
+                db_match = re.search(r'^DATABASE_URL=(postgres(?:ql)?:\/\/[^\s]+)', env_content, re.MULTILINE)
+                if db_match:
+                    db_url = db_match.group(1)
+        
+        if db_url:
+            pg_url = db_url.replace("postgres://", "postgresql://", 1) if db_url.startswith("postgres://") else db_url
+            try:
+                subprocess.run(['psql', pg_url, '-f', db_dump_file], check=True)
+                print("PostgreSQL database restored successfully.")
+            except Exception as e:
+                print(f"Warning: Failed to restore PostgreSQL database: {e}")
         else:
-            print("Warning: .env file not found. Could not restore PostgreSQL database.")
-        os.remove(db_dump_file)
+            print("Warning: DATABASE_URL not found for Postgres, but a dump exists in the backup.")
+            
+        try:
+            os.remove(db_dump_file)
+        except Exception:
+            pass
+    else:
+        # SQLite: Check if database exists and checkpoint
+        sqlite_file = os.path.join(base_dir, 'ffmotors.db')
+        if os.path.exists(sqlite_file):
+            try:
+                conn = sqlite3.connect(sqlite_file)
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                conn.close()
+                print("SQLite database verified and checkpointed.")
+            except Exception as e:
+                print(f"Notice: SQLite verification note: {e}")
         
     print("Application successfully restored to the chosen restore point!")
 

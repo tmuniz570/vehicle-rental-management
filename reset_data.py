@@ -1,37 +1,57 @@
 import os
 import shutil
 import sqlite3
+from app import app, db
+from database import (
+    AuditLog, ContractAttachment, FinancialTransaction, Inspection,
+    Contract, Client, Motorcycle, Claim, JobExecutionLock, User
+)
 
-def clean_all():
+def clean_all(keep_users=False):
     base_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(base_dir, 'ffmotors.db')
     uploads_dir = os.path.join(base_dir, 'static', 'uploads')
     demo_assets_dir = os.path.join(base_dir, 'static', 'demo_assets')
 
-    # 1. Clean database
-    if os.path.exists(db_path):
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA foreign_keys = OFF;")
-        
-        tables = ['logs_auditoria', 'contrato_anexos', 'financeiro_transacoes', 'vistorias', 'contratos', 'clientes', 'motos', 'claims']
-        for table in tables:
-            cursor.execute(f"DELETE FROM {table};")
-            print(f"Limpa tabela: {table}")
-        
-        # Reset autoincrement sequences
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence';")
-        if cursor.fetchone():
-            cursor.execute("DELETE FROM sqlite_sequence;")
-            print("Sequências de autoincrement zeradas.")
-            
-        conn.commit()
-        cursor.execute("VACUUM;")
-        cursor.execute("PRAGMA foreign_keys = ON;")
-        conn.close()
-        print("Banco de dados SQLite limpo e otimizado com sucesso.")
-    else:
-        print("Arquivo ffmotors.db não encontrado.")
+    print("=== Iniciando Limpeza Geral do Sistema (reset_data.py) ===")
+
+    # 1. Clean database tables via SQLAlchemy
+    with app.app_context():
+        try:
+            print("Limpando tabelas do banco de dados...")
+            AuditLog.query.delete()
+            ContractAttachment.query.delete()
+            FinancialTransaction.query.delete()
+            Inspection.query.delete()
+            Contract.query.delete()
+            Client.query.delete()
+            Motorcycle.query.delete()
+            Claim.query.delete()
+            JobExecutionLock.query.delete()
+            if not keep_users:
+                User.query.delete()
+                print("Tabela usuarios limpa.")
+
+            db.session.commit()
+            print("Tabelas operacionais limpas com sucesso via SQLAlchemy.")
+
+            # Se for SQLite local, zera sqlite_sequence e executa checkpoint/vacuum
+            db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+            if 'sqlite' in db_uri.lower() and os.path.exists(db_path):
+                conn = sqlite3.connect(db_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence';")
+                if cursor.fetchone():
+                    cursor.execute("DELETE FROM sqlite_sequence;")
+                    print("Sequências de autoincrement SQLite zeradas.")
+                conn.commit()
+                cursor.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+                cursor.execute("VACUUM;")
+                conn.close()
+                print("Banco de dados SQLite vacuum e checkpoint executados com sucesso.")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Aviso durante limpeza do banco de dados: {e}")
 
     # 2. Clean static/uploads and restore demo assets
     if os.path.exists(uploads_dir):
@@ -70,6 +90,8 @@ def clean_all():
                 shutil.copy2(src, dst)
                 restored += 1
         print(f"Restaurados {restored} assets de demonstração em static/uploads.")
+
+    print("=== Limpeza Concluída com Sucesso! ===\n")
 
 if __name__ == '__main__':
     clean_all()

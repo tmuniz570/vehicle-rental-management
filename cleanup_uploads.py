@@ -20,25 +20,37 @@ def run_cleanup():
         for c in Client.query.all():
             for field in [c.url_habilitacao, c.url_habilitacao_verso, c.url_cbt, c.url_comprovante_endereco]:
                 if field:
-                    valid_files.add(os.path.basename(field))
+                    clean_name = os.path.basename(field.split('?')[0].strip())
+                    if clean_name:
+                        valid_files.add(clean_name)
                     
-        # Contracts
+        # Contracts (active files + immutable snapshot documents)
         for c in Contract.query.all():
-            for field in [c.url_seguro, c.url_comprovante_deposito, c.assinatura_cliente_inicial, c.assinatura_cliente_devolucao]:
+            for field in [
+                c.url_seguro, c.url_comprovante_deposito, 
+                c.assinatura_cliente_inicial, c.assinatura_cliente_devolucao,
+                c.url_habilitacao, c.url_habilitacao_verso, c.url_cbt, c.url_comprovante_endereco
+            ]:
                 if field:
-                    valid_files.add(os.path.basename(field))
+                    clean_name = os.path.basename(field.split('?')[0].strip())
+                    if clean_name:
+                        valid_files.add(clean_name)
                     
         # Contract Attachments
         for a in ContractAttachment.query.all():
             if a.url_arquivo:
-                valid_files.add(os.path.basename(a.url_arquivo))
+                clean_name = os.path.basename(a.url_arquivo.split('?')[0].strip())
+                if clean_name:
+                    valid_files.add(clean_name)
                 
         # Inspections (can have multiple photos separated by comma)
         for i in Inspection.query.all():
             if i.url_fotos:
                 urls = [u.strip() for u in i.url_fotos.split(',') if u.strip()]
                 for u in urls:
-                    valid_files.add(os.path.basename(u))
+                    clean_name = os.path.basename(u.split('?')[0].strip())
+                    if clean_name:
+                        valid_files.add(clean_name)
                     
         print(f"Found {len(valid_files)} valid file references in the database.")
         
@@ -53,8 +65,8 @@ def run_cleanup():
                 
             filename = os.path.basename(filepath)
             
-            # Skip excluded prefixes
-            if filename.startswith(EXCLUDE_PREFIXES):
+            # Skip hidden files (.gitkeep, etc.) and excluded prefixes
+            if filename.startswith('.') or filename in ('.gitkeep', '.gitignore') or filename.startswith(EXCLUDE_PREFIXES):
                 continue
                 
             # If not in database, delete it
