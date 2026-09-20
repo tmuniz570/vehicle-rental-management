@@ -48,6 +48,16 @@ function formatarDescricaoTransacao(tipo) {
     return tipo.replace(/_/g, ' ');
 }
 
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
     const diasSemana = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -327,11 +337,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (motEval.status === 'expired') expiredList.push(`MOT (expired ${motEval.diffDays}d ago on ${motEval.formattedDate})`);
             else if (motEval.status === 'warning') warningList.push(`MOT (due in ${motEval.diffDays}d on ${motEval.formattedDate})`);
 
-            // Include Insurance status in top banner
-            if (data.status_seguro === 'Cancelled') {
-                expiredList.push('Motor Insurance (FLAGGED CANCELLED ON askMID)');
-            } else if (data.checagem_seguro_devida) {
-                warningList.push(`15-day askMID Insurance Check Due (${data.dias_desde_checagem_seguro}d since last check)`);
+            // Include Insurance status in top banner (only for rentals, sales don't monitor 15-day insurance)
+            const isVendaContrato = (data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment');
+            if (!isVendaContrato) {
+                if (data.status_seguro === 'Cancelled') {
+                    expiredList.push('Motor Insurance (FLAGGED CANCELLED ON askMID)');
+                } else if (data.checagem_seguro_devida) {
+                    warningList.push(`15-day askMID Insurance Check Due (${data.dias_desde_checagem_seguro}d since last check)`);
+                }
             }
 
             if (expiredList.length > 0) {
@@ -376,64 +389,127 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // 3. 15-Day askMID Insurance Compliance Rendering
+        // 3. Insurance Section Rendering
+        const isVenda = (data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment');
+        const titleSeguro = document.getElementById('title_seguro_section');
         const badgeSeguro = document.getElementById('badge_status_seguro');
         const boxSeguro = document.getElementById('box_seguro_compliance');
+        const rowBotoesAskmid = document.getElementById('row_botoes_askmid');
+        const btnReportarSeguroCancelado = document.getElementById('btnReportarSeguroCancelado');
         const dataVerifEl = document.getElementById('info_seguro_data_verif');
         const proxVerifEl = document.getElementById('info_seguro_proxima_verif');
         const verifPorEl = document.getElementById('info_seguro_verificado_por');
         const verifPorRow = document.getElementById('info_seguro_verif_por_row');
+        const infoSeguro = document.getElementById('info_seguro');
 
-        if (badgeSeguro) {
-            if (data.status_seguro === 'Cancelled') {
-                badgeSeguro.className = 'badge badge-danger';
-                badgeSeguro.innerHTML = '🚨 CANCELLED / UNINSURED';
-                badgeSeguro.style.cssText = 'background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); font-weight:700;';
-                if (boxSeguro) {
-                    boxSeguro.style.borderColor = 'rgba(239, 68, 68, 0.5)';
-                    boxSeguro.style.background = 'rgba(239, 68, 68, 0.08)';
-                }
-            } else if (data.checagem_seguro_devida) {
-                badgeSeguro.className = 'badge badge-warning';
-                badgeSeguro.innerHTML = `⏳ Check Due (${data.dias_desde_checagem_seguro}d ago)`;
-                badgeSeguro.style.cssText = 'background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight:700;';
-                if (boxSeguro) {
-                    boxSeguro.style.borderColor = 'rgba(245, 158, 11, 0.5)';
-                    boxSeguro.style.background = 'rgba(245, 158, 11, 0.08)';
-                }
-            } else {
-                badgeSeguro.className = 'badge badge-success';
-                badgeSeguro.innerHTML = '✓ Active on askMID';
-                badgeSeguro.style.cssText = 'background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight:600;';
-                if (boxSeguro) {
-                    boxSeguro.style.borderColor = 'var(--border-color)';
-                    boxSeguro.style.background = 'rgba(255,255,255,0.03)';
+        if (isVenda) {
+            // Moto vendida: NÃO monitorar de 15 em 15 dias. Apenas armazenar e exibir o documento entregue na venda.
+            if (titleSeguro) {
+                titleSeguro.innerHTML = '🛡️ Motor Insurance Certificate';
+            }
+            if (badgeSeguro) {
+                if (data.url_seguro) {
+                    badgeSeguro.className = 'badge badge-success';
+                    badgeSeguro.innerHTML = '✓ Document On File';
+                    badgeSeguro.style.cssText = 'background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight:600;';
+                } else {
+                    badgeSeguro.className = 'badge badge-warning';
+                    badgeSeguro.innerHTML = '⚠️ No Document';
+                    badgeSeguro.style.cssText = 'background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight:600;';
                 }
             }
-        }
+            // Oculta caixa de compliance periódico de 15 dias
+            if (boxSeguro) boxSeguro.style.display = 'none';
+            // Oculta botões de rotina do askMID
+            if (rowBotoesAskmid) rowBotoesAskmid.style.display = 'none';
+            if (btnReportarSeguroCancelado) btnReportarSeguroCancelado.style.display = 'none';
 
-        if (dataVerifEl) {
-            const dv = data.data_ultima_checagem_seguro ? new Date(data.data_ultima_checagem_seguro + 'T00:00:00').toLocaleDateString('en-GB') : '-';
-            dataVerifEl.innerHTML = `${dv} <span style="color: var(--text-secondary); font-size: 0.75rem; font-weight: normal;">(${data.dias_desde_checagem_seguro || 0}d ago)</span>`;
-        }
-
-        if (proxVerifEl) {
-            if (data.status_seguro === 'Cancelled') {
-                proxVerifEl.innerHTML = '<span style="color: #f87171; font-weight: 700;">UNINSURED ALERT</span>';
-            } else if (data.checagem_seguro_devida) {
-                const overdue = (data.dias_desde_checagem_seguro || 15) - 15;
-                proxVerifEl.innerHTML = `<span style="color: #fbbf24; font-weight: 700;">CHECK DUE NOW (${overdue > 0 ? `${overdue}d overdue` : 'Today'})</span>`;
-            } else {
-                proxVerifEl.innerHTML = `<span style="color: #4ade80;">Due in ${data.dias_para_proxima_checagem_seguro || 0} days</span>`;
+            // Exibe botão em destaque para ver ou atualizar o documento
+            if (infoSeguro) {
+                if (data.url_seguro) {
+                    infoSeguro.innerHTML = `
+                        <a href="${data.url_seguro}" target="_blank" class="btn-action" style="font-size: 0.8rem; padding: 7px 10px; text-decoration: none; flex: 1; text-align: center; border-radius: 6px; background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.35); color: #60a5fa; font-weight: 600;">📄 View Insurance Certificate</a>
+                        <button class="btn-action btn-atualizar-seguro" style="font-size: 0.8rem; padding: 7px 10px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">Update</button>
+                    `;
+                } else {
+                    infoSeguro.innerHTML = `
+                        <button class="btn-action btn-atualizar-seguro" style="font-size: 0.8rem; padding: 7px 10px; background: var(--accent); flex: 1; border-radius: 6px; font-weight: 600;">+ Attach Insurance Certificate</button>
+                    `;
+                }
             }
-        }
+        } else {
+            // Contrato de Aluguel (Rent): monitoramento padrão de 15 em 15 dias no askMID
+            if (titleSeguro) {
+                titleSeguro.innerHTML = '🛡️ Motor Insurance (askMID)';
+            }
+            if (boxSeguro) boxSeguro.style.display = 'block';
+            if (rowBotoesAskmid) rowBotoesAskmid.style.display = 'flex';
+            if (btnReportarSeguroCancelado) btnReportarSeguroCancelado.style.display = 'block';
 
-        if (verifPorEl) {
-            if (data.seguro_verificado_por) {
-                verifPorEl.textContent = data.seguro_verificado_por;
-                if (verifPorRow) verifPorRow.style.display = 'flex';
-            } else {
-                if (verifPorRow) verifPorRow.style.display = 'none';
+            if (badgeSeguro) {
+                if (data.status_seguro === 'Cancelled') {
+                    badgeSeguro.className = 'badge badge-danger';
+                    badgeSeguro.innerHTML = '🚨 CANCELLED / UNINSURED';
+                    badgeSeguro.style.cssText = 'background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); font-weight:700;';
+                    if (boxSeguro) {
+                        boxSeguro.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                        boxSeguro.style.background = 'rgba(239, 68, 68, 0.08)';
+                    }
+                } else if (data.checagem_seguro_devida) {
+                    badgeSeguro.className = 'badge badge-warning';
+                    badgeSeguro.innerHTML = `⏳ Check Due (${data.dias_desde_checagem_seguro}d ago)`;
+                    badgeSeguro.style.cssText = 'background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight:700;';
+                    if (boxSeguro) {
+                        boxSeguro.style.borderColor = 'rgba(245, 158, 11, 0.5)';
+                        boxSeguro.style.background = 'rgba(245, 158, 11, 0.08)';
+                    }
+                } else {
+                    badgeSeguro.className = 'badge badge-success';
+                    badgeSeguro.innerHTML = '✓ Active on askMID';
+                    badgeSeguro.style.cssText = 'background: rgba(34,197,94,0.15); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); font-weight:600;';
+                    if (boxSeguro) {
+                        boxSeguro.style.borderColor = 'var(--border-color)';
+                        boxSeguro.style.background = 'rgba(255,255,255,0.03)';
+                    }
+                }
+            }
+
+            if (dataVerifEl) {
+                const dv = data.data_ultima_checagem_seguro ? new Date(data.data_ultima_checagem_seguro + 'T00:00:00').toLocaleDateString('en-GB') : '-';
+                dataVerifEl.innerHTML = `${dv} <span style="color: var(--text-secondary); font-size: 0.75rem; font-weight: normal;">(${data.dias_desde_checagem_seguro || 0}d ago)</span>`;
+            }
+
+            if (proxVerifEl) {
+                if (data.status_seguro === 'Cancelled') {
+                    proxVerifEl.innerHTML = '<span style="color: #f87171; font-weight: 700;">UNINSURED ALERT</span>';
+                } else if (data.checagem_seguro_devida) {
+                    const overdue = (data.dias_desde_checagem_seguro || 15) - 15;
+                    proxVerifEl.innerHTML = `<span style="color: #fbbf24; font-weight: 700;">CHECK DUE NOW (${overdue > 0 ? `${overdue}d overdue` : 'Today'})</span>`;
+                } else {
+                    proxVerifEl.innerHTML = `<span style="color: #4ade80;">Due in ${data.dias_para_proxima_checagem_seguro || 0} days</span>`;
+                }
+            }
+
+            if (verifPorEl) {
+                if (data.seguro_verificado_por) {
+                    verifPorEl.textContent = data.seguro_verificado_por;
+                    if (verifPorRow) verifPorRow.style.display = 'flex';
+                } else {
+                    if (verifPorRow) verifPorRow.style.display = 'none';
+                }
+            }
+
+            if (infoSeguro) {
+                if (data.url_seguro) {
+                    infoSeguro.innerHTML = `
+                        <a href="${data.url_seguro}" target="_blank" class="btn-action" style="font-size: 0.75rem; padding: 5px 8px; text-decoration: none; flex: 1; text-align: center; border-radius: 6px;">📄 Policy</a>
+                        <button class="btn-action btn-atualizar-seguro" style="font-size: 0.75rem; padding: 5px 8px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">Update</button>
+                    `;
+                } else {
+                    infoSeguro.innerHTML = `
+                        <button class="btn-action btn-atualizar-seguro" style="font-size: 0.75rem; padding: 5px 8px; background: var(--accent); flex: 1; border-radius: 6px;">+ Attach Policy</button>
+                    `;
+                }
             }
         }
 
@@ -478,7 +554,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             };
         }
 
-        const btnReportarSeguroCancelado = document.getElementById('btnReportarSeguroCancelado');
         if (btnReportarSeguroCancelado) {
             btnReportarSeguroCancelado.onclick = async () => {
                 if (!confirm(`🚨 CRITICAL WARNING:\n\nAre you sure you want to flag vehicle ${data.placa} as UNINSURED / CANCELLED?\n\nThis will trigger urgent compliance alerts across the dashboard and contract.`)) {
@@ -502,20 +577,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     alert('Connection error');
                 }
             };
-        }
-        
-        const infoSeguro = document.getElementById('info_seguro');
-        if (infoSeguro) {
-            if (data.url_seguro) {
-                infoSeguro.innerHTML = `
-                    <a href="${data.url_seguro}" target="_blank" class="btn-action" style="font-size: 0.75rem; padding: 5px 8px; text-decoration: none; flex: 1; text-align: center; border-radius: 6px;">📄 Policy</a>
-                    <button class="btn-action btn-atualizar-seguro" style="font-size: 0.75rem; padding: 5px 8px; background: rgba(255,255,255,0.08); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px;">Update</button>
-                `;
-            } else {
-                infoSeguro.innerHTML = `
-                    <button class="btn-action btn-atualizar-seguro" style="font-size: 0.75rem; padding: 5px 8px; background: var(--accent); flex: 1; border-radius: 6px;">+ Attach Policy</button>
-                `;
-            }
         }
         
         // Upload Seguro
@@ -613,7 +674,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else statusBadge = `<span class="badge badge-info">${(data.status || '').toUpperCase()}</span>`;
         document.getElementById('info_status').innerHTML = statusBadge;
 
-        const isVenda = data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment';
+        // isVenda already declared above
         const blocoAluguel = document.getElementById('bloco_termos_aluguel');
         const blocoVenda = document.getElementById('bloco_termos_venda');
 

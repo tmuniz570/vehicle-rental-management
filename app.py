@@ -2462,12 +2462,15 @@ def detalhe_contrato(id):
     # Transações filtradas para o extrato do cliente (não exibe a devolução de caução como cobrança devida)
     transacoes_cliente = [t for t in transacoes if t.tipo not in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']]
     
-    # 15-Day Insurance Compliance (askMID Verification)
+    # 15-Day Insurance Compliance (askMID Verification) - apenas para contratos de aluguel (Rent)
+    tipo_contrato_val = getattr(c, 'tipo_contrato', 'Rent') or 'Rent'
+    is_venda = tipo_contrato_val in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']
+    
     hoje = get_local_now().date()
     ultima_checagem = c.data_ultima_checagem_seguro or (c.data_retirada.date() if c.data_retirada else hoje)
     dias_desde_checagem = (hoje - ultima_checagem).days
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
-    checagem_seguro_devida = (dias_desde_checagem >= 15)
+    checagem_seguro_devida = (dias_desde_checagem >= 15) if not is_venda else False
     
     is_completed = (c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado', ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
     
@@ -2539,9 +2542,9 @@ def detalhe_contrato(id):
         'data_ultima_checagem_seguro': c.data_ultima_checagem_seguro.strftime('%Y-%m-%d') if c.data_ultima_checagem_seguro else (c.data_retirada.strftime('%Y-%m-%d') if c.data_retirada else None),
         'status_seguro': c.status_seguro or 'Valid',
         'seguro_verificado_por': c.seguro_verificado_por or '',
-        'dias_desde_checagem_seguro': dias_desde_checagem,
-        'dias_para_proxima_checagem_seguro': dias_para_proxima,
-        'checagem_seguro_devida': checagem_seguro_devida,
+        'dias_desde_checagem_seguro': None if is_venda else dias_desde_checagem,
+        'dias_para_proxima_checagem_seguro': None if is_venda else dias_para_proxima,
+        'checagem_seguro_devida': False if is_venda else checagem_seguro_devida,
         'deposito_pago': deposito_pago,
         'deducoes_deposito': deducoes_deposito,
         'saldo_deposito': saldo_deposito,
@@ -3225,6 +3228,11 @@ def get_dashboard():
         contratos_seguro_alerta = []
         
         for ca in contratos_ativos_objs:
+            # Não monitorar seguro quinzenal para motos vendidas (Sale_Full / Sale_Installment)
+            tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
+            if tipo_ca in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+                continue
+                
             u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
             dias_check = (hoje_date - u_check).days
             cli_nome = ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}"

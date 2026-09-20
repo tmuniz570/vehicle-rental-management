@@ -227,6 +227,21 @@ def test_sales_system():
         assert det.get('moto_modelo') == 'Yamaha NMAX 125'
         assert det.get('telefone') == '07123456789'
         assert det.get('endereco') == '10 Test Street, Birmingham, B1 1AA'
+        
+        # Verify 15-day insurance compliance is bypassed for sale contracts
+        assert det.get('checagem_seguro_devida') is False, "Sold bikes must not have checagem_seguro_devida = True"
+        assert det.get('dias_desde_checagem_seguro') is None, "Sold bikes should not track dias_desde_checagem_seguro"
+        assert det.get('dias_para_proxima_checagem_seguro') is None, "Sold bikes should not track dias_para_proxima_checagem_seguro"
+        
+        # Verify dashboard askMID alerts do not include sold bikes
+        res_dash = client.get('/api/dashboard')
+        assert res_dash.status_code == 200
+        dash_data = res_dash.get_json()
+        seg_alertas = dash_data.get('contratos_seguro_alerta', [])
+        alert_ids = [a['id'] for a in seg_alertas]
+        assert cid_inst not in alert_ids, "Sale contract must NEVER trigger askMID insurance alerts on dashboard"
+        assert cid_full not in alert_ids, "Sale contract must NEVER trigger askMID insurance alerts on dashboard"
+        print("-> Confirmed: Sold bikes are completely exempt from 15-day askMID insurance monitoring and dashboard alerts.")
         print("-> API /api/contratos/<id> returned all sale fields and detail aliases correctly.")
         
         # Assert transaction descriptions in details API
