@@ -9,7 +9,7 @@
             <h1 style="margin: 0;">Contract #<span id="header_id">{{ contrato_id }}</span></h1>
             <span id="header_tipo_badge" class="badge" style="font-size: 0.85rem; padding: 0.35rem 0.85rem; font-weight: 700; border-radius: 9999px;">-</span>
         </div>
-        <p style="color: var(--text-secondary); margin-top: 0.35rem;">Rental and vehicle sale agreement management, financial transactions statement and inspections.</p>
+        <p style="color: var(--text-secondary); margin-top: 0.35rem;">Contract agreement management, financial transactions statement and inspections.</p>
     </div>
     <div style="display: flex; gap: 0.75rem; align-items: center;">
         <button id="btnFinalizarContrato" class="btn-primary" style="background: #ef4444; width: auto; display: none; padding: 0.75rem 1.25rem; align-items: center; gap: 0.5rem;">
@@ -259,7 +259,7 @@
     <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
         <div>
             <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
-                <span id="contrato_titulo_tipo">📄 Rental Agreement & Signatures</span>
+                <span id="contrato_titulo_tipo">📄 Agreement & Signatures</span>
                 <span style="font-size: 0.75rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 8px; border-radius: 6px; font-weight: 700;">
                     J&F / FF Motors UK
                 </span>
@@ -284,7 +284,7 @@
         <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border-color); border-radius: 12px; padding: 1.25rem;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                 <span id="label_sig_inicial" style="font-size: 0.8rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
-                    1. Start of Rental Signature
+                    1. Agreement Signature
                 </span>
                 <span id="badge_sig_inicial" class="badge" style="font-size: 0.72rem;">-</span>
             </div>
@@ -646,7 +646,7 @@
                 <div class="form-group">
                     <label for="anexo_tipo">Attachment Category</label>
                     <select id="anexo_tipo" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.75rem 1rem; border-radius: 12px; width: 100%;">
-                        <option value="initial_contract">Signed Agreement (Start of Rental)</option>
+                        <option value="initial_contract">Signed Agreement (Initial Contract)</option>
                         <option value="return_contract">Signed Return Term (Termination)</option>
                         <option value="general">Other Contract Document</option>
                     </select>
@@ -733,8 +733,8 @@
                 <strong style="display: block; margin-bottom: 4px;">⚠️ Important Warning:</strong>
                 Cancelling this contract will immediately:
                 <ul style="margin: 6px 0 0 1.2rem; padding: 0;">
-                    <li>Release the motorcycle back to <strong>Available</strong> status for new rentals.</li>
-                    <li>Cancel all pending rental charges and deposit hold charges.</li>
+                    <li>Release the motorcycle back to <strong>Available</strong> status.</li>
+                    <li>Cancel all pending contract charges.</li>
                     <li>Permanently mark this contract as <strong>Cancelled</strong>.</li>
                 </ul>
             </div>
