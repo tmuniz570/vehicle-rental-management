@@ -36,10 +36,21 @@
     <div style="flex: 1; min-width: 170px;">
         <select id="filterTipo" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
             <option value="">All Types</option>
-            <option value="Rent">Rent</option>
-            <option value="Deposit">Deposit</option>
-            <option value="Fine">Fine</option>
-            <option value="Damage">Damage</option>
+            <optgroup label="Rentals" style="background: #1e293b; color: #94a3b8;">
+                <option value="Rent" style="background: #1e293b; color: white;">Rent</option>
+                <option value="Deposit" style="background: #1e293b; color: white;">Rental Deposit</option>
+                <option value="Deposit_Refund" style="background: #1e293b; color: white;">Deposit Refund</option>
+            </optgroup>
+            <optgroup label="Vehicle Sales" style="background: #1e293b; color: #94a3b8;">
+                <option value="sales_all" style="background: #1e293b; color: white;">All Sales Transactions</option>
+                <option value="Sale_Full" style="background: #1e293b; color: white;">Sale: Full Payment</option>
+                <option value="Sale_Deposit" style="background: #1e293b; color: white;">Sale: Down Payment</option>
+                <option value="Sale_Installment" style="background: #1e293b; color: white;">Sale: Installment</option>
+            </optgroup>
+            <optgroup label="Incidents & Fines" style="background: #1e293b; color: #94a3b8;">
+                <option value="Fine" style="background: #1e293b; color: white;">Fine</option>
+                <option value="Damage" style="background: #1e293b; color: white;">Damage</option>
+            </optgroup>
         </select>
     </div>
 
@@ -197,6 +208,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/financeiro.js?v=5"></script>
+<script src="/static/js/financeiro.js?v=6"></script>
 {% endblock %}
 

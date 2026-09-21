@@ -14,8 +14,9 @@ def create_backup():
     backup_filename = f"ffmotors_backup_{timestamp}.zip"
     backup_path = os.path.join(backups_dir, backup_filename)
     
-    ignore_dirs = {'venv', 'env', '__pycache__', '.git', 'backups'}
-    ignore_exts = {'.pyc', '.pyo'}
+    ignore_dirs = {'venv', 'env', '.venv', '__pycache__', '.git', 'backups', '.pytest_cache', '.agents', '.gemini', '.idea', '.vscode'}
+    ignore_exts = {'.pyc', '.pyo', '.log', '.tmp'}
+    ignore_files = {'database_dump.sql', 'test_syntax.html', 'test_syntax_check.py'}
     
     # 1. Detect Database Type (PostgreSQL vs SQLite)
     db_dump_file = None
@@ -36,8 +37,8 @@ def create_backup():
         # Normalize url for pg_dump if needed
         pg_url = db_url.replace("postgres://", "postgresql://", 1) if db_url.startswith("postgres://") else db_url
         try:
-            subprocess.run(['pg_dump', pg_url, '-f', db_dump_file], check=True)
-            print("PostgreSQL dump successfully generated (database_dump.sql).")
+            subprocess.run(['pg_dump', '--clean', '--if-exists', pg_url, '-f', db_dump_file], check=True)
+            print("PostgreSQL dump successfully generated with clean drop statements (database_dump.sql).")
         except Exception as e:
             print(f"Warning: Failed to create PostgreSQL dump: {e}")
             if os.path.exists(db_dump_file):
@@ -62,6 +63,8 @@ def create_backup():
         for root, dirs, files in os.walk(base_dir):
             dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith('.')]
             for file in files:
+                if file in ignore_files and file != 'database_dump.sql':
+                    continue
                 ext = os.path.splitext(file)[1]
                 if ext in ignore_exts:
                     continue

@@ -4,16 +4,43 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
-## [1.7.0] — 2026-09-20 — *Vehicle Sales System, Itemized Extras & Insurance Exemption*
+## [1.7.1] — 2026-09-21 — *Session Idle Timeout (8h), Contracts Table Cache Immunity & Responsive Mobile Installment Cards*
+
+### ⏱️ Autenticação & Sessão Estendida
+* **Aumento do Timeout de Inatividade para 8 Horas**: Configuração de `SESSION_IDLE_TIMEOUT_SECONDS = 28800` (8 horas) em `app.py`. Garante que operadores de balcão e pátio não percam o login durante o expediente de trabalho, com mensagens de expiração informando `"8 horas"` na interface e na API.
+
+### 🛡️ Tabela de Contratos & Blindagem Contra Cache Desalinhado
+* **Diagnóstico e Correção de Desalinhamento (Print 1 vs Print 2)**: Identificado conflito de cache onde navegadores mantinham em cache a versão anterior do script com 8 colunas enquanto o template HTML havia evoluído para 9 colunas (`TYPE`).
+* **Proteção em Tempo de Execução (`contratos.js`)**: O gerador de linhas agora verifica dinamicamente os cabeçalhos (`<th>`) presentes no DOM, garantindo alinhamento perfeito de células mesmo se o navegador carregar versões de cache divergentes.
+* **Cache Buster Atualizado**: Script incrementado para `contratos.js?v=5` em `templates/contratos.html`.
+
+### 📱 Experiência Mobile no iPhone (Contrato Parcelado)
+* **Card de Parcela Responsivo (`novo_contrato.js`)**: O antigo grid rígido de 4 colunas em linha única foi substituído por um card individual elegante com cabeçalho (badge `#X Installment` e botão `✕ Remove`) e grid de 2 colunas amplas (`Amount (£)` e `Due Date`).
+* **Espaço Amplo de Digitação**: O campo numérico agora dispõe de ~150px livres na tela do iPhone com prefixo fixo `£`, exibindo qualquer valor monetário sem cortes nem esmagamento.
+* **Prevenção de Zoom no iOS**: Inputs configurados com `font-size: 16px`, eliminando o zoom automático invasivo do Safari no iPhone ao tocar nos campos.
+* **Cache Buster Atualizado**: Script incrementado para `novo_contrato.js?v=3` em `templates/novo_contrato.html`.
+
+## [1.7.0] — 2026-09-20 — *Vehicle Sales System, Itemized Extras, Financial Filters & Maintenance Overhaul*
 
 ### 🏍️ Sistema de Venda de Motos (Sale Contracts)
 * **Venda à Vista (`Sale_Full`) e Parcelada (`Sale_Installment`)**: Suporte completo à formalização de venda de veículos com transações separadas de aluguel e status `Sold` atribuído à motocicleta.
 * **Construtor de Acessórios & Extras**: Criação itemizada de extras e acessórios com botões de atalho rápido e cálculo dinâmico somando valores ao preço do veículo em tempo real.
 * **Isenção de Monitoramento de Seguro (15 dias askMID)**: Motos vendidas registram o certificado na venda, mas estão 100% isentas da rotina quinzenal do askMID. Tela de contrato adaptada para exibir documento arquivado sem alarmes nem contadores.
-* **Emissão Formal do Contrato de Venda**: Contrato formalizado por **J&F Motorcycles LTD** com assinatura fixa da loja, cronograma de parcelas e logo com fundo branco para impressão perfeita.
+* **Emissão Formal do Contrato de Venda**: Contrato formalizado com assinatura fixa da concessionária, cronograma de parcelas e logo com fundo branco para impressão perfeita.
 * **Segregação Financeira e Recibos Detalhados**: Entrada registrada como `Sale_Deposit` e parcelas como `Sale_Installment`, mantendo `Pending` na criação e gerando recibos enriquecidos (`Vehicle Sale - Instalment X of Y`).
 * **Proteção contra Vistorias Incompatíveis**: Vistorias de devolução (`Check-in`) rejeitadas para veículos vendidos, autorizando vistorias de avaria/garantia (`Incident`).
 * **Harmonização de Terminologia**: Textos de interface atualizados para "Contract / Agreement" em todas as telas.
+
+### 💰 Filtros e Navegação no Financeiro
+* **Filtro de Tipos Estruturado (`templates/financeiro.html` & `app.py`)**: Agrupamento visual com `<optgroup>` para *Rentals* (Aluguel, Caução, Devolução de Caução), *Vehicle Sales* (`sales_all`, Venda à Vista, Entrada, Parcelas) e *Incidents & Fines* (Multas, Danos).
+* **Busca Ampliada**: Campo de busca agora pesquisa simultaneamente por ID, Contrato, Cliente, Placa, Tipo, Status, **Valor numérico** (ex: `2850`) e **Forma de Pagamento** (ex: `Card`, `Bank Transfer`).
+* **Compatibilidade e Resiliência Bilíngue**: Suporte completo a termos em inglês e português em todas as rotas financeiras e de vistorias.
+
+### 🛠️ Scripts Operacionais & Coleta de Órfãos
+* **Modernização do `cleanup_uploads.py`**: Suporte a decodificação de URLs (`urllib.parse.unquote`), parsing de fotos de vistorias em formato JSON e lista separada por vírgula, proteção automática a arquivos de demonstração (`static/demo_assets`), e flags `--dry-run` e `--verbose`.
+* **Reset Inteligente (`reset_data.py`)**: Adicionada flag `--keep-users` para resetar dados operacionais preservando contas de operadores e administradores, com reset universal de sequências de ID para SQLite e PostgreSQL.
+* **Backups Otimizados (`backup.py` & `restore.py`)**: Dumps com `--clean --if-exists`, checkpoint atômico de WAL e exclusão estrita de caches e arquivos temporários.
+* **Dados Fictícios (`seed_data.py`)**: Povoamento de motos vendidas, compradores e contratos de venda (`Sale_Full` e `Sale_Installment`) com transações e vistorias vinculadas.
 
 ## [1.6.0] — 2026-09-20 — *Performance Engine, Maintenance Scripts & Data Agility*
 

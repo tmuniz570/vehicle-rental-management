@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import sqlite3
 from app import app, db
@@ -14,6 +15,8 @@ def clean_all(keep_users=False):
     demo_assets_dir = os.path.join(base_dir, 'static', 'demo_assets')
 
     print("=== Iniciando Limpeza Geral do Sistema (reset_data.py) ===")
+    if keep_users:
+        print("Opção --keep-users ativada: Usuários e operadores serão preservados.")
 
     # 1. Clean database tables via SQLAlchemy
     with app.app_context():
@@ -23,11 +26,12 @@ def clean_all(keep_users=False):
             ContractAttachment.query.delete()
             FinancialTransaction.query.delete()
             Inspection.query.delete()
-            Contract.query.delete()
-            Client.query.delete()
-            Motorcycle.query.delete()
             Claim.query.delete()
+            Contract.query.delete()
+            Motorcycle.query.delete()
+            Client.query.delete()
             JobExecutionLock.query.delete()
+            
             if not keep_users:
                 User.query.delete()
                 print("Tabela usuarios limpa.")
@@ -35,9 +39,10 @@ def clean_all(keep_users=False):
             db.session.commit()
             print("Tabelas operacionais limpas com sucesso via SQLAlchemy.")
 
-            # Se for SQLite local, zera sqlite_sequence e executa checkpoint/vacuum
-            db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
-            if 'sqlite' in db_uri.lower() and os.path.exists(db_path):
+            db_uri = str(app.config.get('SQLALCHEMY_DATABASE_URI', '')).lower()
+
+            # SQLite: zera sqlite_sequence e executa checkpoint/vacuum
+            if 'sqlite' in db_uri and os.path.exists(db_path):
                 conn = sqlite3.connect(db_path)
                 cursor = conn.cursor()
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence';")
@@ -49,6 +54,20 @@ def clean_all(keep_users=False):
                 cursor.execute("VACUUM;")
                 conn.close()
                 print("Banco de dados SQLite vacuum e checkpoint executados com sucesso.")
+            
+            # PostgreSQL: reseta sequências serial
+            elif 'postgres' in db_uri:
+                tables = ['clientes', 'contratos', 'contrato_anexos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims', 'job_locks']
+                if not keep_users:
+                    tables.append('usuarios')
+                for t in tables:
+                    try:
+                        db.session.execute(db.text(f"SELECT setval(pg_get_serial_sequence('{t}', 'id'), 1, false);"))
+                    except Exception:
+                        pass
+                db.session.commit()
+                print("Sequências de ID do PostgreSQL reiniciadas com sucesso.")
+
         except Exception as e:
             db.session.rollback()
             print(f"Aviso durante limpeza do banco de dados: {e}")
@@ -94,4 +113,5 @@ def clean_all(keep_users=False):
     print("=== Limpeza Concluída com Sucesso! ===\n")
 
 if __name__ == '__main__':
-    clean_all()
+    keep = '--keep-users' in sys.argv
+    clean_all(keep_users=keep)

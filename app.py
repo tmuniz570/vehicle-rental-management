@@ -109,8 +109,8 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 if os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or (os.environ.get('FLASK_ENV') == 'production' and os.environ.get('HTTPS') == 'on'):
     app.config['SESSION_COOKIE_SECURE'] = True
 
-# Segurança de Sessão: Expiração por Inatividade (padrão 60 min) e Duração Máxima
-SESSION_IDLE_TIMEOUT_SECONDS = int(os.environ.get('SESSION_IDLE_TIMEOUT_SECONDS', 3600))  # 60 minutos
+# Segurança de Sessão: Expiração por Inatividade (padrão 8 horas = 28800s) e Duração Máxima
+SESSION_IDLE_TIMEOUT_SECONDS = int(os.environ.get('SESSION_IDLE_TIMEOUT_SECONDS', 28800))  # 8 horas
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 app.config['REMEMBER_COOKIE_DURATION'] = timedelta(hours=12)
 
@@ -275,12 +275,14 @@ def check_authentication():
         if last_activity is None or (now - float(last_activity)) > SESSION_IDLE_TIMEOUT_SECONDS:
             logout_user()
             session.pop('last_activity', None)
+            timeout_hours = max(1, SESSION_IDLE_TIMEOUT_SECONDS // 3600)
+            timeout_desc = f"{timeout_hours} horas" if timeout_hours > 1 else "60 minutos"
             if request.path.startswith('/api/'):
                 return jsonify({
                     "error": "SessionExpired",
-                    "message": "Sua sessão expirou por inatividade (60 minutos). Faça login novamente."
+                    "message": f"Sua sessão expirou por inatividade ({timeout_desc}). Faça login novamente."
                 }), 401
-            flash('Sua sessão expirou por inatividade após 60 minutos. Por segurança, faça login novamente.', 'warning')
+            flash(f'Sua sessão expirou por inatividade após {timeout_desc}. Por segurança, faça login novamente.', 'warning')
             return redirect(url_for('login', next=request.path))
 
         # Atualiza o timestamp da última atividade do usuário
@@ -2763,7 +2765,15 @@ def listar_vistorias():
         ))
         
     if tipo:
-        query = query.filter(Inspection.tipo == tipo)
+        t_lower = tipo.lower()
+        if t_lower in ['check-out', 'checkout', 'saida', 'saída']:
+            query = query.filter(Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida']))
+        elif t_lower in ['check-in', 'checkin', 'entrada']:
+            query = query.filter(Inspection.tipo.in_([InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']))
+        elif t_lower in ['incident', 'ocorrencia', 'ocorrência']:
+            query = query.filter(Inspection.tipo.in_([InspectionType.INCIDENT.value, 'Incident', 'Ocorrência', 'Ocorrencia']))
+        else:
+            query = query.filter(Inspection.tipo == tipo)
         
     if data_filtro:
         try:
@@ -2836,6 +2846,8 @@ def listar_financeiro():
             FinancialTransaction.id_contrato.cast(db.String).ilike(search_term),
             FinancialTransaction.tipo.ilike(search_term),
             FinancialTransaction.status.ilike(search_term),
+            FinancialTransaction.forma_pagamento.ilike(search_term),
+            FinancialTransaction.valor.cast(db.String).ilike(search_term),
             Contract.placa.ilike(search_plate_term),
             Contract.placa.ilike(search_term),
             Client.nome.ilike(search_term)
@@ -2848,13 +2860,42 @@ def listar_financeiro():
                 FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
                 FinancialTransaction.data_vencimento < agora
             )
+        elif status_filtro.lower() in ['paid', 'pago']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']))
+        elif status_filtro.lower() in ['cancelled', 'cancelado']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.CANCELLED.value, 'Cancelled', 'Cancelado']))
+        elif status_filtro.lower() in ['pending', 'pendente']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
         else:
             query = query.filter(FinancialTransaction.status == status_filtro)
     elif pendentes:
         query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
         
     if tipo_filtro:
-        query = query.filter(FinancialTransaction.tipo == tipo_filtro)
+        tipo_lower = tipo_filtro.lower()
+        if tipo_lower in ['sales_all', 'sales', 'vendas']:
+            query = query.filter(FinancialTransaction.tipo.in_([
+                TransactionType.SALE_FULL.value, TransactionType.SALE_DEPOSIT.value, TransactionType.SALE_INSTALLMENT.value,
+                'Sale_Full', 'Sale_Deposit', 'Sale_Installment', 'Venda_Vista', 'Venda_Entrada', 'Venda_Parcela'
+            ]))
+        elif tipo_lower in ['sale_full', 'venda_vista']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_FULL.value, 'Sale_Full', 'Venda_Vista']))
+        elif tipo_lower in ['sale_deposit', 'venda_entrada']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_DEPOSIT.value, 'Sale_Deposit', 'Venda_Entrada']))
+        elif tipo_lower in ['sale_installment', 'venda_parcela']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_INSTALLMENT.value, 'Sale_Installment', 'Venda_Parcela']))
+        elif tipo_lower in ['rent', 'aluguel']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']))
+        elif tipo_lower in ['deposit', 'deposito', 'depósito']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']))
+        elif tipo_lower in ['deposit_refund', 'devolucao_deposito']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']))
+        elif tipo_lower in ['fine', 'multa']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.FINE.value, 'Fine', 'Multa']))
+        elif tipo_lower in ['damage', 'dano']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DAMAGE.value, 'Damage', 'Dano']))
+        else:
+            query = query.filter(FinancialTransaction.tipo == tipo_filtro)
 
     # Date Range Filter
     col_data = FinancialTransaction.data_pagamento if campo_data == 'pagamento' else FinancialTransaction.data_vencimento
@@ -3560,9 +3601,11 @@ if __name__ == '__main__':
     uploads_dir = os.path.join(basedir, 'static', 'uploads')
     os.makedirs(uploads_dir, exist_ok=True)
     
-    # Start APScheduler with Europe/London timezone at 01:00 AM
-    scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
-    scheduler.add_job(func=run_daily_jobs, trigger="cron", hour=1, minute=0)
-    scheduler.start()
+    # Start APScheduler with Europe/London timezone at 01:00 AM (guarded for Flask reloader)
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+        scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
+        scheduler.add_job(func=run_daily_jobs, trigger="cron", hour=1, minute=0)
+        scheduler.start()
     
-    app.run(debug=True, host='0.0.0.0', use_reloader=False)
+    debug_mode = os.environ.get('FLASK_DEBUG', 'true').lower() in ('true', '1')
+    app.run(debug=debug_mode, host='0.0.0.0', use_reloader=debug_mode)

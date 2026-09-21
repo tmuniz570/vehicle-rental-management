@@ -379,20 +379,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         scheduleItems.forEach((item, index) => {
             const row = document.createElement('div');
-            row.style.display = 'grid';
-            row.style.gridTemplateColumns = '80px 1fr 1fr 40px';
+            row.className = 'schedule-installment-card';
+            row.style.background = 'rgba(255, 255, 255, 0.03)';
+            row.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+            row.style.borderRadius = '10px';
+            row.style.padding = '10px 12px';
+            row.style.marginBottom = '8px';
+            row.style.display = 'flex';
+            row.style.flexDirection = 'column';
             row.style.gap = '8px';
-            row.style.alignItems = 'center';
+
             row.innerHTML = `
-                <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); padding-left: 4px;">Inst. #${index + 1}</div>
-                <div>
-                    <input type="number" step="0.01" value="${parseFloat(item.valor || 0).toFixed(2)}" class="schedule-amount-input" data-idx="${index}" placeholder="Amount (£)" style="width:100%; padding:6px 10px; border-radius:8px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-primary); font-size:0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                        <span style="background: rgba(255, 102, 0, 0.15); color: var(--accent); border: 1px solid rgba(255, 102, 0, 0.3); border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; font-weight: 700;">
+                            #${index + 1}
+                        </span>
+                        <span>Installment</span>
+                    </div>
+                    <button type="button" class="btn-remove-installment" data-idx="${index}" title="Remove" style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #ef4444; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; line-height: 1;">
+                        <span style="font-size: 1rem; font-weight: bold; line-height: 1;">&times;</span> Remove
+                    </button>
                 </div>
-                <div>
-                    <input type="date" value="${item.vencimento || ''}" class="schedule-date-input" data-idx="${index}" style="width:100%; padding:6px 10px; border-radius:8px; border:1px solid var(--input-border); background:var(--input-bg); color:var(--text-primary); font-size:0.85rem;">
-                </div>
-                <div>
-                    <button type="button" class="btn-remove-installment" data-idx="${index}" title="Remove" style="background:transparent; border:none; color:#ef4444; font-size:1.2rem; cursor:pointer; padding:2px 6px;">&times;</button>
+                <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 10px; align-items: end;">
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; font-weight: 600;">Amount (£)</label>
+                        <div style="position: relative;">
+                            <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 0.9rem; pointer-events: none; font-weight: 600;">£</span>
+                            <input type="number" step="0.01" value="${parseFloat(item.valor || 0).toFixed(2)}" class="schedule-amount-input" data-idx="${index}" placeholder="0.00" style="width: 100%; box-sizing: border-box; padding: 8px 10px 8px 24px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 16px; font-weight: 600; min-width: 0;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; font-weight: 600;">Due Date</label>
+                        <input type="date" value="${item.vencimento || ''}" class="schedule-date-input" data-idx="${index}" style="width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 16px; min-width: 0;">
+                    </div>
                 </div>
             `;
             scheduleContainer.appendChild(row);

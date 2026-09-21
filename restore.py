@@ -40,8 +40,16 @@ def restore_backup(backup_file=None):
             print("Invalid choice.")
             return
 
-    target_zip = os.path.join(backups_dir, backup_file)
-    print(f"\nRestoring from {backup_file} ...")
+    if os.path.isabs(backup_file) or os.path.exists(backup_file):
+        target_zip = backup_file
+    else:
+        target_zip = os.path.join(backups_dir, backup_file)
+
+    if not os.path.exists(target_zip):
+        print(f"Error: Backup file not found: {target_zip}")
+        return
+
+    print(f"\nRestoring from {os.path.basename(target_zip)} ...")
     
     with zipfile.ZipFile(target_zip, 'r') as zipf:
         zipf.extractall(base_dir)

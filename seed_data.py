@@ -2,12 +2,13 @@ import os
 import shutil
 import sqlite3
 import pytz
+import json
 from datetime import datetime, timedelta, date
 from app import app
 from database import (
     db, Motorcycle, Client, Contract, Inspection, FinancialTransaction, User, AuditLog, Claim,
     ContractAttachment, JobExecutionLock, MotoStatus, ContractStatus, InspectionType,
-    TransactionType, TransactionStatus
+    TransactionType, TransactionStatus, ContractType
 )
 
 def seed():
@@ -50,10 +51,10 @@ def seed():
         ContractAttachment.query.delete()
         FinancialTransaction.query.delete()
         Inspection.query.delete()
-        Contract.query.delete()
-        Client.query.delete()
-        Motorcycle.query.delete()
         Claim.query.delete()
+        Contract.query.delete()
+        Motorcycle.query.delete()
+        Client.query.delete()
         JobExecutionLock.query.delete()
         User.query.delete()
         
@@ -117,16 +118,17 @@ def seed():
         hoje = datetime.now(london_tz).replace(tzinfo=None)
         hoje_date = hoje.date()
 
-        print("Seeding fleet with diverse operational alert states (FF Motors Birmingham)...")
-        # Fleet of 18 bikes covering all states:
-        # - Available bikes (some fresh, one with MOT expiring soon)
-        # - Rented bikes (some fresh, one with Tax expiring soon, one with insurance cancelled, one with 15-day check overdue)
-        # - Maintenance bikes (one with MOT already expired!)
+        print("Seeding fleet with diverse operational alert states and vehicle sales (FF Motors Birmingham)...")
+        # Fleet of 20 bikes covering all states:
+        # - Available bikes (fresh, one with MOT expiring soon)
+        # - Rented bikes (fresh, Tax expiring, insurance cancelled, 15-day check overdue, overdue rent)
+        # - Maintenance bikes (MOT expired)
+        # - Sold bikes (Full cash sale and Instalment finance purchase)
         motos_data = [
             # (plate, model, colour, status, mot_days_ahead, tax_days_ahead, milhagem_atual)
             ("XX10YYY", "Honda Forza 300", "Blue Metallic", MotoStatus.RENTED.value, 240, 210, 14850),
             ("FF27MOT", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 300, 270, 8920),
-            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150, 11400),  # AVAILABLE (recently returned/cancelled, MOT due in 18d)
+            ("BK22NMX", "Yamaha NMAX 125", "Midnight Black", MotoStatus.AVAILABLE.value, 18, 150, 11400),  # AVAILABLE (MOT due in 18d)
             ("WM23PCX", "Honda PCX 125", "Silver Frost", MotoStatus.AVAILABLE.value, 330, 330, 6200),      # AVAILABLE: 100% valid
             ("BM19WKP", "Honda Vision 110", "Red Gloss", MotoStatus.MAINTENANCE.value, -4, 90, 24350),     # RED ALERT: Expired MOT (-4 days)!
             ("BV21XKT", "Honda PCX 125", "Matt Black", MotoStatus.RENTED.value, 180, 14, 16100),           # YELLOW ALERT: Road Tax due in 14 days!
@@ -142,6 +144,8 @@ def seed():
             ("WR23ZXC", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 360, 330, 7500),
             ("WT21OPL", "Honda PCX 125", "Matte Galaxy Black", MotoStatus.RENTED.value, 190, 170, 11950),
             ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250, 17320),      # AVAILABLE: Just returned from contract
+            ("SL24FUL", "Honda PCX 125", "Pearl White", MotoStatus.SOLD.value, 320, 290, 4800),            # SOLD: Full cash sale with accessories
+            ("SL24INS", "Yamaha NMAX 125", "Midnight Black", MotoStatus.SOLD.value, 350, 310, 3200),        # SOLD: Instalment sale with 4-month payment plan
         ]
         
         motos = {}
@@ -185,6 +189,8 @@ def seed():
             ("Anderson Silva", "07777888999", "anderson.silva@example.com", "18 Walsall Road, Perry Barr, Birmingham B42 1SF", True, True, False, True, "Completed contract client (Full Licence)"),
             ("Victor Hugo", "07900112233", "victor.hugo@example.com", "50 Jewellery Quarter, Birmingham B18 6EW", True, True, True, True, "Quarantine deposit client (All 4 docs)"),
             ("Alex Santos", "07111222333", None, "14 Bullring, Birmingham B5 4BU", True, True, True, True, "Cancelled contract rider (No Email registered)"),
+            ("Oliver Davies", "07444555666", "oliver.davies@example.com", "74 Harborne Park Road, Birmingham B17 0DE", True, True, False, True, "Vehicle buyer (Sale_Full - Cash purchase)"),
+            ("Marcus Sterling", "07988776655", "marcus.sterling@example.com", "29 Selly Oak Road, Birmingham B29 7JE", True, True, True, True, "Vehicle buyer (Sale_Installment - 4-month finance)"),
         ]
 
         clients = []
@@ -560,6 +566,256 @@ def seed():
                         ip_origem="127.0.0.1"
                     ))
 
+        # --- SEEDING VEHICLE SALE CONTRACTS ---
+        print("Seeding Vehicle Sale Contracts (Sale_Full and Sale_Installment with segregated deposits & schedules)...")
+        
+        # 1. Sale_Full: Oliver Davies buying Honda PCX 125 (SL24FUL) in cash
+        client_of = clients[17]
+        moto_of = motos["SL24FUL"]
+        sale_full_date = hoje - timedelta(days=25)
+        
+        ct_sale_full = Contract(
+            id_cliente=client_of.id,
+            placa="SL24FUL",
+            tipo_contrato=ContractType.SALE_FULL.value,
+            data_retirada=sale_full_date,
+            data_devolucao=None,
+            dia_pagamento_semanal=None,
+            valor_aluguel_semanal=0.0,
+            status=ContractStatus.ACTIVE.value,
+            categoria_historico="Clear",
+            valor_venda_veiculo=2600.0,
+            acessorios_extras="£180 Easyblok, £70 Tucano Leg Cover",
+            valor_admin_fee=0.0,
+            valor_total_venda=2850.0,
+            valor_entrada=0.0,
+            saldo_devedor=0.0,
+            cronograma_parcelas_json=None,
+            milhagem_inicial=4200,
+            milhagem_final=None,
+            assinatura_cliente_inicial="/static/uploads/demo_signature_client.png",
+            data_assinatura_inicial=sale_full_date,
+            url_seguro="/static/uploads/demo_insurance_forza.webp",
+            criado_por_nome=u_admin.nome,
+            data_ultima_checagem_seguro=sale_full_date.date(),
+            status_seguro="Valid",
+            seguro_verificado_por=u_admin.nome,
+            cliente_nome=client_of.nome,
+            cliente_telefone=client_of.telefone,
+            cliente_email=client_of.email,
+            cliente_endereco=client_of.endereco,
+            url_habilitacao=client_of.url_habilitacao,
+            url_habilitacao_verso=client_of.url_habilitacao_verso,
+            url_cbt=client_of.url_cbt,
+            url_comprovante_endereco=client_of.url_comprovante_endereco,
+            moto_modelo=moto_of.modelo,
+            moto_cor=moto_of.cor,
+            moto_placa=moto_of.placa,
+            valor_deposito=0.0
+        )
+        db.session.add(ct_sale_full)
+        db.session.flush()
+
+        anexo_sale_full = ContractAttachment(
+            id_contrato=ct_sale_full.id,
+            tipo='initial_contract',
+            url_arquivo="/static/uploads/demo_contract_scan.pdf",
+            nome_original="Vehicle_Sale_Agreement_SL24FUL.pdf",
+            data_criacao=sale_full_date
+        )
+        db.session.add(anexo_sale_full)
+
+        insp_sale_full = Inspection(
+            id_contrato=ct_sale_full.id,
+            tipo=InspectionType.CHECK_OUT.value,
+            data=sale_full_date,
+            milhagem=4200,
+            observacoes="Check-out delivery inspection for cash vehicle sale SL24FUL. V5C and keys transferred to Oliver Davies.",
+            url_fotos="/static/uploads/demo_vision_front.webp,/static/uploads/demo_forza_front.webp",
+            realizado_por_nome=u_admin.nome
+        )
+        db.session.add(insp_sale_full)
+
+        tx_sale_full = FinancialTransaction(
+            id_contrato=ct_sale_full.id,
+            tipo=TransactionType.SALE_FULL.value,
+            data_vencimento=sale_full_date,
+            data_pagamento=sale_full_date,
+            valor=2850.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Bank Transfer",
+            registrado_por_nome=u_admin.nome
+        )
+        db.session.add(tx_sale_full)
+
+        all_logs.append(AuditLog(
+            data_hora=sale_full_date,
+            id_usuario=u_admin.id,
+            usuario_nome=u_admin.nome,
+            acao="CREATE_CONTRACT",
+            entidade="Contract",
+            entidade_id=str(ct_sale_full.id),
+            descricao=f"Contrato de Venda à Vista #{ct_sale_full.id} aberto para {client_of.nome} ({moto_of.placa}) por {u_admin.nome} (Total: £2850.00)",
+            ip_origem="127.0.0.1"
+        ))
+
+        # 2. Sale_Installment: Marcus Sterling buying Yamaha NMAX 125 (SL24INS) in 4 installments
+        client_ms = clients[18]
+        moto_ms = motos["SL24INS"]
+        sale_inst_date = hoje - timedelta(days=15)
+        
+        cronograma = [
+            {"numero": 1, "valor": 500.0, "vencimento": (hoje_date - timedelta(days=5)).isoformat(), "status": "Pago"},
+            {"numero": 2, "valor": 500.0, "vencimento": (hoje_date + timedelta(days=25)).isoformat(), "status": "Pendente"},
+            {"numero": 3, "valor": 500.0, "vencimento": (hoje_date + timedelta(days=55)).isoformat(), "status": "Pendente"},
+            {"numero": 4, "valor": 500.0, "vencimento": (hoje_date + timedelta(days=85)).isoformat(), "status": "Pendente"},
+        ]
+
+        ct_sale_inst = Contract(
+            id_cliente=client_ms.id,
+            placa="SL24INS",
+            tipo_contrato=ContractType.SALE_INSTALLMENT.value,
+            data_retirada=sale_inst_date,
+            data_devolucao=None,
+            dia_pagamento_semanal=None,
+            valor_aluguel_semanal=0.0,
+            status=ContractStatus.ACTIVE.value,
+            categoria_historico="Cat N",
+            valor_venda_veiculo=2800.0,
+            acessorios_extras="£180 Easyblok, £45 Phone Mount, £140 Leg Cover",
+            valor_admin_fee=50.0,
+            valor_total_venda=3215.0,
+            valor_entrada=1215.0,
+            saldo_devedor=2000.0,
+            cronograma_parcelas_json=json.dumps(cronograma),
+            milhagem_inicial=5800,
+            milhagem_final=None,
+            assinatura_cliente_inicial="/static/uploads/demo_signature_client.png",
+            data_assinatura_inicial=sale_inst_date,
+            url_seguro="/static/uploads/demo_insurance_forza.webp",
+            url_comprovante_deposito="/static/uploads/demo_proof_address.webp",
+            criado_por_nome=u_staff1.nome,
+            data_ultima_checagem_seguro=sale_inst_date.date(),
+            status_seguro="Valid",
+            seguro_verificado_por=u_staff1.nome,
+            cliente_nome=client_ms.nome,
+            cliente_telefone=client_ms.telefone,
+            cliente_email=client_ms.email,
+            cliente_endereco=client_ms.endereco,
+            url_habilitacao=client_ms.url_habilitacao,
+            url_habilitacao_verso=client_ms.url_habilitacao_verso,
+            url_cbt=client_ms.url_cbt,
+            url_comprovante_endereco=client_ms.url_comprovante_endereco,
+            moto_modelo=moto_ms.modelo,
+            moto_cor=moto_ms.cor,
+            moto_placa=moto_ms.placa,
+            valor_deposito=1215.0
+        )
+        db.session.add(ct_sale_inst)
+        db.session.flush()
+
+        anexo_sale_inst = ContractAttachment(
+            id_contrato=ct_sale_inst.id,
+            tipo='initial_contract',
+            url_arquivo="/static/uploads/demo_contract_scan.pdf",
+            nome_original="Hire_Purchase_Sale_Agreement_SL24INS.pdf",
+            data_criacao=sale_inst_date
+        )
+        db.session.add(anexo_sale_inst)
+
+        insp_sale_inst_out = Inspection(
+            id_contrato=ct_sale_inst.id,
+            tipo=InspectionType.CHECK_OUT.value,
+            data=sale_inst_date,
+            milhagem=5800,
+            observacoes="Check-out delivery inspection for hire-purchase sale SL24INS. Accessories installed: Easyblok, Phone Mount, Leg Cover.",
+            url_fotos="/static/uploads/demo_vision_front.webp,/static/uploads/demo_vision_side.webp",
+            realizado_por_nome=u_staff1.nome
+        )
+        db.session.add(insp_sale_inst_out)
+
+        insp_sale_inst_inc = Inspection(
+            id_contrato=ct_sale_inst.id,
+            tipo=InspectionType.INCIDENT.value,
+            data=hoje - timedelta(days=3),
+            milhagem=5920,
+            observacoes="Customer brought motorcycle for complimentary 30-day warranty check & rear mirror adjustment.",
+            url_fotos="/static/uploads/demo_forza_front.webp",
+            realizado_por_nome=u_staff2.nome
+        )
+        db.session.add(insp_sale_inst_inc)
+
+        tx_deposit = FinancialTransaction(
+            id_contrato=ct_sale_inst.id,
+            tipo=TransactionType.SALE_DEPOSIT.value,
+            data_vencimento=sale_inst_date,
+            data_pagamento=sale_inst_date,
+            valor=1215.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Card",
+            registrado_por_nome=u_staff1.nome
+        )
+        db.session.add(tx_deposit)
+
+        tx_inst1 = FinancialTransaction(
+            id_contrato=ct_sale_inst.id,
+            tipo=TransactionType.SALE_INSTALLMENT.value,
+            data_vencimento=hoje - timedelta(days=5),
+            data_pagamento=hoje - timedelta(days=5),
+            valor=500.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Bank Transfer",
+            registrado_por_nome=u_staff1.nome
+        )
+        db.session.add(tx_inst1)
+
+        tx_inst2 = FinancialTransaction(
+            id_contrato=ct_sale_inst.id,
+            tipo=TransactionType.SALE_INSTALLMENT.value,
+            data_vencimento=hoje + timedelta(days=25),
+            data_pagamento=None,
+            valor=500.0,
+            status=TransactionStatus.PENDING.value,
+            forma_pagamento=None,
+            registrado_por_nome=None
+        )
+        db.session.add(tx_inst2)
+
+        tx_inst3 = FinancialTransaction(
+            id_contrato=ct_sale_inst.id,
+            tipo=TransactionType.SALE_INSTALLMENT.value,
+            data_vencimento=hoje + timedelta(days=55),
+            data_pagamento=None,
+            valor=500.0,
+            status=TransactionStatus.PENDING.value,
+            forma_pagamento=None,
+            registrado_por_nome=None
+        )
+        db.session.add(tx_inst3)
+
+        tx_inst4 = FinancialTransaction(
+            id_contrato=ct_sale_inst.id,
+            tipo=TransactionType.SALE_INSTALLMENT.value,
+            data_vencimento=hoje + timedelta(days=85),
+            data_pagamento=None,
+            valor=500.0,
+            status=TransactionStatus.PENDING.value,
+            forma_pagamento=None,
+            registrado_por_nome=None
+        )
+        db.session.add(tx_inst4)
+
+        all_logs.append(AuditLog(
+            data_hora=sale_inst_date,
+            id_usuario=u_staff1.id,
+            usuario_nome=u_staff1.nome,
+            acao="CREATE_CONTRACT",
+            entidade="Contract",
+            entidade_id=str(ct_sale_inst.id),
+            descricao=f"Contrato de Venda Parcelada #{ct_sale_inst.id} aberto para {client_ms.nome} ({moto_ms.placa}) por {u_staff1.nome} (Entrada: £1215.00, Saldo: £2000.00)",
+            ip_origem="127.0.0.1"
+        ))
+
         # Add recent staff payment received logs for rich audit stream
         recent_payments = FinancialTransaction.query.filter_by(status=TransactionStatus.PAID.value).limit(10).all()
         for p in recent_payments:
@@ -705,19 +961,22 @@ def seed():
         print("    - 4 Available (including 1 with MOT due in 18d, and 1 returned from cancelled rental)")
         print("    - 13 Rented (including 1 with Tax due in 14d, 1 with Cancelled Insurance, 1 with 15-day check overdue)")
         print("    - 1 Maintenance (with MOT expired -4 days)")
+        print("    - 2 Sold (1 Honda PCX 125 Cash Sale, 1 Yamaha NMAX 125 Instalment Plan)")
         print(f"✓ {Client.query.count()} Clients with varied document profiles & optional emails:")
         print("    - Full UK Licences (Front + Back + Address, no CBT)")
         print("    - Provisional + CBT Couriers (Front + Back + CBT + Address)")
         print("    - Incomplete (Missing Back, Missing Address, or New Lead)")
         print("    - Clients without email (Optional customer email UX)")
+        print("    - Vehicle Buyers (Cash full sale & Instalment finance)")
         print(f"✓ {Contract.query.count()} Contracts:")
         print("    - Up to date active rentals")
         print("    - Overdue rentals (1 week and 2 weeks behind in rent)")
         print("    - 14-day Deposit Hold (quarantine after bike return)")
         print("    - Cancelled rental (early termination demonstration)")
         print("    - Completed rentals (1 with £50 damage deduction, 1 with full refund)")
-        print(f"✓ {FinancialTransaction.query.count()} Financial Ledger Transactions (including cancelled pending rent)")
-        print(f"✓ {Inspection.query.count()} Check-out and Check-in Inspections with multi-photo carousels & mileages")
+        print("    - Vehicle Sales (1 Sale_Full paid in full, 1 Sale_Installment with segregated down payment & 4 installments)")
+        print(f"✓ {FinancialTransaction.query.count()} Financial Ledger Transactions (Rent, Deposit, Damage, Refunds, Sale_Full, Sale_Deposit, Sale_Installments)")
+        print(f"✓ {Inspection.query.count()} Check-out, Check-in, and Incident/Warranty Inspections with photos & mileages")
         print(f"✓ {ContractAttachment.query.count()} Official Signed Agreement Attachments (PDFs & Scans)")
         print(f"✓ {Contract.query.filter(Contract.assinatura_cliente_inicial.isnot(None)).count()} Contracts with touch-screen digital signatures")
         print(f"✓ {AuditLog.query.count()} Audit Log activities across the timeline")

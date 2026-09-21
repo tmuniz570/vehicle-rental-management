@@ -27,8 +27,12 @@ async function carregarContratos() {
         const data = await res.json();
         const contratos = data.itens || [];
         
+        const headerCols = document.querySelectorAll('#contratosTable thead th');
+        const totalCols = headerCols.length > 0 ? headerCols.length : 9;
+        const hasTypeCol = !!document.querySelector('#contratosTable thead th[data-sort-field="tipo"]');
+
         if (contratos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No contracts found.</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="${totalCols}" style="text-align:center;">No contracts found.</td></tr>`;
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
@@ -76,10 +80,11 @@ async function carregarContratos() {
             
             const nomeCliente = escapeHtml(c.cliente_nome || '-');
             const placa = escapeHtml(c.placa || '-');
+            const typeCell = hasTypeCol ? `<td>${tipoBadge}</td>` : '';
             
             tr.innerHTML = `
                 <td>#${c.id}</td>
-                <td>${tipoBadge}</td>
+                ${typeCell}
                 <td style="font-weight:600; white-space: nowrap;" title="${nomeCliente}">${nomeCliente}</td>
                 <td class="nowrap"><span class="badge-plate">${placa}</span></td>
                 <td>${dataRetirada}</td>
@@ -107,7 +112,8 @@ async function carregarContratos() {
         }
         
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--error);">Error loading contracts.</td></tr>';
+        const colSpan = document.querySelectorAll('#contratosTable thead th').length || 9;
+        tbody.innerHTML = `<tr><td colspan="${colSpan}" style="text-align:center;color:var(--error);">Error loading contracts.</td></tr>`;
     }
 }
 
