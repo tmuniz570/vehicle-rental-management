@@ -3252,14 +3252,13 @@ def get_dashboard():
                 'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
             })
         
-        # Alertas de Compliance de Frota: Road Tax e MOT (apenas frota ativa, exclui vendidas)
+        # Alertas de Compliance: Road Tax (apenas frota ativa) e MOT (frota ativa + motos vendidas para prospecção de serviço na oficina)
         hoje_date = get_london_date()
         todas_motos = db.session.query(
             Motorcycle.placa,
+            Motorcycle.status,
             Motorcycle.vencimento_tax,
             Motorcycle.vencimento_mot
-        ).filter(
-            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])
         ).all()
         tax_mot_warnings = 0
         tax_warnings = 0
@@ -3268,11 +3267,13 @@ def get_dashboard():
         tax_mot_expiring_soon = 0
         
         for m in todas_motos:
+            is_sold = (m.status in [MotoStatus.SOLD.value, 'Sold', 'Vendida'])
             has_tax_w = False
             has_mot_w = False
             is_m_expired = False
             
-            if m.vencimento_tax:
+            # Road Tax: checado apenas para frota ativa (motos vendidas são isentas, imposto é pago pelo comprador)
+            if not is_sold and m.vencimento_tax:
                 diff_t = (m.vencimento_tax - hoje_date).days
                 if diff_t < 0:
                     has_tax_w = True
@@ -3280,6 +3281,8 @@ def get_dashboard():
                 elif diff_t <= 30:
                     has_tax_w = True
                     
+            # MOT: checado SEMPRE para todas as motos (inclusive vendidas),
+            # permitindo à oficina contatar proativamente o cliente da moto vendida para fazer revisão pré-MOT e faturar o serviço
             if m.vencimento_mot:
                 diff_m = (m.vencimento_mot - hoje_date).days
                 if diff_m < 0:

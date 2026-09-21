@@ -23,7 +23,9 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
 ### 📊 Ajuste nos Indicadores do Dashboard (Frota Ativa & Disponíveis em Geral)
 * **Exclusão de Motos Vendidas do "Total Fleet"**: O total de motocicletas na frota (`total_motos`) agora contabiliza estritamente a frota ativa (`Available` + `Rented` + `Maintenance`), excluindo motos vendidas (`Sold`). A barra de distribuição percentual da frota agora fecha com precisão em 100% da frota em operação.
 * **Redefinição de "Available"**: O indicador "Available to Rent" foi renomeado para **"Available"** com descrição `"Available in general"`, esclarecendo que as motos disponíveis no pátio atendem tanto à locação quanto à venda imediata.
-* **Compliance de TAX & MOT**: O cálculo de alertas de vencimento de Road Tax e MOT no dashboard filtra apenas veículos da frota ativa, impedindo que motos já vendidas gerem alertas desnecessários.
+* **Compliance de TAX & MOT (Oportunidade Comercial de Oficina)**: 
+  - **Road Tax**: Checado exclusivamente para a frota ativa em operação (motos vendidas são isentas, pois o imposto é pago pelo comprador ao DVLA).
+  - **MOT**: Monitorado para **toda a base de motocicletas, incluindo motos vendidas (`Sold`)**. Permite que a FF Motors acompanhe vencimentos de MOT de clientes que compraram motos na loja, contatando-os com antecedência para agendar revisão pré-MOT e faturar o serviço de oficina.
 
 ## [1.7.3] — 2026-09-21 — *iPhone AirPrint & PDF Perfection (Zero Blank Pages, 3-Page Rental & Balanced Sales)*
 
