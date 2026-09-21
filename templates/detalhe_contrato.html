@@ -80,7 +80,7 @@
             <!-- Mileage Tracker in Vehicle Card -->
             <div id="box_mileage_info" style="margin-top: 0.85rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); font-size: 0.82rem;">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                    <span style="color: var(--text-secondary);">Start Mileage:</span>
+                    <span id="label_milhagem_inicial" style="color: var(--text-secondary);">Start Mileage:</span>
                     <strong id="info_milhagem_inicial" style="color: var(--text-primary);">-</strong>
                 </div>
                 <div id="row_milhagem_final" style="display: flex; justify-content: space-between; margin-bottom: 3px;">
@@ -768,5 +768,5 @@
     const CONTRATO_ID = {{ contrato_id }};
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/detalhe_contrato.js?v=14"></script>
+<script src="/static/js/detalhe_contrato.js?v=15"></script>
 {% endblock %}

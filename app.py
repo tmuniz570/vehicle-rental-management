@@ -2476,6 +2476,15 @@ def detalhe_contrato(id):
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
     checagem_seguro_devida = (dias_desde_checagem >= 15) if not is_venda else False
     
+    # Auto-conclusão para contratos de venda quando todas as transações estiverem quitadas
+    if is_venda and c.status in [ContractStatus.ATIVO.value, 'Active', 'Ativo']:
+        tem_pendente = any(t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente'] for t in transacoes)
+        tem_paga = any(t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago'] for t in transacoes)
+        if tem_paga and not tem_pendente:
+            c.status = ContractStatus.COMPLETED.value
+            db.session.commit()
+            registrar_log('CONTRACT_COMPLETED', 'Contract', c.id, f"Contrato de venda #{c.id} ({c.tipo_contrato}) concluído com sucesso após quitação integral.")
+
     is_completed = (c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado', ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
     
     # Parse cronograma se existir
@@ -2976,11 +2985,25 @@ def pagar_transacao(id):
     t.data_pagamento = get_local_now()
     t.forma_pagamento = forma
     t.registrado_por_nome = operador_atual
+
+    # Auto-conclusão para contratos de venda quando todas as transações forem quitadas
+    if t.contrato and t.contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+        contrato_venda = t.contrato
+        transacoes_pendentes = FinancialTransaction.query.filter(
+            FinancialTransaction.id_contrato == contrato_venda.id,
+            FinancialTransaction.id != t.id,
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
+        ).count()
+        if transacoes_pendentes == 0 and contrato_venda.status != ContractStatus.COMPLETED.value:
+            contrato_venda.status = ContractStatus.COMPLETED.value
+            registrar_log('CONTRACT_COMPLETED', 'Contract', contrato_venda.id, f"Contrato de venda #{contrato_venda.id} ({contrato_venda.tipo_contrato}) concluído com sucesso após quitação integral.")
+
     db.session.commit()
     registrar_log('PAYMENT_RECEIVED', 'Transaction', t.id, f"Baixa de £{float(t.valor):.2f} ({t.tipo}) confirmada via {forma} por {operador_atual} no Contrato #{t.id_contrato}")
     return jsonify({'message': 'Transaction marked as paid successfully', 'mensagem': 'Transação paga com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
 
 @app.route('/api/financeiro/<int:id>/reverter', methods=['POST', 'PUT'])
+@app.route('/api/financeiro/reverter/<int:id>', methods=['POST', 'PUT'])
 @app.route('/api/cobrancas/<int:id>/reverter', methods=['POST', 'PUT'])
 @alugueis_required
 def reverter_pagamento(id):
@@ -3000,6 +3023,13 @@ def reverter_pagamento(id):
     t.data_pagamento = None
     t.forma_pagamento = None
     t.registrado_por_nome = None
+
+    # Se o contrato era de venda e estava Completed, reabre para Active
+    if t.contrato and t.contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+        if t.contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
+            t.contrato.status = ContractStatus.ATIVO.value
+            registrar_log('CONTRACT_REOPENED', 'Contract', t.contrato.id, f"Contrato de venda #{t.contrato.id} reaberto para Active devido a estorno do pagamento #{t.id}.")
+
     db.session.commit()
     
     registrar_log(

@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.7.1--Mobile%20Optimized-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.7.4--Sales%20Lifecycle%20%26%20Mobile%20Print-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -51,10 +51,14 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 ### 📋 5. Contract Agreements & Lifecycle (Rentals & Vehicle Sales)
 * **Dual Contract Modes (Rentals & Vehicle Sales):**
   - **Rental Agreements (`Rent`):** Provisions Week 1 collection rent and Week 2 recurring rent scheduled for the client's chosen weekday payment cycle, with security deposit holding.
-  - **Full Vehicle Sales (`Sale_Full`):** Outright vehicle sale provisioned with pending transaction and immediate transition of motorcycle status to `Sold`.
-  - **Instalment Vehicle Sales (`Sale_Installment`):** Financed purchase provisioned with segregated down payment (`Sale_Deposit`), administrative fee, itemized accessories, and scheduled instalment payment dates (`Sale_Installment`).
+  - **Full Vehicle Sales (`Sale_Full`):** Outright vehicle sale provisioned with pending transaction and immediate transition of motorcycle status to `Sold`. Automatically completes (`Completed`) upon total payment quittance.
+  - **Instalment Vehicle Sales (`Sale_Installment`):** Financed purchase provisioned with segregated down payment (`Sale_Deposit`), administrative fee, itemized accessories, and scheduled instalment payment dates (`Sale_Installment`). Automatically completes (`Completed`) once down payment and all scheduled instalments are paid in full (£0.00 outstanding).
+* **Sales Contract Lifecycle & Reopening:**
+  - Automatic status transition to `Completed` when all sales transactions are settled.
+  - Automatic reversal and reopening back to `Active` with audit trail tracking if a completed sale payment is cancelled or reverted.
+  - Removal of "Return Mileage" and "Miles driven" rows on vehicle cards for sales contracts, displaying clean "Sale Mileage".
 * **Interactive Itemized Accessories & Extras Builder:** Real-time selector and custom accessory adder (e.g., security trackers, locks, heated grips, weather covers) with dynamic cost summation applied directly to the agreement total.
-* **Printable Formal Agreements:** Dedicated print templates for both rental agreements and vehicle sales agreements featuring dealership credentials, fixed seller authorization signature, instalment schedule tables, and UK vehicle history categorization (`Clear`, `Cat N`, etc.).
+* **Printable Formal Agreements & iPhone AirPrint A4 Engine:** Dedicated print templates for both rental agreements and vehicle sales agreements featuring dealership credentials, fixed seller authorization signature, instalment schedule tables, UK vehicle history categorization (`Clear`, `Cat N`, etc.), and strict zero-blank-page pagination across iOS Safari (AirPrint) and desktop browsers.
 * **Smart Insurance Compliance & Exemption:** 15-day recurring government database verification (askMID) for active rentals, with automatic exemption for sold vehicles while preserving the collected insurance policy on file.
 * **Protection Against Incompatible Operations:** Sold motorbikes are automatically protected against rental return inspections (`Check-in`) and excluded from recurring rental billing batches, while allowing warranty and damage logs (`Incident`).
 * **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.

@@ -231,18 +231,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Mileage Tracker
+        const isVendaContrato = (data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment');
+        const labelStartMileage = document.getElementById('label_milhagem_inicial');
+        if (labelStartMileage) {
+            labelStartMileage.textContent = isVendaContrato ? 'Sale Mileage:' : 'Start Mileage:';
+        }
         const elStartMileage = document.getElementById('info_milhagem_inicial');
         if (elStartMileage) {
             elStartMileage.textContent = (data.milhagem_inicial !== undefined && data.milhagem_inicial !== null) ? `${data.milhagem_inicial.toLocaleString('en-GB')} miles` : '0 miles';
         }
+        const rowEndMileage = document.getElementById('row_milhagem_final');
         const elEndMileage = document.getElementById('info_milhagem_final');
-        if (elEndMileage) {
-            elEndMileage.textContent = (data.milhagem_final !== undefined && data.milhagem_final !== null) ? `${data.milhagem_final.toLocaleString('en-GB')} miles` : 'Pending return';
+        if (rowEndMileage) {
+            if (isVendaContrato) {
+                rowEndMileage.style.display = 'none';
+            } else {
+                rowEndMileage.style.display = 'flex';
+                if (elEndMileage) {
+                    elEndMileage.textContent = (data.milhagem_final !== undefined && data.milhagem_final !== null) ? `${data.milhagem_final.toLocaleString('en-GB')} miles` : 'Pending return';
+                }
+            }
         }
         const rowDistance = document.getElementById('row_milhas_rodadas');
         const elDistance = document.getElementById('info_milhas_rodadas');
         if (rowDistance && elDistance) {
-            if (data.milhas_rodadas !== undefined && data.milhas_rodadas !== null) {
+            if (!isVendaContrato && data.milhas_rodadas !== undefined && data.milhas_rodadas !== null) {
                 rowDistance.style.display = 'flex';
                 elDistance.textContent = `${data.milhas_rodadas.toLocaleString('en-GB')} miles driven`;
             } else {

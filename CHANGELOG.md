@@ -4,6 +4,22 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.7.4] — 2026-09-21 — *Sales Contract Lifecycle (Auto-Completion upon Quittance) & Mileage Tracker Optimization*
+
+### 🏍️ Ajuste de Quilometragem em Contratos de Venda
+* **Remoção de "Return Mileage" para Vendas**: Motocicletas vendidas não retornam à frota de aluguel. O card de informações do veículo em detalhes do contrato (`detalhe_contrato.html` / `detalhe_contrato.js`) agora oculta as linhas `"Return Mileage"` e `"Miles driven"` quando o contrato for `Sale_Full` ou `Sale_Installment`.
+* **Rótulo Apropriado**: O rótulo `"Start Mileage:"` é dinamicamente alterado para `"Sale Mileage:"`, exibindo com precisão a quilometragem no momento da entrega da venda.
+* **Cache Buster Atualizado**: Script atualizado para `detalhe_contrato.js?v=15`.
+
+### 🏁 Ciclo de Vida e Conclusão de Contratos de Venda
+* **Regra de Conclusão Automática (`Completed`)**:
+  - **Venda à Vista (`Sale_Full`)**: O contrato transiciona automaticamente para status `Completed` no instante em que a transação de pagamento integral for marcada como `Paid`.
+  - **Venda Parcelada (`Sale_Installment`)**: O contrato transiciona automaticamente para status `Completed` assim que a entrada (`Sale_Deposit`) e todas as parcelas (`Sale_Installment`) forem baixadas como `Paid` (saldo devedor liquidado / £0.00 pendente).
+  - **Validação Proativa**: A rota de detalhes do contrato (`/api/contratos/<id>`) também checa o status financeiro e atualiza contratos de venda quitados para `Completed`.
+* **Estorno Seguro e Reabertura Automática**:
+  - Se um operador reverter uma transação (`POST /api/financeiro/<id>/reverter`) de um contrato de venda já concluído, o sistema reabre o contrato automaticamente para `Active` (`ContractStatus.ATIVO`) e grava o evento `CONTRACT_REOPENED` no `AuditLog`.
+  - Adicionada rota de conveniência `/api/financeiro/reverter/<id>` em paridade com `/api/financeiro/pagar/<id>`.
+
 ## [1.7.3] — 2026-09-21 — *iPhone AirPrint & PDF Perfection (Zero Blank Pages, 3-Page Rental & Balanced Sales)*
 
 ### 📱 Correção de Impressão no iPhone / iOS Safari

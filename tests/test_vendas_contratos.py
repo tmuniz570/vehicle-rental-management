@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
 from app import app
-from database import db, Motorcycle, Client, Contract, FinancialTransaction, User, ContractType, TransactionType, MotoStatus, TransactionStatus
+from database import db, Motorcycle, Client, Contract, FinancialTransaction, User, ContractType, TransactionType, MotoStatus, TransactionStatus, ContractStatus
 
 def test_sales_system():
     print("=== STARTING VEHICLE SALE CONTRACTS TEST ===")
@@ -326,7 +326,37 @@ def test_sales_system():
             'fotos': dummy_insp_img2
         }, content_type='multipart/form-data')
         assert res_incident.status_code == 201, f"Expected 201 for Incident inspection on sold bike, got {res_incident.status_code}"
-        print("-> Confirmed: Incident inspection successfully accepted for sold bike.")
+        # Test auto-completion of sales contract upon full payment and reopening on reversal
+        print("\n[TEST 3.3] Testing auto-completion of sales contract upon payment quittance...")
+        # cid_full has 1 transaction (Sale_Full), currently Pending
+        c_full = db.session.get(Contract, cid_full)
+        assert c_full.status in [ContractStatus.ATIVO.value, 'Active']
+        t_full = FinancialTransaction.query.filter_by(id_contrato=cid_full).first()
+        res_pay_full = client.post(f'/api/financeiro/pagar/{t_full.id}', json={'forma_pagamento': 'Bank Transfer'})
+        assert res_pay_full.status_code == 200
+        db.session.refresh(c_full)
+        assert c_full.status == ContractStatus.COMPLETED.value, f"Expected Completed, got {c_full.status}"
+        print("-> Confirmed: Sale_Full auto-transitions to Completed when paid in full.")
+
+        # Revert payment and ensure it re-opens to Active
+        res_rev_full = client.post(f'/api/financeiro/reverter/{t_full.id}')
+        assert res_rev_full.status_code == 200
+        db.session.refresh(c_full)
+        assert c_full.status == ContractStatus.ATIVO.value, f"Expected Active after reversal, got {c_full.status}"
+        print("-> Confirmed: Reverting payment re-opens Completed sale contract to Active.")
+
+        # Re-pay to test detail API auto-check
+        res_pay_full2 = client.post(f'/api/financeiro/pagar/{t_full.id}', json={'forma_pagamento': 'Card'})
+        assert res_pay_full2.status_code == 200
+        db.session.refresh(c_full)
+        assert c_full.status == ContractStatus.COMPLETED.value
+        print("-> Confirmed: Re-paying transaction sets status back to Completed.")
+
+        # Revert payment back to Pending so cid_full is Active with Pending transaction for cancellation test (TEST 5)
+        res_rev_full2 = client.post(f'/api/financeiro/reverter/{t_full.id}')
+        assert res_rev_full2.status_code == 200
+        db.session.refresh(c_full)
+        assert c_full.status == ContractStatus.ATIVO.value
         
         # ==========================================
         # TEST 4: Weekly Rent Generation Logic
