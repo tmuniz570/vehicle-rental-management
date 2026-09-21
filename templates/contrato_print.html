@@ -191,7 +191,7 @@
                 padding: 0 !important;
                 margin: 0 !important;
                 width: 100% !important;
-                font-size: 9.8pt !important;
+                font-size: 8.9pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -207,8 +207,6 @@
                 max-width: 100% !important;
                 box-sizing: border-box !important;
                 background: transparent !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
             }
             .agreement-page:not(:last-child) {
                 page-break-after: always !important;
@@ -219,63 +217,75 @@
                 break-after: avoid !important;
             }
             .header-logo {
-                margin-bottom: 0.35rem !important;
+                margin-bottom: 0.25rem !important;
             }
             .header-logo img {
-                max-height: 40px !important;
+                max-height: 36px !important;
             }
             .agreement-title {
-                font-size: 1.3rem !important;
-                margin: 0 0 0.6rem 0 !important;
+                font-size: 1.25rem !important;
+                margin: 0 0 0.5rem 0 !important;
             }
             .section-title {
-                font-size: 0.98rem !important;
-                margin-top: 0.65rem !important;
-                margin-bottom: 0.25rem !important;
-                padding-bottom: 0.15rem !important;
+                font-size: 0.95rem !important;
+                margin-top: 0.55rem !important;
+                margin-bottom: 0.20rem !important;
+                padding-bottom: 0.12rem !important;
                 page-break-after: avoid !important;
                 break-after: avoid !important;
             }
             .subsection-title {
-                font-size: 0.90rem !important;
-                margin-top: 0.35rem !important;
-                margin-bottom: 0.15rem !important;
+                font-size: 0.88rem !important;
+                margin-top: 0.30rem !important;
+                margin-bottom: 0.12rem !important;
                 page-break-after: avoid !important;
                 break-after: avoid !important;
             }
             p, li {
-                font-size: 9.15pt !important;
-                line-height: 1.37 !important;
-                margin-bottom: 0.26rem !important;
+                font-size: 8.9pt !important;
+                line-height: 1.35 !important;
+                margin-bottom: 0.22rem !important;
             }
             ul {
-                margin: 0.15rem 0 0.35rem 1rem !important;
+                margin: 0.12rem 0 0.30rem 1rem !important;
             }
             .signature-box {
                 background: #f8fafc !important;
                 border: 1px solid #cbd5e1 !important;
-                padding: 0.45rem 0.75rem !important;
-                margin-top: 0.35rem !important;
-                margin-bottom: 0.35rem !important;
+                padding: 0.40rem 0.65rem !important;
+                margin-top: 0.30rem !important;
+                margin-bottom: 0.30rem !important;
+                display: flex !important;
+                flex-direction: row !important;
+                align-items: flex-end !important;
+                justify-content: space-between !important;
+                gap: 1rem !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
+            .sig-item {
+                flex: 1 !important;
+                width: 48% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-start !important;
+            }
             .sig-img {
-                max-height: 44px !important;
+                max-height: 40px !important;
             }
             .sig-line {
-                margin-top: 22px !important;
+                margin-top: 20px !important;
             }
             .sig-label {
-                font-size: 0.80rem !important;
+                font-size: 0.78rem !important;
             }
             .screen-spacer {
-                margin-top: 0.2rem !important;
+                display: none !important;
             }
             .page-footer-num {
                 margin-top: 0.5rem !important;
-                padding-top: 0.3rem !important;
-                font-size: 8.5pt !important;
+                padding-top: 0.25rem !important;
+                font-size: 8pt !important;
             }
         }
     </style>
@@ -355,14 +365,8 @@
         <p>
             <strong>4.3 Maintenance and Oil Changes:</strong> Oil changes must be performed at <strong>FF Motors Birmingham</strong> every <strong>500 to 600 miles</strong>. Oil changes and scheduled maintenance (e.g., brakes, drive belt, battery, etc.) are included in the rental price. If the Renter fails to perform oil changes and maintenance within the correct mileage timeframe, any resulting damage to the motorcycle will be the Renter's full financial responsibility. If the Renter chooses to perform maintenance at a different garage, they must provide all official receipts and evidence of the completed work. Failure to provide proper evidence makes the Renter fully liable for any mechanical damages.
         </p>
-        <p>
-            <strong>4.4 Condition of Vehicle and MOT Standards:</strong> The Renter is fully responsible for any damages caused to the motorcycle during the rental period. The vehicle must be returned to the Owner in the exact same condition it was rented. Under no circumstances may the motorcycle be ridden if it falls below the minimum legal safety conditions required by UK law (MOT standards).
-        </p>
-        <p>
-            <strong>4.5 Fines, Penalties, and Transfer of Liability:</strong> All traffic, speeding, and parking fines or penalties are the sole responsibility of the Renter. The Renter must pay these fines within the discount period offered by the issuing authority, or within a maximum of 14 days from the date of the notification letter if no discount is available. In the event of serious traffic offenses (such as speeding, red light violations, bus lane contraventions, etc.), the Owner will automatically nominate the Renter as the driver at the time of the offense and transfer liability directly to the issuing authority or Police.
-        </p>
 
-        <div class="page-footer-num">Page 1 of 2</div>
+        <div class="page-footer-num">Page 1 of {{ total_paginas|default(3) }}</div>
     </div>
 
     <!-- ================= PAGE 2 ================= -->
@@ -373,6 +377,12 @@
 
         <div class="section-title">4. Terms and Conditions of Rental (Continued)</div>
 
+        <p>
+            <strong>4.4 Condition of Vehicle and MOT Standards:</strong> The Renter is fully responsible for any damages caused to the motorcycle during the rental period. The vehicle must be returned to the Owner in the exact same condition it was rented. Under no circumstances may the motorcycle be ridden if it falls below the minimum legal safety conditions required by UK law (MOT standards).
+        </p>
+        <p>
+            <strong>4.5 Fines, Penalties, and Transfer of Liability:</strong> All traffic, speeding, and parking fines or penalties are the sole responsibility of the Renter. The Renter must pay these fines within the discount period offered by the issuing authority, or within a maximum of 14 days from the date of the notification letter if no discount is available. In the event of serious traffic offenses (such as speeding, red light violations, bus lane contraventions, etc.), the Owner will automatically nominate the Renter as the driver at the time of the offense and transfer liability directly to the issuing authority or Police.
+        </p>
         <p>
             <strong>4.6 Accidents:</strong> In the event of an accident, the Renter assumes full and total responsibility for the motorcycle.<br>
             - If the Renter is at fault, they must assume all legal and financial consequences, including the payment of any insurance excess (deductible) applied by the insurance company.<br>
@@ -388,6 +398,18 @@
             c. The vehicle must be locked and secured at all times when not in use, and keys kept under personal control. In case of loss of keys, the Renter is responsible for the cost of a new key.<br>
             d. Only the specified fuel type must be used, and tire pressures/oil levels must be checked regularly.
         </p>
+
+        <div class="page-footer-num">Page 2 of {{ total_paginas|default(3) }}</div>
+    </div>
+
+    <!-- ================= PAGE 3 ================= -->
+    <div class="agreement-page">
+        <div class="header-logo">
+            <img src="/static/images/logo_print.jpg" alt="FF Motors Logo">
+        </div>
+
+        <div class="section-title">4. Terms and Conditions of Rental (Continued)</div>
+
         <p>
             <strong>4.9 Data Protection (GDPR) and Information Sharing:</strong> The Renter explicitly agrees that their personal data (including name, address, and driving licence details) may be processed and shared with third parties, such as local authorities, councils, debt collection agencies, or the Police, strictly for the purpose of transferring liability for fines, resolving traffic offenses, or reporting criminal activity (e.g., theft).
         </p>
@@ -467,7 +489,7 @@
             </div>
         </div>
 
-        <div class="page-footer-num">Page 2 of 2</div>
+        <div class="page-footer-num">Page 3 of {{ total_paginas|default(3) }}</div>
     </div>
 
 </body>

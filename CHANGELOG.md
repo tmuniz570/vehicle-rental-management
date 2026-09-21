@@ -4,6 +4,28 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.7.3] — 2026-09-21 — *iPhone AirPrint & PDF Perfection (Zero Blank Pages, 3-Page Rental & Balanced Sales)*
+
+### 📱 Correção de Impressão no iPhone / iOS Safari
+* **Eliminação de Páginas em Branco no iPhone**:
+  - **Diagnóstico WebKit Mobile**: O iOS Safari (AirPrint e Salvar como PDF) impõe margens físicas de hardware de aproximadamente 15mm (~950px de altura disponível), menores que os 1060px do desktop Chrome. Conteúdos que no computador cabiam no limite, no iPhone sofriam um estouro de 10 a 100px, forçando a criação de páginas fantasmas em branco.
+  - **Remoção de `break-inside: avoid` em `.agreement-page`**: Evita que o motor de layout do WebKit crie quebras forçadas de página inteira quando o conteúdo se aproxima da borda inferior.
+  - **Proteção dos Grids de Assinatura**: Forçado `display: grid; grid-template-columns: 1fr 1fr !important` e `display: flex; flex-direction: row !important` em `@media print`, garantindo que as assinaturas permaneçam lado a lado na impressão mesmo quando disparada de telas pequenas de celular.
+* **Contrato de Aluguel em Exatas 3 Páginas Balanceadas (`contrato_print.html`)**:
+  - **Página 1 (de 3)**: Partes, Veículo, Requisitos/Depósito (3.1 a 3.4) e Termos 4.1 a 4.3 (`Page 1 of 3`).
+  - **Página 2 (de 3)**: Termos operacionais e de responsabilidade 4.4 a 4.8 (MOT, Multas, Acidentes, Furto, Restrições de Uso) (`Page 2 of 3`).
+  - **Página 3 (de 3)**: Termos legais 4.9 a 4.11 (GDPR, Indenização, Jurisdição), Declaração e Assinaturas de Início (Seção 5) e Declaração e Assinaturas de Devolução (Seção 6) (`Page 3 of 3`).
+  - **Zero Páginas Sobrando**: Todas as páginas possuem entre 280px e 430px de margem de segurança contra estouro de margens.
+* **Contrato de Venda à Vista em Exatas 2 Páginas (`contrato_venda_print.html`)**:
+  - **Grid Executivo em 2 Colunas (`.print-two-col`)**: Reestruturadas as Seções 1 (Vendedor e Comprador) e Seções 2 & 3 (Veículo e Preço) para exibição lado a lado na impressão. Reduziu a metade superior da Página 1 de 400px para apenas ~190px.
+  - **Página 1 (de 2)**: Contém Partes, Veículo, Finanças e Termos 4.1 a 4.4 (~500px de altura total, folga de mais de 400px).
+  - **Página 2 (de 2)**: Contém Termos 4.5 a 4.11 e Seção 5 de Assinaturas (~580px de altura total, folga de mais de 350px).
+  - **Zero Páginas Sobrando**: Erradicado o vazamento que gerava uma folha intermediária em branco no iPhone.
+* **Contrato de Venda Parcelada em Exatas 3 Páginas (`contrato_venda_print.html`)**:
+  - **Página 1 (de 3)**: Partes em 2 colunas, Veículo, Finanças e Tabela do Cronograma de Parcelas (`Page 1 of 3`).
+  - **Página 2 (de 3)**: Termos gerais 4.1 a 4.8 (`Page 2 of 3`).
+  - **Página 3 (de 3)**: Termo 4.9 (GDPR), 4.10, 4.11 e Seção 5 de Assinaturas (`Page 3 of 3`).
+
 ## [1.7.2] — 2026-09-21 — *Mobile Contract Print & PDF Perfection (Exact 2-Page Rental & Balanced 3-Page Sales)*
 
 ### 🖨️ Padronização de Impressão e PDF Mobile (A4 Engine)

@@ -705,7 +705,7 @@ def imprimir_contrato(id):
         hora_devolucao_uk=hora_devolucao_uk,
         data_assinatura_inicial_uk=data_assinatura_inicial_uk,
         data_assinatura_devolucao_uk=data_assinatura_devolucao_uk,
-        total_paginas=2
+        total_paginas=3
     )
 
 @app.route('/usuarios')

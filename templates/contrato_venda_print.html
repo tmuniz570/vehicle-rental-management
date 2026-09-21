@@ -137,6 +137,12 @@
             border-top: 2px solid #e2e8f0;
         }
 
+        .print-two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
         .signature-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -191,6 +197,10 @@
             .agreement-title {
                 font-size: 1.3rem;
             }
+            .print-two-col {
+                grid-template-columns: 1fr !important;
+                gap: 0.75rem !important;
+            }
             .signature-grid {
                 grid-template-columns: 1fr !important;
                 gap: 1rem !important;
@@ -208,9 +218,14 @@
                 padding: 0 !important;
                 margin: 0 !important;
                 width: 100% !important;
-                font-size: 9.8pt !important;
+                font-size: 8.7pt !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+            }
+            .print-two-col {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 1.25rem !important;
             }
             .actions-bar {
                 display: none !important;
@@ -219,6 +234,7 @@
                 max-width: 100% !important;
                 width: 100% !important;
                 margin: 0 !important;
+                padding: 0 !important;
             }
             .agreement-page {
                 box-shadow: none !important;
@@ -229,8 +245,6 @@
                 max-width: 100% !important;
                 box-sizing: border-box !important;
                 background: transparent !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
             }
             .agreement-page:not(:last-child) {
                 page-break-after: always !important;
@@ -241,69 +255,71 @@
                 break-after: avoid !important;
             }
             .header-logo {
-                margin-bottom: 0.35rem !important;
+                margin-bottom: 0.15rem !important;
             }
             .header-logo img {
-                max-height: 40px !important;
+                max-height: 32px !important;
             }
             .agreement-title {
-                font-size: 1.3rem !important;
-                margin: 0 0 0.6rem 0 !important;
+                font-size: 1.20rem !important;
+                margin: 0 0 0.35rem 0 !important;
             }
             .section-title {
-                font-size: 0.98rem !important;
-                margin-top: 0.65rem !important;
-                margin-bottom: 0.25rem !important;
-                padding-bottom: 0.15rem !important;
+                font-size: 0.92rem !important;
+                margin-top: 0.42rem !important;
+                margin-bottom: 0.15rem !important;
+                padding-bottom: 0.10rem !important;
                 page-break-after: avoid !important;
                 break-after: avoid !important;
             }
             .subsection-title {
-                font-size: 0.90rem !important;
-                margin-top: 0.35rem !important;
-                margin-bottom: 0.15rem !important;
+                font-size: 0.85rem !important;
+                margin-top: 0.22rem !important;
+                margin-bottom: 0.08rem !important;
                 page-break-after: avoid !important;
                 break-after: avoid !important;
             }
             p, li {
-                font-size: 9.15pt !important;
-                line-height: 1.37 !important;
-                margin-bottom: 0.26rem !important;
+                font-size: 8.7pt !important;
+                line-height: 1.32 !important;
+                margin-bottom: 0.16rem !important;
             }
             ul {
-                margin: 0.15rem 0 0.35rem 1rem !important;
+                margin: 0.08rem 0 0.22rem 0.9rem !important;
             }
             .schedule-table {
-                font-size: 9pt !important;
-                margin: 0.45rem 0 0.7rem 0 !important;
+                font-size: 8.6pt !important;
+                margin: 0.25rem 0 0.4rem 0 !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
             .schedule-table th, .schedule-table td {
-                padding: 0.45rem 0.65rem !important;
+                padding: 0.30rem 0.50rem !important;
             }
             .signature-grid {
-                gap: 1.25rem !important;
-                margin-top: 1rem !important;
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 1rem !important;
+                margin-top: 0.5rem !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
             .signature-box {
-                padding: 0.75rem 0.9rem !important;
-                min-height: 95px !important;
+                padding: 0.50rem 0.70rem !important;
+                min-height: 80px !important;
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
             .signature-img {
-                max-height: 50px !important;
+                max-height: 40px !important;
             }
             .signature-line {
-                margin: 2rem 0 0.4rem 0 !important;
+                margin: 1.4rem 0 0.25rem 0 !important;
             }
             .page-footer-num {
-                margin-top: 0.8rem !important;
-                padding-top: 0.4rem !important;
-                font-size: 8.5pt !important;
+                margin-top: 0.35rem !important;
+                padding-top: 0.18rem !important;
+                font-size: 7.8pt !important;
             }
         }
     </style>
@@ -337,20 +353,25 @@
             <!-- 1. THE PARTIES -->
             <div class="section-title">1. THE PARTIES</div>
             
-            <div class="subsection-title">1.1 THE SELLER</div>
-            <ul>
-                <li><strong>Company Name:</strong> <span class="data-highlight">J&F Motorcycles LTD</span></li>
-                <li><strong>Company Number:</strong> <span class="data-highlight">16684924</span></li>
-                <li><strong>Address:</strong> <span class="data-highlight">109 WINDMILL LANE, BIRMINGHAM B66 3EW</span></li>
-            </ul>
-
-            <div class="subsection-title">1.2 THE BUYER</div>
-            <ul>
-                <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente_nome }}</span></li>
-                <li><strong>Full Address:</strong> <span class="data-highlight">{{ cliente_endereco }}</span></li>
-                <li><strong>Mobile Number:</strong> <span class="data-highlight">{{ cliente_telefone }}</span></li>
-                <li><strong>Email:</strong> <span class="data-highlight">{{ cliente_email or 'N/A' }}</span></li>
-            </ul>
+            <div class="print-two-col">
+                <div>
+                    <div class="subsection-title">1.1 THE SELLER</div>
+                    <ul>
+                        <li><strong>Company Name:</strong> <span class="data-highlight">J&F Motorcycles LTD</span></li>
+                        <li><strong>Company Number:</strong> <span class="data-highlight">16684924</span></li>
+                        <li><strong>Address:</strong> <span class="data-highlight">109 WINDMILL LANE, BIRMINGHAM B66 3EW</span></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="subsection-title">1.2 THE BUYER</div>
+                    <ul>
+                        <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente_nome }}</span></li>
+                        <li><strong>Full Address:</strong> <span class="data-highlight">{{ cliente_endereco }}</span></li>
+                        <li><strong>Mobile Number:</strong> <span class="data-highlight">{{ cliente_telefone }}</span></li>
+                        <li><strong>Email:</strong> <span class="data-highlight">{{ cliente_email or 'N/A' }}</span></li>
+                    </ul>
+                </div>
+            </div>
 
             <!-- 2. VEHICLE DETAILS -->
             <div class="section-title">2. VEHICLE DETAILS</div>
@@ -438,14 +459,11 @@
             <div class="subsection-title">4.8 Accident Liability and Mandatory Claims</div>
             <p>If the Buyer is involved in a road traffic accident while the motorcycle is still registered in the Seller's name, the Buyer bears total and exclusive responsibility for the accident, third-party damages, and any associated costs or liabilities. However, any insurance claim, accident management, or repair process resulting from such an accident MUST obligatorily be processed and managed directly through the Seller. The Seller shall not be held financially or legally responsible for the accident itself, but retains the exclusive right to manage the claim while holding the legal title of the vehicle.</p>
 
-            <div class="subsection-title">4.9 Data Protection (UK GDPR)</div>
-            <p>The Seller collects, processes, and securely stores the Buyer’s personal data in strict compliance with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018. The personal information and documentation provided by the Buyer (including identification, proof of address, and financial details) will be used solely for the purposes of executing this agreement, facilitating vehicle registration with the DVLA, legal compliance, and debt collection procedures if necessary. The Buyer consents to the processing of their data for these express purposes.</p>
-
             <div class="page-footer-num">Page 2 of {{ total_pages }}</div>
         </div>
 
         <!-- ================================================================= -->
-        <!-- INSTALLMENT AGREEMENT: PAGE 3 OF 3 (TERMS 4.10-4.11 & SIGNATURES) -->
+        <!-- INSTALLMENT AGREEMENT: PAGE 3 OF 3 (TERMS 4.9-4.11 & SIGNATURES)  -->
         <!-- ================================================================= -->
         <div class="agreement-page">
             <div class="header-logo">
@@ -453,6 +471,9 @@
             </div>
 
             <div class="section-title">4. GENERAL TERMS AND CONDITIONS (CONTINUED)</div>
+
+            <div class="subsection-title">4.9 Data Protection (UK GDPR)</div>
+            <p>The Seller collects, processes, and securely stores the Buyer’s personal data in strict compliance with the UK General Data Protection Regulation (UK GDPR) and the Data Protection Act 2018. The personal information and documentation provided by the Buyer (including identification, proof of address, and financial details) will be used solely for the purposes of executing this agreement, facilitating vehicle registration with the DVLA, legal compliance, and debt collection procedures if necessary. The Buyer consents to the processing of their data for these express purposes.</p>
 
             <div class="subsection-title">4.10 Indemnity</div>
             <p>The Buyer agrees to indemnify, defend, and hold harmless the Seller, its directors, and employees from and against any and all claims, liabilities, fines, penalties, costs, and expenses (including reasonable legal fees) arising from or related to the Buyer’s possession, operation, maintenance, or use of the motorcycle. This includes, but is not limited to, traffic violations, parking fines, toll charges (e.g., ULEZ, Congestion Charge), towing fees, criminal acts, and any third-party claims for personal injury or property damage.</p>
@@ -517,38 +538,47 @@
             <!-- 1. THE PARTIES -->
             <div class="section-title">1. THE PARTIES</div>
             
-            <div class="subsection-title">1.1 THE SELLER</div>
-            <ul>
-                <li><strong>Company Name:</strong> <span class="data-highlight">J&F Motorcycles LTD</span></li>
-                <li><strong>Company Number:</strong> <span class="data-highlight">16684924</span></li>
-                <li><strong>Address:</strong> <span class="data-highlight">109 WINDMILL LANE, BIRMINGHAM B66 3EW</span></li>
-            </ul>
+            <div class="print-two-col">
+                <div>
+                    <div class="subsection-title">1.1 THE SELLER</div>
+                    <ul>
+                        <li><strong>Company Name:</strong> <span class="data-highlight">J&F Motorcycles LTD</span></li>
+                        <li><strong>Company Number:</strong> <span class="data-highlight">16684924</span></li>
+                        <li><strong>Address:</strong> <span class="data-highlight">109 WINDMILL LANE, BIRMINGHAM B66 3EW</span></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="subsection-title">1.2 THE BUYER</div>
+                    <ul>
+                        <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente_nome }}</span></li>
+                        <li><strong>Full Address:</strong> <span class="data-highlight">{{ cliente_endereco }}</span></li>
+                        <li><strong>Mobile Number:</strong> <span class="data-highlight">{{ cliente_telefone }}</span></li>
+                        <li><strong>Email:</strong> <span class="data-highlight">{{ cliente_email or 'N/A' }}</span></li>
+                    </ul>
+                </div>
+            </div>
 
-            <div class="subsection-title">1.2 THE BUYER</div>
-            <ul>
-                <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente_nome }}</span></li>
-                <li><strong>Full Address:</strong> <span class="data-highlight">{{ cliente_endereco }}</span></li>
-                <li><strong>Mobile Number:</strong> <span class="data-highlight">{{ cliente_telefone }}</span></li>
-                <li><strong>Email:</strong> <span class="data-highlight">{{ cliente_email or 'N/A' }}</span></li>
-            </ul>
-
-            <!-- 2. VEHICLE DETAILS -->
-            <div class="section-title">2. VEHICLE DETAILS</div>
-            <ul>
-                <li><strong>Make and Model:</strong> <span class="data-highlight">{{ moto_modelo }}</span> ({{ moto_cor }})</li>
-                <li><strong>Registration (Plate):</strong> <span class="data-highlight" style="font-family: monospace; letter-spacing: 1px;">{{ moto_placa }}</span></li>
-                <li><strong>Mileage:</strong> <span class="data-highlight">{{ contrato.milhagem_inicial or 0 }} Miles</span></li>
-                <li><strong>Category:</strong> <span class="data-highlight">{{ contrato.categoria_historico or 'Clear' }}</span></li>
-            </ul>
-
-            <!-- 3. PURCHASE PRICE AND PAYMENT TERMS -->
-            <div class="section-title">3. PURCHASE PRICE AND PAYMENT TERMS</div>
-            <ul>
-                <li><strong>Sale Type:</strong> <span class="data-highlight">Full Payment at Once (Outright Purchase)</span></li>
-                <li><strong>Vehicle Sale Price:</strong> <span class="data-highlight">£{{ "%.2f"|format(contrato.valor_venda_veiculo or 0) }}</span></li>
-                <li><strong>Accessories / Extras:</strong> <span class="data-highlight">{{ contrato.acessorios_extras or 'None' }}</span></li>
-                <li><strong>Total Amount Due (Paid/Due upon signing this agreement):</strong> <span class="data-highlight">£{{ "%.2f"|format(contrato.valor_total_venda or contrato.valor_venda_veiculo or 0) }}</span></li>
-            </ul>
+            <!-- 2. VEHICLE DETAILS & 3. PURCHASE PRICE -->
+            <div class="print-two-col">
+                <div>
+                    <div class="section-title">2. VEHICLE DETAILS</div>
+                    <ul>
+                        <li><strong>Make and Model:</strong> <span class="data-highlight">{{ moto_modelo }}</span> ({{ moto_cor }})</li>
+                        <li><strong>Registration (Plate):</strong> <span class="data-highlight" style="font-family: monospace; letter-spacing: 1px;">{{ moto_placa }}</span></li>
+                        <li><strong>Mileage:</strong> <span class="data-highlight">{{ contrato.milhagem_inicial or 0 }} Miles</span></li>
+                        <li><strong>Category:</strong> <span class="data-highlight">{{ contrato.categoria_historico or 'Clear' }}</span></li>
+                    </ul>
+                </div>
+                <div>
+                    <div class="section-title">3. PURCHASE PRICE & PAYMENT</div>
+                    <ul>
+                        <li><strong>Sale Type:</strong> <span class="data-highlight">Full Payment at Once (Outright)</span></li>
+                        <li><strong>Vehicle Sale Price:</strong> <span class="data-highlight">£{{ "%.2f"|format(contrato.valor_venda_veiculo or 0) }}</span></li>
+                        <li><strong>Accessories / Extras:</strong> <span class="data-highlight">{{ contrato.acessorios_extras or 'None' }}</span></li>
+                        <li><strong>Total Amount Due:</strong> <span class="data-highlight">£{{ "%.2f"|format(contrato.valor_total_venda or contrato.valor_venda_veiculo or 0) }}</span></li>
+                    </ul>
+                </div>
+            </div>
 
             <!-- 4. GENERAL TERMS AND CONDITIONS (INÍCIO) -->
             <div class="section-title">4. GENERAL TERMS AND CONDITIONS</div>
@@ -562,11 +592,14 @@
             <div class="subsection-title">4.3 Warranty Requirements</div>
             <p>The Seller provides a warranty of 3 months or 3,000 miles (whichever comes first) strictly covering the engine and gearbox. To maintain this warranty, the Buyer must strictly follow the maintenance schedule and change the engine oil every 600 miles. There is no warranty on electrical or other parts, and breakdown recovery is not included.</p>
 
+            <div class="subsection-title">4.4 Theft, Loss, or Damage</div>
+            <p>In the event of theft, total loss, or damage to the motorcycle, the risk lies entirely with the Buyer. The Buyer remains fully legally and financially responsible for settling all outstanding balances and obligations under this contract.</p>
+
             <div class="page-footer-num">Page 1 of {{ total_pages }}</div>
         </div>
 
         <!-- ================================================================= -->
-        <!-- FULL SALE AGREEMENT: PAGE 2 OF 2 (TERMS 4.4-4.11 & SIGNATURES)    -->
+        <!-- FULL SALE AGREEMENT: PAGE 2 OF 2 (TERMS 4.5-4.11 & SIGNATURES)    -->
         <!-- ================================================================= -->
         <div class="agreement-page">
             <div class="header-logo">
@@ -574,9 +607,6 @@
             </div>
 
             <div class="section-title">4. GENERAL TERMS AND CONDITIONS (CONTINUED)</div>
-
-            <div class="subsection-title">4.4 Theft, Loss, or Damage</div>
-            <p>In the event of theft, total loss, or damage to the motorcycle, the risk lies entirely with the Buyer. The Buyer remains fully legally and financially responsible for settling all outstanding balances and obligations under this contract.</p>
 
             <div class="subsection-title">4.5 Validation of Documents</div>
             <p>The Buyer hereby declares and warrants that all documents provided to the Seller for the execution of this contract—including but not limited to the Driving Licence, CBT (Compulsory Basic Training, if applicable), Insurance Certificate, Proof of Address, and any other requested documentation—are valid, authentic, and up-to-date.</p>
@@ -600,41 +630,41 @@
             <p>This Agreement shall be governed by and construed in accordance with the laws of England and Wales.</p>
 
             <!-- 5. SIGNATURES -->
-            <div class="section-title" style="margin-top: 1rem;">5. SIGNATURES</div>
+            <div class="section-title">5. SIGNATURES</div>
             
-            <p style="margin-top: 0.5rem; font-size: 0.92rem;">
+            <p style="margin-top: 0.25rem;">
                 <strong>Buyer's Declaration:</strong> I am happy with the purchase and I acknowledge that the vehicle is in good condition, has been inspected, and is safe to go on the road. I agree to all terms stated in this agreement.
             </p>
-            <p style="font-size: 0.92rem;">
+            <p style="margin-bottom: 0.25rem;">
                 <strong>Date:</strong> <span class="data-highlight">{{ data_assinatura_uk or hoje_uk }}</span>
             </p>
 
-            <div class="signature-grid" style="margin-top: 1rem;">
+            <div class="signature-grid">
                 <div class="signature-box">
                     <div>
                         <strong>Seller's Signature:</strong>
-                        <div style="margin: 0.4rem 0;">
-                            <img src="/static/images/signature_fernando.png" alt="Seller's Signature" class="signature-img" style="max-height: 55px; width: auto; object-fit: contain;">
+                        <div style="margin: 0.25rem 0;">
+                            <img src="/static/images/signature_fernando.png" alt="Seller's Signature" class="signature-img">
                         </div>
-                        <div style="font-weight: 700; color: #0f172a; margin-top: 0.2rem;">J&F MOTORCYCLES LTD</div>
+                        <div style="font-weight: 700; color: #0f172a; margin-top: 0.15rem;">J&F MOTORCYCLES LTD</div>
                     </div>
-                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.4rem;">Authorized Representative</div>
+                    <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Authorized Representative</div>
                 </div>
 
                 <div class="signature-box">
                     <div>
                         <strong>Buyer's Signature:</strong>
                         {% if contrato.assinatura_cliente_inicial %}
-                            <div style="margin: 0.4rem 0;">
-                                <img src="{{ contrato.assinatura_cliente_inicial }}" alt="Buyer Digital Signature" class="signature-img" style="max-height: 55px; width: auto; object-fit: contain;">
+                            <div style="margin: 0.25rem 0;">
+                                <img src="{{ contrato.assinatura_cliente_inicial }}" alt="Buyer Digital Signature" class="signature-img">
                             </div>
                             <div style="font-size: 0.72rem; color: #16a34a; font-weight: 600;">✓ Digitally Signed on {{ data_assinatura_uk or hoje_uk }}</div>
                         {% else %}
-                            <div class="signature-line" style="margin-top: 35px;"></div>
+                            <div class="signature-line"></div>
                             <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Sign above line</div>
                         {% endif %}
                     </div>
-                    <div class="data-highlight" style="font-size: 0.85rem; margin-top: 0.4rem;">{{ cliente_nome }}</div>
+                    <div class="data-highlight" style="font-size: 0.85rem; margin-top: 0.25rem;">{{ cliente_nome }}</div>
                 </div>
             </div>
 
