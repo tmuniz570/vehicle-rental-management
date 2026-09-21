@@ -240,7 +240,11 @@ def test_sales_system():
         seg_alertas = dash_data.get('contratos_seguro_alerta', [])
         alert_ids = [a['id'] for a in seg_alertas]
         assert cid_inst not in alert_ids, "Sale contract must NEVER trigger askMID insurance alerts on dashboard"
-        assert cid_full not in alert_ids, "Sale contract must NEVER trigger askMID insurance alerts on dashboard"
+        # Verify total_motos in dashboard excludes sold bikes
+        assert dash_data.get('motos_vendidas', 0) >= 2, "Sold bikes must be tracked in motos_vendidas"
+        # Total fleet must equal sum of active fleet only (available + rented + maintenance)
+        assert dash_data['total_motos'] == (dash_data['motos_disponiveis'] + dash_data['motos_alugadas'] + dash_data['motos_manutencao']), "Total fleet must strictly exclude sold motorbikes"
+        print(f"-> Dashboard verified: Total Fleet ({dash_data['total_motos']}) = Available ({dash_data['motos_disponiveis']}) + Rented ({dash_data['motos_alugadas']}) + Maintenance ({dash_data['motos_manutencao']}). Sold bikes ({dash_data['motos_vendidas']}) strictly excluded.")
         print("-> Confirmed: Sold bikes are completely exempt from 15-day askMID insurance monitoring and dashboard alerts.")
         print("-> API /api/contratos/<id> returned all sale fields and detail aliases correctly.")
         

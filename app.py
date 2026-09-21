@@ -3141,10 +3141,12 @@ def get_dashboard():
     pode_alugueis = current_user.is_authenticated and current_user.pode_alugueis()
 
     if pode_alugueis:
-        total_motos = Motorcycle.query.count()
+        # Total Fleet exclui motos vendidas (frota ativa = disponíveis + alugadas + manutenção)
+        total_motos = Motorcycle.query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).count()
         motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
         motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
         motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
+        motos_vendidas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).count()
         
         # Detalhes das motos em manutenção (otimizado com batch query de contratos)
         motos_manutencao_lista = []
@@ -3250,12 +3252,14 @@ def get_dashboard():
                 'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
             })
         
-        # Alertas de Compliance de Frota: Road Tax e MOT (vencidos ou a vencer em até 30 dias - query colunas necessárias)
+        # Alertas de Compliance de Frota: Road Tax e MOT (apenas frota ativa, exclui vendidas)
         hoje_date = get_london_date()
         todas_motos = db.session.query(
             Motorcycle.placa,
             Motorcycle.vencimento_tax,
             Motorcycle.vencimento_mot
+        ).filter(
+            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])
         ).all()
         tax_mot_warnings = 0
         tax_warnings = 0
@@ -3336,6 +3340,7 @@ def get_dashboard():
             'motos_disponiveis': motos_disponiveis,
             'motos_alugadas': motos_alugadas,
             'motos_manutencao': motos_manutencao,
+            'motos_vendidas': motos_vendidas,
             'motos_manutencao_lista': motos_manutencao_lista,
             'tax_mot_warnings': tax_mot_warnings,
             'tax_mot_expired': tax_mot_expired,

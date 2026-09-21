@@ -20,6 +20,11 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
   - Se um operador reverter uma transação (`POST /api/financeiro/<id>/reverter`) de um contrato de venda já concluído, o sistema reabre o contrato automaticamente para `Active` (`ContractStatus.ATIVO`) e grava o evento `CONTRACT_REOPENED` no `AuditLog`.
   - Adicionada rota de conveniência `/api/financeiro/reverter/<id>` em paridade com `/api/financeiro/pagar/<id>`.
 
+### 📊 Ajuste nos Indicadores do Dashboard (Frota Ativa & Disponíveis em Geral)
+* **Exclusão de Motos Vendidas do "Total Fleet"**: O total de motocicletas na frota (`total_motos`) agora contabiliza estritamente a frota ativa (`Available` + `Rented` + `Maintenance`), excluindo motos vendidas (`Sold`). A barra de distribuição percentual da frota agora fecha com precisão em 100% da frota em operação.
+* **Redefinição de "Available"**: O indicador "Available to Rent" foi renomeado para **"Available"** com descrição `"Available in general"`, esclarecendo que as motos disponíveis no pátio atendem tanto à locação quanto à venda imediata.
+* **Compliance de TAX & MOT**: O cálculo de alertas de vencimento de Road Tax e MOT no dashboard filtra apenas veículos da frota ativa, impedindo que motos já vendidas gerem alertas desnecessários.
+
 ## [1.7.3] — 2026-09-21 — *iPhone AirPrint & PDF Perfection (Zero Blank Pages, 3-Page Rental & Balanced Sales)*
 
 ### 📱 Correção de Impressão no iPhone / iOS Safari
