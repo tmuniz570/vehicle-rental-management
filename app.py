@@ -668,6 +668,7 @@ def imprimir_contrato(id):
             moto_cor=moto_cor,
             moto_placa=moto_placa,
             is_installment=is_installment,
+            total_paginas=3 if is_installment else 2,
             cronograma=cronograma,
             data_assinatura_uk=data_assinatura_inicial_uk,
             hoje_uk=get_local_now().strftime('%d/%m/%Y %H:%M')
@@ -703,7 +704,8 @@ def imprimir_contrato(id):
         data_devolucao_uk=data_devolucao_uk,
         hora_devolucao_uk=hora_devolucao_uk,
         data_assinatura_inicial_uk=data_assinatura_inicial_uk,
-        data_assinatura_devolucao_uk=data_assinatura_devolucao_uk
+        data_assinatura_devolucao_uk=data_assinatura_devolucao_uk,
+        total_paginas=2
     )
 
 @app.route('/usuarios')

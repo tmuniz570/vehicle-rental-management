@@ -4,6 +4,24 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.7.2] — 2026-09-21 — *Mobile Contract Print & PDF Perfection (Exact 2-Page Rental & Balanced 3-Page Sales)*
+
+### 🖨️ Padronização de Impressão e PDF Mobile (A4 Engine)
+* **Geração Perfeita Direto do Smartphone**: Resolvido o problema de quebras desordenadas e páginas fantasmas vazias ao imprimir ou salvar PDF pelo celular (iOS Safari e Android Chrome), permitindo que a operação de pátio e balcão entregue o contrato na hora ao cliente sem precisar recorrer ao computador.
+* **Contrato de Aluguel em Exatas 2 Páginas (`contrato_print.html`)**:
+  - **Página 1 (de 2)**: Cabeçalho com logo, identificação das partes (Locador J&F Motorcycles e Locatário), dados do veículo, requisitos de locação e depósito caução (3.1 a 3.4) e cláusulas 4.1 a 4.5 (`Page 1 of 2`).
+  - **Página 2 (de 2)**: Logo, continuação dos termos contratuais (4.6 a 4.11), Declaração e Assinaturas de Início da Locação (Seção 5) e Termo de Devolução do Veículo e Caução (Seção 6) (`Page 2 of 2`).
+  - **Zero Páginas Sobrando**: Eliminada a antiga 3ª página desnecessária com excesso de espaço em branco.
+* **Contrato de Venda Parcelada em Exatas 3 Páginas (`contrato_venda_print.html`)**:
+  - **Página 1 (de 3)**: Partes, detalhes da moto, discriminação financeira consolidada e tabela com o cronograma completo de parcelas (`Page 1 of 3`), encerrando sem vazar linhas.
+  - **Página 2 (de 3)**: Termos e condições gerais 4.1 a 4.9 (incluindo recompra voluntária, acidentes/seguro e compliance com UK GDPR) (`Page 2 of 3`).
+  - **Página 3 (de 3)**: Cláusulas 4.10 (Indenização) e 4.11 (Jurisdição), seguidas pela Declaração do Comprador e os Quadros de Assinatura com chancela fixa da concessionária (`Page 3 of 3`).
+* **Contrato de Venda à Vista (`contrato_venda_print.html`)**:
+  - Mantido perfeitamente em **2 páginas** (Página 1: Partes, Veículo, Finanças e 4.1 a 4.3; Página 2: 4.4 a 4.11 e Assinaturas).
+* **Tipografia e Margens A4 Otimizadas**:
+  - Configurado `@page { size: A4 portrait; margin: 8mm 12mm 8mm 12mm; }`.
+  - Tipografia balanceada para documentos formais (`font-size: 9.15pt`, `line-height: 1.37`), com proteção ativa contra quebras internas em caixas de assinatura e tabelas (`break-inside: avoid !important`).
+
 ## [1.7.1] — 2026-09-21 — *Session Idle Timeout (8h), Contracts Table Cache Immunity & Responsive Mobile Installment Cards*
 
 ### ⏱️ Autenticação & Sessão Estendida
