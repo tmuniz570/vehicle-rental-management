@@ -89,9 +89,11 @@ async function carregarMotos() {
                 <td data-sort="${m.milhagem_atual || 0}" style="font-weight: 600; color: #f8fafc;"><span style="color: var(--accent); font-weight:700;">${milhagemFormatada}</span></td>
                 <td data-sort="${m.vencimento_tax || ''}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${m.vencimento_mot || ''}" class="nowrap">${motBadge}</td>
-                <td class="nowrap" style="display: flex; gap: 6px; align-items: center; min-height: 48px;">
-                    ${v5cBadge}
-                    ${trackerBadge}
+                <td class="nowrap">
+                    <div style="display: inline-flex; gap: 6px; align-items: center; min-height: 36px;">
+                        ${v5cBadge}
+                        ${trackerBadge}
+                    </div>
                 </td>
                 <td>${statusBadge}</td>
                 <td>${btnEdit}</td>

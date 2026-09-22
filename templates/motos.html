@@ -40,9 +40,28 @@
 </div>
 
 {% include 'moto_manage_modal.html' %}
+
+<style>
+    #motosTable th, #motosTable td {
+        padding: 0.75rem 0.65rem;
+        font-size: 0.88rem;
+    }
+    #motosTable th:first-child,
+    #motosTable td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: #1e293b;
+        box-shadow: 2px 0 5px rgba(0, 0, 0, 0.3);
+    }
+    #motosTable th:first-child {
+        z-index: 3;
+        background: #0f172a;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script src="/static/js/moto_modal_shared.js?v=1"></script>
-<script src="/static/js/motos.js?v=6"></script>
+<script src="/static/js/motos.js?v=7"></script>
 {% endblock %}
