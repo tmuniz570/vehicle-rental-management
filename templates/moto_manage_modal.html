@@ -1,0 +1,201 @@
+<!-- Motorbike Management Modal (Info, V5C Logbook & GPS Trackers) -->
+<div id="motoManageModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-card" style="max-width: 720px; padding: 0;">
+        <!-- Modal Header -->
+        <div class="modal-header" style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="badge-plate" id="modalDisplayPlaca" style="font-size: 1.1rem; padding: 3px 10px;">-</span>
+                    <h3 id="modalDisplayModelo" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">-</h3>
+                </div>
+                <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage vehicle details, V5C registration documents, and GPS trackers.</p>
+            </div>
+            <button type="button" id="closeMotoModal" class="modal-close" aria-label="Close" style="background: transparent; border: none; color: var(--text-secondary); font-size: 1.6rem; cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.5rem 0 1.5rem; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.15); overflow-x: auto;">
+            <button type="button" class="tab-btn active" data-tab="tabInfo" style="padding: 0.6rem 1rem; border: none; background: transparent; color: var(--text-primary); font-weight: 600; font-size: 0.9rem; border-bottom: 2px solid var(--accent); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <span>🛵 Details & Status</span>
+            </button>
+            <button type="button" class="tab-btn" data-tab="tabV5C" style="padding: 0.6rem 1rem; border: none; background: transparent; color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <span>📄 V5C Logbook</span>
+                <span id="badgeCountV5C" class="badge" style="background: rgba(6,182,212,0.2); color: #22d3ee; font-size: 0.72rem; padding: 1px 6px;">0</span>
+            </button>
+            <button type="button" class="tab-btn" data-tab="tabTrackers" style="padding: 0.6rem 1rem; border: none; background: transparent; color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+                <span>📡 GPS Trackers</span>
+                <span id="badgeCountTrackers" class="badge" style="background: rgba(59,130,246,0.2); color: #60a5fa; font-size: 0.72rem; padding: 1px 6px;">0</span>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="modal-body" style="padding: 1.5rem;">
+            
+            <!-- TAB 1: INFO & STATUS -->
+            <div id="tabInfo" class="tab-pane active">
+                <form id="editMotoForm" class="modern-form">
+                    <input type="hidden" id="edit_placa">
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Model</label>
+                            <input type="text" id="edit_modelo" required>
+                        </div>
+                        <div class="form-group half">
+                            <label>Colour</label>
+                            <input type="text" id="edit_cor" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Current Mileage (Miles)</label>
+                        <input type="number" id="edit_milhagem" min="0" step="1" placeholder="e.g. 12500" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                        <small style="display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-secondary);">Odometer reading in UK miles.</small>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label>Road Tax Expiry Date</label>
+                            <input type="date" id="edit_tax">
+                        </div>
+                        <div class="form-group half">
+                            <label>MOT Expiry Date</label>
+                            <input type="date" id="edit_mot">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="edit_status" required>
+                            <option value="Available">Available</option>
+                            <option value="Rented">Rented</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Sold">Sold (Vendida)</option>
+                        </select>
+                    </div>
+                    <div class="form-actions" style="margin-top: 1.5rem;">
+                        <button type="submit" class="btn-primary" id="btnSaveMotoInfo">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB 2: V5C LOGBOOK -->
+            <div id="tabV5C" class="tab-pane" style="display: none;">
+                <div style="margin-bottom: 1.25rem; padding: 1rem; background: rgba(6,182,212,0.06); border: 1px solid rgba(6,182,212,0.25); border-radius: 12px;">
+                    <h4 style="margin: 0 0 0.4rem 0; font-size: 0.95rem; color: #22d3ee; display: flex; align-items: center; gap: 6px;">
+                        <span>📄</span> Attach V5C Document / Page Photos
+                    </h4>
+                    <p style="margin: 0 0 0.85rem 0; font-size: 0.82rem; color: var(--text-secondary);">
+                        Attach photos of the V5C logbook pages (e.g. Page 1, Page 2) or upload the complete digital PDF certificate.
+                    </p>
+                    
+                    <form id="v5cUploadForm" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;">
+                        <input type="file" id="v5cFileInput" accept="image/*,application/pdf" multiple style="display: none;">
+                        <button type="button" id="btnChooseV5CFiles" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                            <span>📁</span> Choose Photo(s) or PDF
+                        </button>
+                        <span id="v5cSelectedCount" style="font-size: 0.82rem; color: var(--text-secondary);">No file chosen</span>
+                        <button type="submit" id="btnUploadV5C" class="btn-primary" style="padding: 0.65rem 1.2rem; font-size: 0.85rem; margin-left: auto;" disabled>
+                            Upload to V5C
+                        </button>
+                    </form>
+                    <div id="v5cUploadStatus" style="font-size: 0.82rem; margin-top: 0.5rem; display: none;"></div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-primary);">
+                        Attached V5C Documents &amp; Pages
+                    </h4>
+                    <div id="v5cListContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem;">
+                        <!-- Injetado dinamicamente via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: GPS TRACKERS -->
+            <div id="tabTrackers" class="tab-pane" style="display: none;">
+                <!-- Existing Trackers List -->
+                <div style="margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">
+                            Installed GPS Trackers (<span id="trackersCountHeader">0</span>)
+                        </h4>
+                        <button type="button" id="btnToggleAddTracker" class="btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">
+                            <span>+</span> Add Another Tracker
+                        </button>
+                    </div>
+
+                    <div id="trackersListContainer" style="display: flex; flex-direction: column; gap: 0.85rem;">
+                        <!-- Injetado dinamicamente via JS -->
+                    </div>
+                </div>
+
+                <!-- Add Tracker Card / Form -->
+                <div id="boxAddTracker" style="padding: 1.25rem; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px;">
+                    <h4 style="margin: 0 0 0.85rem 0; font-size: 0.95rem; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 6px;">
+                        <span>📡</span> Register New Tracker on this Bike
+                    </h4>
+
+                    <form id="addTrackerForm" class="modern-form">
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label for="tracker_numero">Tracker Serial Number / IMEI *</label>
+                                <input type="text" id="tracker_numero" name="numero" placeholder="e.g. 865432049281726" required autocomplete="off">
+                                <small style="display: block; margin-top: 3px; font-size: 0.75rem; color: var(--text-secondary);">Found on the device sticker or box barcode.</small>
+                            </div>
+
+                            <div class="form-group half">
+                                <label for="tracker_propriedade">Ownership (Propriedade) *</label>
+                                <select id="tracker_propriedade" name="tipo_propriedade" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                                    <option value="Company" selected>🏢 FF Motors (Nosso Tracker)</option>
+                                    <option value="Customer">👤 Customer (Tracker do Cliente)</option>
+                                </select>
+                                <small style="display: block; margin-top: 3px; font-size: 0.75rem; color: var(--text-secondary);">Identifies who owns this GPS hardware.</small>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 0.5rem;">
+                            <label for="tracker_observacoes">Observations &amp; Installation Notes</label>
+                            <textarea id="tracker_observacoes" name="observacoes" rows="2" placeholder="e.g. Installed behind battery cover, hardwired to ignition, Monimoto model, Vodafone SIM..." style="width: 100%; background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem;"></textarea>
+                        </div>
+
+                        <!-- Tracker Serial Number Photos -->
+                        <div class="form-group" style="margin-top: 0.5rem;">
+                            <label>📸 Photos of Tracker Number &amp; Installation</label>
+                            <small style="display: block; margin-bottom: 0.5rem; font-size: 0.78rem; color: var(--text-secondary);">
+                                Take a clear photo of the serial number / barcode sticker and where it was fitted.
+                            </small>
+
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                                <input type="file" id="trackerCameraInput" accept="image/*" capture="environment" style="display: none;">
+                                <input type="file" id="trackerGalleryInput" accept="image/*" multiple style="display: none;">
+                                
+                                <button type="button" id="btnTrackerCamera" class="btn-secondary" style="padding: 0.55rem 0.9rem; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;">
+                                    <span>📸</span> Take Photo (Camera)
+                                </button>
+                                <button type="button" id="btnTrackerGallery" class="btn-secondary" style="padding: 0.55rem 0.9rem; font-size: 0.82rem; display: inline-flex; align-items: center; gap: 6px;">
+                                    <span>📁</span> Photo Library
+                                </button>
+                            </div>
+
+                            <!-- Preview list of photos to be uploaded with this tracker -->
+                            <div id="trackerPhotosPreview" style="display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.75rem;"></div>
+                        </div>
+
+                        <div class="form-actions" style="margin-top: 1.25rem;">
+                            <button type="submit" class="btn-primary" id="btnSubmitTracker">
+                                Save Tracker on Motorbike
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Image Lightbox Modal -->
+<div id="lightboxModal" class="modal-overlay" style="z-index: 1100;" role="dialog" aria-modal="true">
+    <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center;">
+        <button type="button" id="closeLightboxBtn" style="position: absolute; top: -40px; right: 0; background: transparent; border: none; color: white; font-size: 2rem; cursor: pointer;">&times;</button>
+        <img id="lightboxImg" src="" alt="Enlarged preview" style="max-width: 90vw; max-height: 80vh; object-fit: contain; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+        <p id="lightboxCaption" style="color: white; margin-top: 0.5rem; font-size: 0.9rem; text-align: center;"></p>
+    </div>
+</div>

@@ -2,6 +2,7 @@ let paginaAtual = 1;
 let termoBusca = '';
 let sortCol = 'placa';
 let sortOrder = 'asc';
+let motosCache = {};
 
 function formatExpiryBadge(dateStr) {
     if (!dateStr) return '<span style="color:var(--text-secondary); opacity:0.6;">-</span>';
@@ -24,9 +25,16 @@ function formatExpiryBadge(dateStr) {
     }
 }
 
+// Hook called when V5C or Trackers are updated inside the shared modal
+window.onMotoModalUpdated = function() {
+    carregarMotos();
+};
+
+// Load Motorbikes Table
 async function carregarMotos() {
     const tbody = document.querySelector('#motosTable tbody');
     const paginationInfo = document.getElementById('paginationInfo');
+    if (!tbody) return;
     
     try {
         const res = await fetch(`/api/motos?page=${paginaAtual}&limit=20&search=${encodeURIComponent(termoBusca)}&sort_by=${encodeURIComponent(sortCol)}&sort_order=${encodeURIComponent(sortOrder)}`);
@@ -34,10 +42,14 @@ async function carregarMotos() {
         const motos = data.itens || [];
         
         if (motos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;">No motorbikes found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">No motorbikes found.</td></tr>';
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
+        
+        // Cache motos for fast modal population
+        motosCache = {};
+        motos.forEach(m => { motosCache[m.placa] = m; });
         
         tbody.innerHTML = '';
         motos.forEach(m => {
@@ -52,18 +64,35 @@ async function carregarMotos() {
             else statusBadge = `<span class="badge badge-danger">${escapeHtml(m.status)}</span>`;
             
             const milhagemFormatada = Number(m.milhagem_atual || 0).toLocaleString('en-GB') + ' mi';
-            const btnEdit = `<button class="btn-edit" data-placa="${escapeHtml(m.placa)}" data-modelo="${escapeHtml(m.modelo)}" data-cor="${escapeHtml(m.cor)}" data-milhagem="${m.milhagem_atual || 0}" data-status="${escapeHtml(m.status)}" data-mot="${m.vencimento_mot || ''}" data-tax="${m.vencimento_tax || ''}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             const motBadge = formatExpiryBadge(m.vencimento_mot);
             const taxBadge = formatExpiryBadge(m.vencimento_tax);
 
+            // V5C and Tracker Badges
+            const v5cCount = m.v5c_count || 0;
+            const trackersCount = m.trackers_count || 0;
+            
+            const v5cBadge = v5cCount > 0 
+                ? `<span class="badge" style="background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3); font-size:0.75rem; cursor:pointer;" title="View ${v5cCount} V5C document(s)" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">📄 ${v5cCount} Doc${v5cCount > 1 ? 's' : ''}</span>`
+                : `<span style="opacity:0.4; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; text-decoration: underline;" title="Attach V5C" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">+ V5C</span>`;
+
+            const trackerBadge = trackersCount > 0
+                ? `<span class="badge" style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-size:0.75rem; cursor:pointer;" title="View ${trackersCount} GPS tracker(s)" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabTrackers', motosCache['${escapeHtml(m.placa)}'])">📡 ${trackersCount} GPS</span>`
+                : `<span style="opacity:0.4; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; text-decoration: underline;" title="Register tracker" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabTrackers', motosCache['${escapeHtml(m.placa)}'])">+ Tracker</span>`;
+
+            const btnEdit = `<button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:8px 14px; min-width:64px; min-height:36px; border-radius:6px; cursor:pointer; font-weight:600;">Manage</button>`;
+
             tr.innerHTML = `
-                <td class="nowrap"><span class="badge-plate">${escapeHtml(m.placa)}</span></td>
+                <td class="nowrap"><span class="badge-plate" style="cursor:pointer;" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])">${escapeHtml(m.placa)}</span></td>
                 <td>${escapeHtml(m.modelo)}</td>
                 <td>${escapeHtml(m.cor)}</td>
                 <td data-sort="${m.milhagem_atual || 0}" style="font-weight: 600; color: #f8fafc;"><span style="color: var(--accent); font-weight:700;">${milhagemFormatada}</span></td>
                 <td data-sort="${m.vencimento_tax || ''}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${m.vencimento_mot || ''}" class="nowrap">${motBadge}</td>
+                <td class="nowrap" style="display: flex; gap: 6px; align-items: center; min-height: 48px;">
+                    ${v5cBadge}
+                    ${trackerBadge}
+                </td>
                 <td>${statusBadge}</td>
                 <td>${btnEdit}</td>
             `;
@@ -78,29 +107,14 @@ async function carregarMotos() {
         const btnNext = document.getElementById('btnNextPage');
         if(btnPrev) btnPrev.disabled = data.pagina_atual <= 1;
         if(btnNext) btnNext.disabled = data.pagina_atual >= data.paginas;
-        
-        // Setup Edit Modal
-        const modal = document.getElementById('editMotoModal');
-        document.querySelectorAll('.btn-edit').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const placa = e.target.getAttribute('data-placa');
-                document.getElementById('edit_placa').value = placa;
-                document.getElementById('display_placa').textContent = placa;
-                document.getElementById('edit_modelo').value = e.target.getAttribute('data-modelo');
-                document.getElementById('edit_cor').value = e.target.getAttribute('data-cor');
-                document.getElementById('edit_milhagem').value = e.target.getAttribute('data-milhagem') || '0';
-                document.getElementById('edit_status').value = e.target.getAttribute('data-status');
-                document.getElementById('edit_mot').value = e.target.getAttribute('data-mot') || '';
-                document.getElementById('edit_tax').value = e.target.getAttribute('data-tax') || '';
-                modal.style.display = 'flex';
-            });
-        });
+
         if (typeof setTableSortIndicator === 'function') {
             setTableSortIndicator('motosTable', sortCol, sortOrder);
         }
         
     } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
+        console.error('Error loading motorbikes:', e);
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
     }
 }
 
@@ -135,38 +149,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 500);
         });
     }
-
-    const modal = document.getElementById('editMotoModal');
-    const closeBtn = document.getElementById('closeMotoModal');
-    if(closeBtn) closeBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-
-    document.getElementById('editMotoForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const placa = document.getElementById('edit_placa').value;
-        const data = {
-            modelo: document.getElementById('edit_modelo').value,
-            cor: document.getElementById('edit_cor').value,
-            status: document.getElementById('edit_status').value,
-            milhagem_atual: parseInt(document.getElementById('edit_milhagem').value || '0', 10),
-            vencimento_mot: document.getElementById('edit_mot').value || null,
-            vencimento_tax: document.getElementById('edit_tax').value || null
-        };
-        
-        try {
-            const response = await fetch(`/api/motos/${placa}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (response.ok) {
-                modal.style.display = 'none';
-                carregarMotos();
-            } else {
-                const res = await response.json();
-                alert(res.message || res.mensagem || res.erro || res.error || 'Failed to update motorbike');
-            }
-        } catch(err) {
-            alert('Connection error');
-        }
-    });
 });

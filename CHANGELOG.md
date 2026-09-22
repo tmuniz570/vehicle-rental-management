@@ -4,6 +4,36 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.8.0] — 2026-09-22 — *Motorcycle V5C Logbook Documents & Multi-Tracker Management System*
+
+### 📄 Gestão de Documentos V5C (Logbook)
+* **Suporte a Múltiplas Páginas e PDFs**: Cada motocicleta agora pode armazenar páginas fotografadas do seu documento de registro britânico V5C (Logbook) ou o certificado digital completo em PDF.
+* **Modelo `MotorcycleV5C`**: Criada a tabela `moto_v5c` com campos `placa`, `url_arquivo`, `nome_original`, `tipo_arquivo` (`image` ou `pdf`), `criado_por_nome` e `data_criacao`.
+* **Endpoints Dedicados**:
+  - `POST /api/motos/<placa>/v5c`: Upload múltiplo com otimização automática de imagens, suporte a PDF e registro de auditoria `MOTO_V5C_UPLOADED`.
+  - `DELETE /api/motos/<placa>/v5c/<id>`: Exclusão com limpeza do arquivo físico em disco e log de auditoria `MOTO_V5C_DELETED`.
+* **Interface do Usuário**: Aba dedicada no modal de gerenciamento (`#tabV5C`), miniaturas com zoom interativo (lightbox) para imagens, link de abertura para PDFs e contadores dinâmicos na tabela principal.
+* **Atalho no Card de Veículo em Detalhes do Contrato**:
+  - Inseridos botões dedicados de atalho rápido no card de veículo da tela de detalhes do contrato (`/contratos/<id>`): **"📄 V5C"** e **"📡 Trackers"** com contadores dinâmicos em tempo real.
+  - Permite abrir e gerenciar os documentos V5C e rastreadores GPS diretamente na tela do contrato sem precisar navegar para `/motos`.
+  - Atualização reativa instantânea dos badges na tela ao anexar ou excluir documentos e rastreadores.
+
+### 📡 Gestão de Múltiplos Rastreadores GPS (Trackers)
+* **Múltiplos Trackers por Moto**: Uma motocicleta pode possuir um ou mais rastreadores GPS simultaneamente (ex: rastreador corporativo da FF Motors + rastreador privado do cliente).
+* **Identificação de Propriedade**: Badge visual com distinção imediata entre:
+  - 🏢 `Company`: FF Motors (Nosso Tracker) em verde escuro/claro.
+  - 👤 `Customer`: Cliente (Tracker do Cliente) em roxo.
+* **Número de Série / IMEI e Observações**: Registro obrigatório do serial/IMEI e notas de instalação (ex: modelo Monimoto, chicote da ignição, localização física no chassi).
+* **Fotos do Rastreador (Multi-Shot Camera)**:
+  - Integração com o acumulador multi-foto mobile (câmera com `capture="environment"` e galeria), permitindo fotografar a etiqueta de número de série e o local de fixação.
+  - Armazenamento em `MotorcycleTracker.url_fotos`.
+* **Remoção de Tracker**:
+  - Endpoint `DELETE /api/motos/<placa>/trackers/<id>` permitindo a desinstalação/remoção completa do rastreador da moto com confirmação e expurgo automático das fotos físicas em disco.
+
+### 🛡️ Proteção de Armazenamento e Limpeza
+* **Whitelist `cleanup_uploads.py`**: Atualizada a função `collect_valid_files()` para proteger integralmente todos os documentos V5C e todas as fotos de rastreadores contra purga acidental.
+* **Integração `reset_data.py`**: Adicionada limpeza e reset de sequência universal para `moto_v5c` e `moto_trackers`.
+
 ## [1.7.4] — 2026-09-21 — *Sales Contract Lifecycle (Auto-Completion upon Quittance) & Mileage Tracker Optimization*
 
 ### 🏍️ Ajuste de Quilometragem em Contratos de Venda

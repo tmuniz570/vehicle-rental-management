@@ -223,12 +223,88 @@ document.addEventListener('DOMContentLoaded', async () => {
         const placaVal = data.placa || data.moto_placa || '-';
         const modeloVal = data.modelo || data.moto_modelo || '-';
         const corVal = data.cor || data.moto_cor || '-';
-        document.getElementById('info_placa').textContent = placaVal;
+        const elPlaca = document.getElementById('info_placa');
+        elPlaca.textContent = placaVal;
+        if (placaVal && placaVal !== '-') {
+            elPlaca.style.cursor = 'pointer';
+            elPlaca.title = 'Click to manage vehicle details, V5C and trackers';
+            elPlaca.onclick = () => {
+                if (typeof abrirModalMoto === 'function') {
+                    abrirModalMoto(placaVal, 'tabInfo', {
+                        modelo: modeloVal,
+                        cor: corVal,
+                        milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
+                        vencimento_mot: data.vencimento_mot,
+                        vencimento_tax: data.vencimento_tax
+                    });
+                }
+            };
+        }
         document.getElementById('info_modelo_cor').textContent = `${modeloVal} • ${corVal}`;
         
         if (data.data_retirada) {
             document.getElementById('info_data_retirada').textContent = 'Collection: ' + new Date(data.data_retirada).toLocaleDateString('en-GB');
         }
+
+        // V5C & GPS Trackers Shortcuts
+        const badgeV5C = document.getElementById('badge_v5c_count');
+        if (badgeV5C) {
+            badgeV5C.textContent = (data.v5c_count !== undefined && data.v5c_count !== null) ? data.v5c_count : 0;
+        }
+        const badgeTrk = document.getElementById('badge_trackers_count');
+        if (badgeTrk) {
+            badgeTrk.textContent = (data.trackers_count !== undefined && data.trackers_count !== null) ? data.trackers_count : 0;
+        }
+
+        const btnV5C = document.getElementById('btnShortcutV5C');
+        if (btnV5C) {
+            btnV5C.onclick = () => {
+                if (placaVal && placaVal !== '-' && typeof abrirModalMoto === 'function') {
+                    abrirModalMoto(placaVal, 'tabV5C', {
+                        modelo: modeloVal,
+                        cor: corVal,
+                        milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
+                        vencimento_mot: data.vencimento_mot,
+                        vencimento_tax: data.vencimento_tax
+                    });
+                } else if (!placaVal || placaVal === '-') {
+                    alert('No vehicle registration plate linked to this contract.');
+                }
+            };
+        }
+
+        const btnTrk = document.getElementById('btnShortcutTrackers');
+        if (btnTrk) {
+            btnTrk.onclick = () => {
+                if (placaVal && placaVal !== '-' && typeof abrirModalMoto === 'function') {
+                    abrirModalMoto(placaVal, 'tabTrackers', {
+                        modelo: modeloVal,
+                        cor: corVal,
+                        milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
+                        vencimento_mot: data.vencimento_mot,
+                        vencimento_tax: data.vencimento_tax
+                    });
+                } else if (!placaVal || placaVal === '-') {
+                    alert('No vehicle registration plate linked to this contract.');
+                }
+            };
+        }
+
+        window.onMotoModalUpdated = async function(placa) {
+            if (!placa) return;
+            try {
+                const res = await fetch(`/api/motos/${encodeURIComponent(placa)}/detalhes`);
+                if (res.ok) {
+                    const d = await res.json();
+                    const bV5C = document.getElementById('badge_v5c_count');
+                    const bTrk = document.getElementById('badge_trackers_count');
+                    if (bV5C) bV5C.textContent = (d.v5c_arquivos || []).length;
+                    if (bTrk) bTrk.textContent = (d.trackers || []).length;
+                }
+            } catch(err) {
+                console.error('Error refreshing vehicle badges:', err);
+            }
+        };
 
         // Mileage Tracker
         const isVendaContrato = (data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment');

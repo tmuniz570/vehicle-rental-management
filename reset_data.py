@@ -5,7 +5,8 @@ import sqlite3
 from app import app, db
 from database import (
     AuditLog, ContractAttachment, FinancialTransaction, Inspection,
-    Contract, Client, Motorcycle, Claim, JobExecutionLock, User
+    Contract, Client, Motorcycle, Claim, JobExecutionLock, User,
+    MotorcycleV5C, MotorcycleTracker
 )
 
 def clean_all(keep_users=False):
@@ -28,6 +29,8 @@ def clean_all(keep_users=False):
             Inspection.query.delete()
             Claim.query.delete()
             Contract.query.delete()
+            MotorcycleV5C.query.delete()
+            MotorcycleTracker.query.delete()
             Motorcycle.query.delete()
             Client.query.delete()
             JobExecutionLock.query.delete()
@@ -57,7 +60,7 @@ def clean_all(keep_users=False):
             
             # PostgreSQL: reseta sequências serial
             elif 'postgres' in db_uri:
-                tables = ['clientes', 'contratos', 'contrato_anexos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims', 'job_locks']
+                tables = ['clientes', 'contratos', 'contrato_anexos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims', 'job_locks', 'moto_v5c', 'moto_trackers']
                 if not keep_users:
                     tables.append('usuarios')
                 for t in tables:

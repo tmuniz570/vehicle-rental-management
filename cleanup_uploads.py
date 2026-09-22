@@ -4,7 +4,7 @@ import glob
 import json
 import urllib.parse
 from app import app
-from database import Client, Contract, Inspection, ContractAttachment
+from database import Client, Contract, Inspection, ContractAttachment, MotorcycleV5C, MotorcycleTracker
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
@@ -74,6 +74,34 @@ def collect_valid_files():
                 pass
         
         # Fallback to comma-separated list
+        urls = [u.strip() for u in raw.split(',') if u.strip()]
+        for u in urls:
+            fname = extract_clean_filename(u)
+            if fname:
+                valid_files.add(fname)
+
+    # 5. Motorcycle V5C Documents
+    for v in MotorcycleV5C.query.all():
+        fname = extract_clean_filename(v.url_arquivo)
+        if fname:
+            valid_files.add(fname)
+
+    # 6. Motorcycle GPS Trackers Photos
+    for t in MotorcycleTracker.query.all():
+        if not t.url_fotos:
+            continue
+        raw = t.url_fotos.strip()
+        if (raw.startswith('[') and raw.endswith(']')) or (raw.startswith('{') and raw.endswith('}')):
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        fname = extract_clean_filename(str(item))
+                        if fname:
+                            valid_files.add(fname)
+                    continue
+            except Exception:
+                pass
         urls = [u.strip() for u in raw.split(',') if u.strip()]
         for u in urls:
             fname = extract_clean_filename(u)

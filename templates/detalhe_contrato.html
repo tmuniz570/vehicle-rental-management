@@ -94,6 +94,24 @@
             </div>
             
             <div id="info_mot_tax" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;"></div>
+
+            <!-- Hardware & Registration Shortcuts: V5C Logbook & GPS Trackers -->
+            <div id="box_vehicle_docs_trackers" style="margin-top: 0.85rem; padding: 0.75rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
+                <div style="font-size: 0.72rem; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.05em; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Registration &amp; Trackers</span>
+                    <span style="font-size: 0.85rem;">📄📡</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <button type="button" id="btnShortcutV5C" class="btn-action" style="flex: 1; min-width: 110px; font-size: 0.8rem; padding: 8px 10px; background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.35); color: #22d3ee; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="View and manage V5C logbook documents for this vehicle">
+                        <span>📄 V5C</span>
+                        <span id="badge_v5c_count" class="badge" style="background: rgba(6,182,212,0.25); color: #22d3ee; font-size: 0.72rem; padding: 1px 6px;">0</span>
+                    </button>
+                    <button type="button" id="btnShortcutTrackers" class="btn-action" style="flex: 1; min-width: 110px; font-size: 0.8rem; padding: 8px 10px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.35); color: #60a5fa; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 600;" title="View and manage GPS trackers for this vehicle">
+                        <span>📡 Trackers</span>
+                        <span id="badge_trackers_count" class="badge" style="background: rgba(59,130,246,0.25); color: #60a5fa; font-size: 0.72rem; padding: 1px 6px;">0</span>
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- Insurance & 15-Day askMID Compliance -->
@@ -761,6 +779,8 @@
         </div>
     </div>
 </div>
+
+{% include 'moto_manage_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
@@ -768,5 +788,6 @@
     const CONTRATO_ID = {{ contrato_id }};
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/detalhe_contrato.js?v=15"></script>
+<script src="/static/js/moto_modal_shared.js?v=1"></script>
+<script src="/static/js/detalhe_contrato.js?v=16"></script>
 {% endblock %}

@@ -151,6 +151,31 @@ class Motorcycle(db.Model):
     vencimento_tax = db.Column(db.Date, nullable=True, index=True)
     
     contratos = db.relationship('Contract', backref='moto', lazy=True)
+    v5c_arquivos = db.relationship('MotorcycleV5C', backref='moto', lazy=True, cascade='all, delete-orphan')
+    trackers = db.relationship('MotorcycleTracker', backref='moto', lazy=True, cascade='all, delete-orphan')
+
+class MotorcycleV5C(db.Model):
+    __tablename__ = 'moto_v5c'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    placa = db.Column(db.String(10), db.ForeignKey('motos.placa', ondelete='CASCADE'), nullable=False, index=True)
+    url_arquivo = db.Column(db.String(255), nullable=False)
+    nome_original = db.Column(db.String(255), nullable=True)
+    tipo_arquivo = db.Column(db.String(20), default='image', nullable=False) # 'image' or 'pdf'
+    criado_por_nome = db.Column(db.String(100), nullable=True)
+    data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
+
+class MotorcycleTracker(db.Model):
+    __tablename__ = 'moto_trackers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    placa = db.Column(db.String(10), db.ForeignKey('motos.placa', ondelete='CASCADE'), nullable=False, index=True)
+    numero = db.Column(db.String(100), nullable=False) # Serial / IMEI / Número do tracker
+    tipo_propriedade = db.Column(db.String(30), default='Company', nullable=False) # 'Company' (Nosso) ou 'Customer' (Cliente)
+    observacoes = db.Column(db.Text, nullable=True) # Ex: local de instalação, fiação, operadora
+    url_fotos = db.Column(db.Text, nullable=True) # URLs separadas por vírgula ou JSON das fotos do serial e instalação
+    instalado_por_nome = db.Column(db.String(100), nullable=True)
+    data_instalacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
 
 class Contract(db.Model):
     __tablename__ = 'contratos'

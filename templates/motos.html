@@ -22,12 +22,13 @@
                 <th data-sort-field="milhagem_atual">Mileage (Miles)</th>
                 <th data-sort-field="vencimento_tax">Road Tax Expiry</th>
                 <th data-sort-field="vencimento_mot">MOT Expiry</th>
+                <th>V5C & Trackers</th>
                 <th data-sort-field="status">Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="8" style="text-align:center;">Loading...</td></tr>
+            <tr><td colspan="9" style="text-align:center;">Loading...</td></tr>
         </tbody>
     </table>
 </div>
@@ -37,55 +38,11 @@
     <span id="paginationInfo" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
     <button id="btnNextPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">Next &raquo;</button>
 </div>
-<!-- Edit Modal -->
-<div id="editMotoModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-    <div class="glass-card" style="width:100%; max-width:500px; padding:2rem; position:relative;">
-        <button id="closeMotoModal" style="position:absolute; top:15px; right:20px; background:transparent; border:none; color:white; font-size:1.5rem; cursor:pointer;" aria-label="Close">&times;</button>
-        <h2>Edit Motorbike: <span id="display_placa"></span></h2>
-        <form id="editMotoForm" class="modern-form" style="margin-top:1.5rem;">
-            <input type="hidden" id="edit_placa">
-            <div class="form-row">
-                <div class="form-group half">
-                    <label>Model</label>
-                    <input type="text" id="edit_modelo" required>
-                </div>
-                <div class="form-group half">
-                    <label>Colour</label>
-                    <input type="text" id="edit_cor" required>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Current Mileage (Miles)</label>
-                <input type="number" id="edit_milhagem" min="0" step="1" placeholder="e.g. 12500" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
-                <small style="display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-secondary);">Odometer reading in UK miles.</small>
-            </div>
-            <div class="form-row">
-                <div class="form-group half">
-                    <label>Road Tax Expiry Date</label>
-                    <input type="date" id="edit_tax">
-                </div>
-                <div class="form-group half">
-                    <label>MOT Expiry Date</label>
-                    <input type="date" id="edit_mot">
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Status</label>
-                <select id="edit_status" required>
-                    <option value="Available">Available</option>
-                    <option value="Rented">Rented</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Sold">Sold (Vendida)</option>
-                </select>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn-primary">Save Changes</button>
-            </div>
-        </form>
-    </div>
-</div>
+
+{% include 'moto_manage_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/motos.js?v=2"></script>
+<script src="/static/js/moto_modal_shared.js?v=1"></script>
+<script src="/static/js/motos.js?v=6"></script>
 {% endblock %}

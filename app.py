@@ -18,9 +18,10 @@ from flask_login import (
 from database import (
     db, init_db, Contract, ContractType, FinancialTransaction, TransactionType, 
     TransactionStatus, ContractStatus, MotoStatus, Motorcycle, Client, Inspection, InspectionType,
-    User, AuditLog, JobExecutionLock, Claim, ContractAttachment, delete_file_if_exists
+    User, AuditLog, JobExecutionLock, Claim, ContractAttachment, delete_file_if_exists,
+    MotorcycleV5C, MotorcycleTracker
 )
-from sqlalchemy.orm import joinedload, contains_eager
+from sqlalchemy.orm import joinedload, contains_eager, selectinload
 import werkzeug.utils
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
@@ -1693,7 +1694,10 @@ def listar_motos():
     sort_by = request.args.get('sort_by', 'placa', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'asc', type=str).strip().lower()
     
-    query = Motorcycle.query
+    query = Motorcycle.query.options(
+        selectinload(Motorcycle.v5c_arquivos),
+        selectinload(Motorcycle.trackers)
+    )
     if search:
         search_clean = search.strip().replace(' ', '')
         search_term = f"%{search.strip()}%"
@@ -1733,7 +1737,14 @@ def listar_motos():
         'status': m.status,
         'milhagem_atual': int(m.milhagem_atual or 0),
         'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
-        'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None
+        'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None,
+        'v5c_count': len(m.v5c_arquivos) if m.v5c_arquivos else 0,
+        'trackers_count': len(m.trackers) if m.trackers else 0,
+        'trackers_summary': [{
+            'id': tr.id,
+            'numero': tr.numero,
+            'tipo_propriedade': tr.tipo_propriedade
+        } for tr in (m.trackers or [])]
     } for m in paginated.items]
     
     return jsonify({
@@ -1786,6 +1797,233 @@ def atualizar_moto(placa):
         registrar_log('MOTO_STATUS_CHANGE', 'Motorcycle', placa, f"Status da moto {placa} alterado de '{status_antigo}' para '{dados['status']}' por {operador_atual}")
 
     return jsonify({'message': 'Motorbike updated successfully', 'mensagem': 'Moto atualizada com sucesso'})
+
+@app.route('/api/motos/<placa>/detalhes', methods=['GET'])
+@alugueis_required
+def detalhes_moto(placa):
+    placa_clean = str(placa).strip().replace(' ', '').upper()
+    moto = Motorcycle.query.options(
+        selectinload(Motorcycle.v5c_arquivos),
+        selectinload(Motorcycle.trackers)
+    ).filter_by(placa=placa_clean).first()
+    
+    if not moto:
+        return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
+        
+    return jsonify({
+        'placa': moto.placa,
+        'modelo': moto.modelo,
+        'cor': moto.cor,
+        'status': moto.status,
+        'milhagem_atual': int(moto.milhagem_atual or 0),
+        'vencimento_mot': moto.vencimento_mot.strftime('%Y-%m-%d') if moto.vencimento_mot else None,
+        'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if moto.vencimento_tax else None,
+        'v5c_arquivos': [{
+            'id': v.id,
+            'url_arquivo': v.url_arquivo,
+            'nome_original': v.nome_original or f"V5C_{moto.placa}",
+            'tipo_arquivo': v.tipo_arquivo,
+            'criado_por_nome': v.criado_por_nome or '',
+            'data_criacao': v.data_criacao.strftime('%d/%m/%Y %H:%M') if v.data_criacao else None
+        } for v in sorted(moto.v5c_arquivos, key=lambda x: x.id)],
+        'trackers': [{
+            'id': t.id,
+            'numero': t.numero,
+            'tipo_propriedade': t.tipo_propriedade,
+            'observacoes': t.observacoes or '',
+            'fotos': [f.strip() for f in (t.url_fotos or '').split(',') if f.strip()],
+            'instalado_por_nome': t.instalado_por_nome or '',
+            'data_instalacao': t.data_instalacao.strftime('%d/%m/%Y %H:%M') if t.data_instalacao else None
+        } for t in sorted(moto.trackers, key=lambda x: x.id)]
+    }), 200
+
+@app.route('/api/motos/<placa>/v5c', methods=['POST'])
+@alugueis_required
+def upload_v5c_moto(placa):
+    placa_clean = str(placa).strip().replace(' ', '').upper()
+    moto = db.session.get(Motorcycle, placa_clean)
+    if not moto:
+        return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
+        
+    arquivos = request.files.getlist('v5c_arquivos') or request.files.getlist('arquivos') or request.files.getlist('files')
+    if not arquivos and 'arquivo' in request.files:
+        arquivos = [request.files['arquivo']]
+    elif not arquivos and 'file' in request.files:
+        arquivos = [request.files['file']]
+        
+    if not arquivos:
+        return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
+        
+    salvos = []
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    
+    for f in arquivos:
+        if not f or not f.filename:
+            continue
+        if not is_allowed_file(f.filename):
+            return jsonify({'error': f'Invalid file format: {f.filename}. Only JPG, PNG, WEBP and PDF are allowed.', 'erro': 'Formato inválido'}), 400
+            
+        ext = f.filename.rsplit('.', 1)[1].lower() if '.' in f.filename else ''
+        tipo_arq = 'pdf' if ext == 'pdf' else 'image'
+        safe_orig = werkzeug.utils.secure_filename(f.filename) or f"v5c_{placa_clean}.{ext}"
+        nome_final = f"{int(get_local_now().timestamp())}_v5c_{placa_clean}_{safe_orig}"
+        
+        if tipo_arq == 'pdf':
+            caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_final)
+            f.save(caminho)
+            url_arquivo = f"/static/uploads/{nome_final}"
+        else:
+            nome_salvo = salvar_arquivo_otimizado(f, nome_final)
+            url_arquivo = f"/static/uploads/{nome_salvo}"
+            
+        v5c_rec = MotorcycleV5C(
+            placa=moto.placa,
+            url_arquivo=url_arquivo,
+            nome_original=safe_orig,
+            tipo_arquivo=tipo_arq,
+            criado_por_nome=operador_atual
+        )
+        db.session.add(v5c_rec)
+        salvos.append(v5c_rec)
+        
+    if not salvos:
+        return jsonify({'error': 'No valid files processed', 'erro': 'Nenhum arquivo válido processado'}), 400
+        
+    db.session.commit()
+    registrar_log('MOTO_V5C_UPLOADED', 'Motorcycle', moto.placa, f"{len(salvos)} arquivo(s) de V5C anexados à moto {moto.placa} por {operador_atual}")
+    
+    return jsonify({
+        'message': f'{len(salvos)} V5C file(s) attached successfully',
+        'mensagem': f'{len(salvos)} arquivo(s) de V5C anexados com sucesso',
+        'v5c_arquivos': [{
+            'id': v.id,
+            'url_arquivo': v.url_arquivo,
+            'nome_original': v.nome_original,
+            'tipo_arquivo': v.tipo_arquivo,
+            'data_criacao': v.data_criacao.strftime('%d/%m/%Y %H:%M')
+        } for v in salvos]
+    }), 201
+
+@app.route('/api/motos/<placa>/v5c/<int:v5c_id>', methods=['DELETE'])
+@alugueis_required
+def remover_v5c_moto(placa, v5c_id):
+    placa_clean = str(placa).strip().replace(' ', '').upper()
+    v5c = db.session.get(MotorcycleV5C, v5c_id)
+    if not v5c or v5c.placa != placa_clean:
+        return jsonify({'error': 'V5C record not found', 'erro': 'Registro V5C não encontrado'}), 404
+        
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    nome_orig = v5c.nome_original or str(v5c.id)
+    
+    try:
+        if v5c.url_arquivo:
+            clean_name = os.path.basename(v5c.url_arquivo)
+            disk_path = os.path.join(app.config['UPLOAD_FOLDER'], clean_name)
+            if os.path.exists(disk_path):
+                os.remove(disk_path)
+    except Exception as e:
+        app.logger.warning(f"Failed to delete physical file {v5c.url_arquivo}: {e}")
+        
+    db.session.delete(v5c)
+    db.session.commit()
+    registrar_log('MOTO_V5C_DELETED', 'Motorcycle', placa_clean, f"Documento V5C ({nome_orig}) da moto {placa_clean} excluído por {operador_atual}")
+    
+    return jsonify({'message': 'V5C document deleted successfully', 'mensagem': 'Documento V5C excluído com sucesso'}), 200
+
+@app.route('/api/motos/<placa>/trackers', methods=['POST'])
+@alugueis_required
+def adicionar_tracker_moto(placa):
+    placa_clean = str(placa).strip().replace(' ', '').upper()
+    moto = db.session.get(Motorcycle, placa_clean)
+    if not moto:
+        return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
+        
+    numero = request.form.get('numero', '').strip()
+    if not numero and request.is_json:
+        numero = request.json.get('numero', '').strip()
+        
+    if not numero:
+        return jsonify({'error': 'Tracker number / serial is required', 'erro': 'O número/serial do tracker é obrigatório'}), 400
+        
+    tipo_propriedade = request.form.get('tipo_propriedade', 'Company').strip()
+    if not tipo_propriedade and request.is_json:
+        tipo_propriedade = request.json.get('tipo_propriedade', 'Company').strip()
+    if tipo_propriedade not in ['Company', 'Customer']:
+        tipo_propriedade = 'Company'
+        
+    observacoes = request.form.get('observacoes', '').strip()
+    if not observacoes and request.is_json:
+        observacoes = request.json.get('observacoes', '').strip()
+        
+    fotos_urls = []
+    fotos = request.files.getlist('fotos') or request.files.getlist('fotos[]')
+    if not fotos and 'foto' in request.files:
+        fotos = [request.files['foto']]
+        
+    for f in fotos:
+        if f and f.filename and is_allowed_file(f.filename):
+            safe_orig = werkzeug.utils.secure_filename(f.filename) or 'tracker.jpg'
+            nome_final = f"{int(get_local_now().timestamp())}_tracker_{placa_clean}_{safe_orig}"
+            nome_salvo = salvar_arquivo_otimizado(f, nome_final)
+            fotos_urls.append(f"/static/uploads/{nome_salvo}")
+            
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    novo_tracker = MotorcycleTracker(
+        placa=moto.placa,
+        numero=numero,
+        tipo_propriedade=tipo_propriedade,
+        observacoes=observacoes or None,
+        url_fotos=",".join(fotos_urls) if fotos_urls else None,
+        instalado_por_nome=operador_atual
+    )
+    db.session.add(novo_tracker)
+    db.session.commit()
+    
+    label_prop = "Nosso (Company)" if tipo_propriedade == 'Company' else "Do Cliente (Customer)"
+    registrar_log('MOTO_TRACKER_ADDED', 'Motorcycle', moto.placa, f"Tracker #{numero} ({label_prop}) instalado na moto {moto.placa} por {operador_atual} com {len(fotos_urls)} foto(s)")
+    
+    return jsonify({
+        'message': 'Tracker added successfully',
+        'mensagem': 'Tracker cadastrado com sucesso',
+        'tracker': {
+            'id': novo_tracker.id,
+            'numero': novo_tracker.numero,
+            'tipo_propriedade': novo_tracker.tipo_propriedade,
+            'observacoes': novo_tracker.observacoes or '',
+            'fotos': fotos_urls,
+            'instalado_por_nome': novo_tracker.instalado_por_nome or '',
+            'data_instalacao': novo_tracker.data_instalacao.strftime('%d/%m/%Y %H:%M')
+        }
+    }), 201
+
+@app.route('/api/motos/<placa>/trackers/<int:tracker_id>', methods=['DELETE'])
+@alugueis_required
+def remover_tracker_moto(placa, tracker_id):
+    placa_clean = str(placa).strip().replace(' ', '').upper()
+    tracker = db.session.get(MotorcycleTracker, tracker_id)
+    if not tracker or tracker.placa != placa_clean:
+        return jsonify({'error': 'Tracker not found', 'erro': 'Tracker não encontrado'}), 404
+        
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    num_tracker = tracker.numero
+    prop_tracker = tracker.tipo_propriedade
+    
+    if tracker.url_fotos:
+        for u in tracker.url_fotos.split(','):
+            u_clean = u.strip()
+            if u_clean:
+                try:
+                    fpath = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(u_clean))
+                    if os.path.exists(fpath):
+                        os.remove(fpath)
+                except Exception as e:
+                    app.logger.warning(f"Failed to remove tracker photo {u_clean}: {e}")
+                    
+    db.session.delete(tracker)
+    db.session.commit()
+    registrar_log('MOTO_TRACKER_REMOVED', 'Motorcycle', placa_clean, f"Tracker #{num_tracker} ({prop_tracker}) removido da moto {placa_clean} por {operador_atual}")
+    
+    return jsonify({'message': 'Tracker removed successfully', 'mensagem': 'Tracker removido com sucesso'}), 200
 
 @app.route('/api/contratos', methods=['POST'])
 @alugueis_required
@@ -2528,6 +2766,14 @@ def detalhe_contrato(id):
         'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
         'milhagem_final': c.milhagem_final,
         'milhas_rodadas': (c.milhagem_final - (c.milhagem_inicial or 0)) if (c.milhagem_final is not None and c.milhagem_inicial is not None) else None,
+        'v5c_count': len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else 0,
+        'trackers_count': len(moto.trackers) if (moto and hasattr(moto, 'trackers') and moto.trackers) else 0,
+        'trackers_summary': [{
+            'id': t.id,
+            'numero': t.numero,
+            'tipo_propriedade': t.tipo_propriedade,
+            'has_photos': bool(t.url_fotos)
+        } for t in (moto.trackers or [])] if (moto and hasattr(moto, 'trackers') and moto.trackers) else [],
         'assinatura_cliente_inicial': c.assinatura_cliente_inicial,
         'data_assinatura_inicial': c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial else None,
         'data_assinatura_inicial_uk': c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial else None,
