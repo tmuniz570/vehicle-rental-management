@@ -191,8 +191,8 @@ def registrar_log(acao, entidade, entidade_id, descricao):
     Identifica automaticamente o usuário logado e o IP da requisição.
     """
     try:
-        user_id = current_user.id if current_user.is_authenticated else None
-        user_nome = current_user.nome if current_user.is_authenticated else "System"
+        user_id = current_user.id if getattr(current_user, 'is_authenticated', False) else None
+        user_nome = current_user.nome if getattr(current_user, 'is_authenticated', False) else "System"
         ip = request.remote_addr if request else None
         log = AuditLog(
             id_usuario=user_id,
@@ -227,6 +227,10 @@ def validate_csrf():
         return
     if request.method in ['POST', 'PUT', 'DELETE', 'PATCH']:
         if request.path.startswith('/static/') or request.endpoint == 'custom_static_uploads':
+            return
+            
+        # Isenção de CSRF para rotas de automação e chamadas com chave secreta de cron
+        if request.path.startswith('/api/jobs/') or request.path.startswith('/api/admin/limpar-cobrancas-duplicadas') or request.headers.get('X-Cron-Key') or request.args.get('cron_key'):
             return
             
         expected_token = session.get('_csrf_token')
@@ -265,6 +269,10 @@ def check_authentication():
     if request.path.startswith('/static/'):
         return
     if app.config.get('LOGIN_DISABLED'):
+        return
+        
+    # Rotas de automação e cron que validam sua própria autenticação via check_cron_auth()
+    if request.path.startswith('/api/jobs/') or request.path.startswith('/api/admin/limpar-cobrancas-duplicadas'):
         return
 
     # Verificação de sessão ativa e timeout de inatividade (60 minutos)
@@ -3725,48 +3733,54 @@ def get_relatorios_resumo():
 
 # --- BUSINESS LOGIC (Background Jobs & Schedulers) ---
 
+_BILLING_MUTEX = threading.Lock()
+
 def _gerar_cobrancas_semanais_logic():
-    # London / UK timezone
-    tz = pytz.timezone('Europe/London')
-    hoje = datetime.now(tz)
-    dia_semana_atual = hoje.weekday() # 0 = Monday, 6 = Sunday
-    
-    hoje_utc = get_local_now()
-    
-    contratos_ativos = Contract.query.filter(
-        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
-        Contract.dia_pagamento_semanal == dia_semana_atual,
-        db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None, Contract.tipo_contrato == 'Rent')
-    ).all()
-    
-    transacoes_geradas = 0
-    proximo_vencimento = hoje_utc + timedelta(days=7)
-    inicio_dia_prox = proximo_vencimento.replace(hour=0, minute=0, second=0, microsecond=0)
-    fim_dia_prox = inicio_dia_prox + timedelta(days=1)
-    
-    for contrato in contratos_ativos:
-        cobranca_existente = FinancialTransaction.query.filter(
-            FinancialTransaction.id_contrato == contrato.id,
-            FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']),
-            FinancialTransaction.data_vencimento >= inicio_dia_prox,
-            FinancialTransaction.data_vencimento < fim_dia_prox
-        ).first()
+    """
+    Gera as cobranças de aluguel semanais para contratos ativos cujo dia de pagamento seja hoje.
+    Protegido por mutex de thread e commit imediato por contrato para evitar qualquer duplicidade.
+    """
+    with _BILLING_MUTEX:
+        # London / UK timezone
+        tz = pytz.timezone('Europe/London')
+        hoje = datetime.now(tz)
+        dia_semana_atual = hoje.weekday() # 0 = Monday, 6 = Sunday
         
-        if not cobranca_existente:
-            nova_cobranca = FinancialTransaction(
-                id_contrato=contrato.id,
-                tipo=TransactionType.RENT.value,
-                data_vencimento=proximo_vencimento,
-                valor=contrato.valor_aluguel_semanal,
-                status=TransactionStatus.PENDING.value
-            )
-            db.session.add(nova_cobranca)
-            transacoes_geradas += 1
+        hoje_utc = get_local_now()
+        
+        contratos_ativos = Contract.query.filter(
+            Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+            Contract.dia_pagamento_semanal == dia_semana_atual,
+            db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None, Contract.tipo_contrato == 'Rent')
+        ).all()
+        
+        transacoes_geradas = 0
+        proximo_vencimento = hoje_utc + timedelta(days=7)
+        inicio_dia_prox = proximo_vencimento.replace(hour=0, minute=0, second=0, microsecond=0)
+        fim_dia_prox = inicio_dia_prox + timedelta(days=1)
+        
+        for contrato in contratos_ativos:
+            # Garante que não exista nenhuma cobrança de Rent para este contrato neste vencimento (Paga ou Pendente)
+            cobranca_existente = FinancialTransaction.query.filter(
+                FinancialTransaction.id_contrato == contrato.id,
+                FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']),
+                FinancialTransaction.data_vencimento >= inicio_dia_prox,
+                FinancialTransaction.data_vencimento < fim_dia_prox
+            ).first()
             
-    if transacoes_geradas > 0:
-        db.session.commit()
-        
-    return transacoes_geradas
+            if not cobranca_existente:
+                nova_cobranca = FinancialTransaction(
+                    id_contrato=contrato.id,
+                    tipo=TransactionType.RENT.value,
+                    data_vencimento=proximo_vencimento,
+                    valor=contrato.valor_aluguel_semanal,
+                    status=TransactionStatus.PENDING.value
+                )
+                db.session.add(nova_cobranca)
+                db.session.commit() # Commit imediato por contrato para visibilidade transacional concorrente
+                transacoes_geradas += 1
+                
+        return transacoes_geradas
 
 def check_cron_auth():
     """Verifica se a chamada ao cron veio com token secreto ou de um administrador autenticado."""
@@ -3783,7 +3797,7 @@ def gerar_cobrancas_semanais():
     if not check_cron_auth():
         return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
     transacoes = _gerar_cobrancas_semanais_logic()
-    registrar_log('JOB_WEEKLY_RENT', 'System', None, f"Job de cobranças semanais executado. {len(transacoes)} novas cobranças geradas.")
+    registrar_log('JOB_WEEKLY_RENT', 'System', None, f"Job de cobranças semanais executado. {transacoes} novas cobranças geradas.")
     return jsonify({
         "message": "Weekly rent charges processed successfully",
         "charges_generated": transacoes,
@@ -3839,49 +3853,139 @@ def processar_quarentenas():
     if not check_cron_auth():
         return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
     processados = _processar_quarentenas_logic()
-    registrar_log('JOB_QUARANTINE', 'System', None, f"Job de quarentena executado. {len(processados)} contratos finalizados automaticamente.")
+    registrar_log('JOB_QUARANTINE', 'System', None, f"Job de quarentena executado. {processados} contratos finalizados automaticamente.")
     return jsonify({
         "message": "Deposit holds processed successfully",
         "contracts_completed": processados,
         "contratos_finalizados": processados
     }), 200
 
+def _limpar_cobrancas_semanais_duplicadas_logic(dry_run=False):
+    """
+    Identifica cobranças de aluguel semanais (tipo Rent/Aluguel) com status PENDING
+    que foram criadas em duplicidade para o mesmo contrato e mesma data de vencimento.
+    Mantém a cobrança original (menor ID) e remove as duplicatas extras.
+    NUNCA toca em cobranças PAID (Pagas), depósitos ou outras transações legítimas.
+    """
+    from collections import defaultdict
+    
+    transacoes = FinancialTransaction.query.filter(
+        FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']),
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
+    ).order_by(FinancialTransaction.id.asc()).all()
+    
+    grupos = defaultdict(list)
+    for t in transacoes:
+        if t.data_vencimento:
+            venc_str = t.data_vencimento.strftime('%Y-%m-%d')
+            chave = (t.id_contrato, venc_str)
+            grupos[chave].append(t)
+            
+    duplicadas_para_remover = []
+    detalhes_removidos = []
+    
+    for (id_contrato, venc_str), lista in grupos.items():
+        if len(lista) > 1:
+            original = lista[0]
+            dups = lista[1:]
+            for d in dups:
+                duplicadas_para_remover.append(d)
+                detalhes_removidos.append({
+                    "id_removido": d.id,
+                    "id_contrato": id_contrato,
+                    "vencimento": venc_str,
+                    "valor": float(d.valor),
+                    "id_mantido": original.id
+                })
+                
+    total_duplicadas = len(duplicadas_para_remover)
+    
+    if not dry_run and total_duplicadas > 0:
+        for d in duplicadas_para_remover:
+            db.session.delete(d)
+        db.session.commit()
+        registrar_log(
+            'CLEANUP_DUPLICATE_RENT',
+            'Admin/System',
+            None,
+            f"Limpeza de cobranças duplicadas executada: {total_duplicadas} cobranças pendentes duplicadas removidas."
+        )
+        
+    return {
+        "total_duplicadas": total_duplicadas,
+        "dry_run": dry_run,
+        "detalhes": detalhes_removidos
+    }
+
+@app.route('/api/admin/limpar-cobrancas-duplicadas', methods=['POST'])
+def api_limpar_cobrancas_duplicadas():
+    """
+    Rota administrativa para detecção e limpeza de cobranças duplicadas em produção.
+    Aceita {"dry_run": true} para apenas simular sem apagar.
+    """
+    if not check_cron_auth():
+        return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
+        
+    dados = request.get_json(silent=True) or {}
+    dry_run = dados.get('dry_run', False)
+    if isinstance(dry_run, str):
+        dry_run = dry_run.lower() in ('true', '1', 'yes')
+        
+    resultado = _limpar_cobrancas_semanais_duplicadas_logic(dry_run=dry_run)
+    return jsonify({
+        "success": True,
+        "message": f"{resultado['total_duplicadas']} cobranças duplicadas encontradas." if dry_run else f"{resultado['total_duplicadas']} cobranças duplicadas removidas com sucesso.",
+        "dados": resultado
+    }), 200
+
 def run_daily_jobs():
     with app.app_context():
         london_date_str = get_london_date().strftime('%Y-%m-%d')
         job_name = "daily_rent_and_deposit_jobs"
+        worker_id = f"worker-pid-{os.getpid()}"
         
         # Concurrency safety across multi-worker deployments (e.g. Gunicorn):
-        # Prevent multiple workers from executing the 1am job twice on the same day
+        # 1. Garante que o registro base existe
         try:
             lock = JobExecutionLock.query.filter_by(job_name=job_name).first()
-            if lock and lock.last_run_date == london_date_str:
-                print(f"[Cron Lock] Daily jobs '{job_name}' already completed for date {london_date_str} by {lock.executed_by}. Skipping duplicate execution.")
-                return
-
-            worker_id = f"worker-pid-{os.getpid()}"
             if not lock:
-                lock = JobExecutionLock(
-                    job_name=job_name,
-                    last_run_date=london_date_str,
-                    last_run_at=get_local_now(),
-                    executed_by=worker_id
-                )
-                db.session.add(lock)
-            else:
-                lock.last_run_date = london_date_str
-                lock.last_run_at = get_local_now()
-                lock.executed_by = worker_id
+                try:
+                    init_lock = JobExecutionLock(
+                        job_name=job_name,
+                        last_run_date="",
+                        last_run_at=get_local_now(),
+                        executed_by="init"
+                    )
+                    db.session.add(init_lock)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+            # 2. UPDATE CONDICIONAL ATÔMICO:
+            # Exatamente UM processo concorrente receberá rows_updated == 1.
+            # Todos os demais processos concorrentes receberão 0 e serão abortados.
+            rows_updated = JobExecutionLock.query.filter(
+                JobExecutionLock.job_name == job_name,
+                JobExecutionLock.last_run_date != london_date_str
+            ).update({
+                'last_run_date': london_date_str,
+                'last_run_at': get_local_now(),
+                'executed_by': worker_id
+            })
             db.session.commit()
+
+            if rows_updated == 0:
+                print(f"[Cron Lock] Daily jobs '{job_name}' já foram executados ou adquiridos por outro worker para a data {london_date_str}. Abortando execução duplicada.")
+                return
         except Exception as e:
             db.session.rollback()
-            print(f"[Cron Lock] Worker lock acquired by another process or error for {london_date_str}: {e}")
+            print(f"[Cron Lock] Erro ao tentar adquirir lock atômico de execução diária para {london_date_str}: {e}")
             return
 
-        print(f"[Cron] Starting daily background jobs for {london_date_str} (Europe/London 01:00 AM)...")
+        print(f"[Cron] Iniciando rotinas diárias para {london_date_str} (Europe/London 01:00 AM) no {worker_id}...")
         t_cobrancas = _gerar_cobrancas_semanais_logic()
         t_quarentenas = _processar_quarentenas_logic()
-        print(f"[Cron] Finished. {t_cobrancas} rent charges generated, {t_quarentenas} deposit holds processed.")
+        print(f"[Cron] Concluído. {t_cobrancas} cobranças geradas, {t_quarentenas} quarentenas processadas.")
 
 if __name__ == '__main__':
     uploads_dir = os.path.join(basedir, 'static', 'uploads')
