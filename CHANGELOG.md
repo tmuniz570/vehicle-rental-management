@@ -4,6 +4,21 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.1] — 2026-09-23 — *Accounting Precision: Due Date Overdue Criterion Alignment & Midnight Normalization*
+
+### 💰 Alinhamento de Regra de Negócio Contábil para Vencimentos em Atraso (Overdue)
+* **Correção do Critério Temporal de Atraso**:
+  - Ajustadas as consultas em `/relatorios/vencidos`, `/api/financeiro?status=overdue` e `/api/dashboard` para comparar a `data_vencimento` com o **início do dia atual** no fuso de Londres (`00:00:00`), em vez do instante com hora, minuto e segundo (`agora`).
+  - Cobranças com vencimento no dia de hoje permanecem com status `Pending` durante as 24 horas do dia (até 23:59:59), tornando-se `Overdue` (em atraso) estritamente a partir da meia-noite (`00:00:00`) do dia seguinte caso não sejam liquidadas.
+  - Elimina a divergência na qual cobranças de hoje apareciam no relatório de atrasados, mas com badge amarelo de `Pending` na listagem financeira.
+* **Normalização de `data_vencimento` no Banco de Dados**:
+  - A criação de contratos de aluguel e venda (`criar_contrato`) e o gerador semanal (`_gerar_cobrancas_semanais_logic`) agora normalizam os vencimentos gerados com hora zerada (`.replace(hour=0, minute=0, second=0, microsecond=0)`), eliminando horários fracionários herdados do momento do clique.
+* **Reforço de Comparação de Datas no Frontend**:
+  - `static/js/financeiro.js` e `static/js/detalhe_contrato.js`: normalização das datas para `00:00:00` na checagem de `isVencido`, prevenindo inconsistências por fuso horário local do navegador.
+  - Cachebusters incrementados em `templates/financeiro.html` (`?v=7`) e `templates/detalhe_contrato.html` (`?v=17`).
+* **Suíte de Testes Automatizados Dedicada**:
+  - Adicionado `tests/test_overdue_business_rule.py` cobrindo cenários de cobranças de ontem (vencidas), hoje 01:00 AM (não vencidas), hoje 15:30 (não vencidas), pagas (não vencidas) e amanhã (não vencidas).
+
 ## [1.9.0] — 2026-09-23 — *Multi-Worker Scheduler Isolation, Atomic Job Concurrency Lock & Safe Deduplication Cleanup Tool*
 
 ### ⚙️ Isolamento de Processos e Prevenção de Concorrência

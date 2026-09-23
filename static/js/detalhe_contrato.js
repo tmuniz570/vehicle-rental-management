@@ -1135,13 +1135,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const tr = document.createElement('tr');
                 
                 const dataVencObj = t.data_vencimento ? new Date(t.data_vencimento) : null;
+                const vencZero = dataVencObj ? new Date(dataVencObj.getFullYear(), dataVencObj.getMonth(), dataVencObj.getDate()) : null;
                 const dataVenc = dataVencObj ? dataVencObj.toLocaleDateString('en-GB') : '-';
                 
                 const tStatusLower = (t.status || '').toLowerCase();
                 const tipoLower = (t.tipo || '').toLowerCase();
                 const isPaid = tStatusLower === 'paid' || tStatusLower === 'pago';
                 const isPending = tStatusLower === 'pending' || tStatusLower === 'pendente';
-                const isVencido = isPending && dataVencObj && dataVencObj < hoje;
+                const isVencido = isPending && vencZero && vencZero < hoje;
 
                 const dataPag = t.data_pagamento ? new Date(t.data_pagamento).toLocaleDateString('en-GB') : '-';
                 

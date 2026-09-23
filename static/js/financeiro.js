@@ -65,12 +65,13 @@ async function carregarFinanceiro() {
             
             // Dates
             const dataVencObj = t.data_vencimento ? new Date(t.data_vencimento) : null;
+            const vencZero = dataVencObj ? new Date(dataVencObj.getFullYear(), dataVencObj.getMonth(), dataVencObj.getDate()) : null;
             const vencimento = dataVencObj ? dataVencObj.toLocaleDateString('en-GB') : '-';
             
             const tStatusLower = (t.status || '').toLowerCase();
             const isPaid = tStatusLower === 'paid' || tStatusLower === 'pago';
             const isPending = tStatusLower === 'pending' || tStatusLower === 'pendente';
-            const isVencido = isPending && dataVencObj && dataVencObj < hoje;
+            const isVencido = isPending && vencZero && vencZero < hoje;
 
             const pagamento = t.data_pagamento ? new Date(t.data_pagamento).toLocaleDateString('en-GB') : '-';
             

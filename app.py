@@ -557,11 +557,12 @@ def pagina_relatorios():
 @alugueis_required
 def relatorio_vencidos():
     agora_london = get_london_now()
+    inicio_hoje = agora_london.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     transacoes = FinancialTransaction.query.options(
         db.joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
     ).filter(
         FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pendente']),
-        FinancialTransaction.data_vencimento < agora_london.replace(tzinfo=None)
+        FinancialTransaction.data_vencimento < inicio_hoje
     ).order_by(FinancialTransaction.data_vencimento.asc()).all()
     
     dados = []
@@ -2176,7 +2177,7 @@ def criar_contrato():
     
     db.session.flush() # Retrieve generated contract ID
     
-    hoje = get_local_now()
+    hoje = get_local_now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     # Financial Transactions Provisioning (All transactions start PENDING upon contract creation)
     if tipo_contrato == ContractType.RENT.value:
@@ -2204,7 +2205,7 @@ def criar_contrato():
         days_ahead = dia_pagamento_semanal - hoje.weekday()
         if days_ahead <= 0:
             days_ahead += 7
-        proximo_vencimento = hoje + timedelta(days=days_ahead)
+        proximo_vencimento = (hoje + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
         
         aluguel_semana_2 = FinancialTransaction(
             id_contrato=novo_contrato.id,
@@ -2255,7 +2256,7 @@ def criar_contrato():
             tx_parcela = FinancialTransaction(
                 id_contrato=novo_contrato.id,
                 tipo=TransactionType.SALE_INSTALLMENT.value,
-                data_vencimento=p_venc,
+                data_vencimento=p_venc.replace(hour=0, minute=0, second=0, microsecond=0),
                 valor=p_valor,
                 status=TransactionStatus.PENDING.value
             )
@@ -3120,10 +3121,10 @@ def listar_financeiro():
         
     if status_filtro:
         if status_filtro.lower() in ['overdue', 'vencidos', 'vencido']:
-            agora = get_local_now()
+            inicio_hoje = get_london_now().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
             query = query.filter(
                 FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-                FinancialTransaction.data_vencimento < agora
+                FinancialTransaction.data_vencimento < inicio_hoje
             )
         elif status_filtro.lower() in ['paid', 'pago']:
             query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']))
@@ -3443,13 +3444,13 @@ def get_dashboard():
         ).scalar() or 0.0)
         
         # Performance: Direct SQL sum and count for overdue charges using London Time
-        agora = get_london_now().replace(tzinfo=None)
+        inicio_hoje = get_london_now().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         vencidas_q = db.session.query(
             db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
             db.func.count(FinancialTransaction.id)
         ).filter(
             FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-            FinancialTransaction.data_vencimento < agora
+            FinancialTransaction.data_vencimento < inicio_hoje
         ).first()
         receita_vencida = float(vencidas_q[0]) if vencidas_q else 0.0
         total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
@@ -3755,7 +3756,7 @@ def _gerar_cobrancas_semanais_logic():
         ).all()
         
         transacoes_geradas = 0
-        proximo_vencimento = hoje_utc + timedelta(days=7)
+        proximo_vencimento = (hoje_utc + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
         inicio_dia_prox = proximo_vencimento.replace(hour=0, minute=0, second=0, microsecond=0)
         fim_dia_prox = inicio_dia_prox + timedelta(days=1)
         

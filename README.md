@@ -71,7 +71,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 ### 💳 7. Financial Statements, Overdue Reports & Receipts
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
 * **Payment Cancellation & Reversal:** Operational ability to cancel a completed payment, revert transaction to pending, and automatically record the action in the employee audit log.
-* **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions.
+* **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions. In accordance with UK accounting standards, charges due today remain pending for the entire day and strictly transition to overdue at 00:00:00 of the following day if unpaid.
 * **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, and PDF-friendly styling.
 * **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
 
