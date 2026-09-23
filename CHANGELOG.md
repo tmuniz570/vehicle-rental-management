@@ -4,6 +4,38 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.0] — 2026-09-23 — *Multi-Worker Scheduler Isolation, Atomic Job Concurrency Lock & Safe Deduplication Cleanup Tool*
+
+### ⚙️ Isolamento de Processos e Prevenção de Concorrência
+* **Isolamento de Processo para o Agendador (`wsgi.py`)**:
+  - Implementado lock exclusivo de arquivo (`fcntl.flock` no arquivo `.scheduler.lock` no Linux).
+  - Garante que, mesmo que o Gunicorn execute com múltiplos workers (2 a 4 processos concorrentes), **apenas 1 worker exclusivo** inicialize a thread do `BackgroundScheduler`. Os outros workers ignoram a inicialização.
+  - Liberação automática do lock pelo sistema operacional caso o worker seja reciclado.
+* **Trava Condicional Atômica no Banco de Dados (`run_daily_jobs`)**:
+  - Substituído o padrão vulnerável de `SELECT` + `UPDATE` por um `UPDATE` condicional atômico (`JobExecutionLock.query.filter(job_name == name, last_run_date != london_date_str).update(...)`).
+  - Serializado pelo banco de dados (PostgreSQL e SQLite WAL): exatamente **1 chamada** obtém sucesso (`rows_updated == 1`), eliminando qualquer possibilidade de execução duplicada por workers simultâneos às 01:00 AM.
+* **Mutex em Memória e Commit por Contrato (`_gerar_cobrancas_semanais_logic`)**:
+  - Proteção por `_BILLING_MUTEX` (`threading.Lock`) e execução de `db.session.commit()` imediato após a criação da cobrança de cada contrato, assegurando que transações e threads concorrentes enxerguem os dados atualizados de imediato.
+* **Isenção de CSRF e Autenticação para Endpoints de Automação**:
+  - Configurada isenção segura de CSRF para chamadas de sistema e cron autenticadas por chave de API (`X-Cron-Key`).
+
+### 🧹 Ferramenta de Auditoria e Limpeza de Duplicidades (`cleanup_duplicate_charges.py`)
+* **Script CLI Standalone**:
+  - `python cleanup_duplicate_charges.py`: Modo simulação (`--dry-run`) exibindo relatório dos contratos afetados, IDs mantidos e IDs excedentes.
+  - `python cleanup_duplicate_charges.py --apply [-y]`: Execução com exclusão segura das cobranças duplicadas pendentes.
+* **Regras Estritas de Segurança**:
+  - Afeta exclusivamente transações de aluguel (`Rent`) com status `PENDING`.
+  - **Preserva sempre** a transação original (menor ID) para cada vencimento.
+  - **Nunca toca** em transações pagas (`Paid`), depósitos ou vendas.
+* **Endpoint Administrativo (`/api/admin/limpar-cobrancas-duplicadas`)**:
+  - Rota protegida por privilégio administrativo ou chave de cron para auditoria e limpeza remota via navegador ou API.
+
+### 🧪 Cobertura de Testes Automatizados
+* **Nova Suíte de Testes (`tests/test_concurrency_and_deduplication.py`)**:
+  - Simulação de concorrência com 6 workers simultâneos disparando rotinas no mesmo segundo.
+  - Validação de idempotência da rotina de aluguel semanal.
+  - Validação da detecção e expurgo de duplicatas com proteção a transações pagas e depósitos.
+
 ## [1.8.0] — 2026-09-22 — *Motorcycle V5C Logbook Documents & Multi-Tracker Management System*
 
 ### 📄 Gestão de Documentos V5C (Logbook)

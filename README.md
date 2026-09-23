@@ -99,7 +99,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Zero N+1 Query Architecture:** Dashboard metrics and financial aggregations execute via direct SQL aggregates (`func.sum`, `func.count`) and strategic `joinedload` eager-loading for blazing fast response times.
 * **SQLite WAL Mode & Concurrency:** Database connection configured with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, 30s busy timeout, and enforced relational integrity (`foreign_keys = ON`) for lock-free concurrent reads during background writes.
 * **Strategic Database Indexes:** Foreign keys, filter columns (`id_cliente`, `placa`, `status`, `data_vencimento`, `vencimento_mot`, `vencimento_tax`), and claim indexes (`claim_number`, `empresa_parceira`, `placa`) are pre-indexed for high scalability.
-* **Multi-Worker Job Concurrency Lock (`JobExecutionLock`):** Database-backed atomic lock ensuring background billing executes exactly once per day across multiple WSGI workers at **01:00 AM London Time**.
+* **Multi-Worker Concurrency & Scheduler Isolation:** Multi-worker process isolation via `fcntl.flock` on `.scheduler.lock` combined with database-backed atomic conditional update locks (`JobExecutionLock`) ensuring background billing executes exactly once per day across multiple WSGI workers at **01:00 AM London Time**.
+* **Financial Deduplication & Audit Tool:** Standalone CLI tool (`cleanup_duplicate_charges.py`) and administrative endpoint to detect, inspect (dry-run), and safely clean up duplicate pending weekly charges without ever affecting paid transactions or deposits.
 * **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (GCP, AWS, Render, Railway).
 * **Point-in-Time Backups & Disaster Recovery:** Automated utilities for snapshot archives (`backup.py`), database restore (`restore.py`), and demo data seeding (`seed_data.py`).
 
@@ -212,6 +213,8 @@ FF Motors APP/
 ├── wsgi.py                    # Production WSGI server runner (Waitress / Multi-threaded)
 ├── gunicorn_config.py         # Production Gunicorn server config for Linux cloud deployment
 ├── Procfile                   # Cloud PaaS entrypoint (Render, Railway, Heroku)
+├── cleanup_duplicate_charges.py# CLI audit and cleanup tool for duplicate pending weekly charges
+├── cleanup_uploads.py         # Automated media orphan purger and disk space cleanup
 ├── database.py                # Database models (User, Clients, Motos, Contracts, Inspections, Claims, Transactions)
 ├── backup.py                  # Automated database & asset backup utility
 ├── restore.py                 # Restoration utility for backup archives
@@ -224,7 +227,9 @@ FF Motors APP/
 │   ├── DEPLOY_E_BANCO_DE_DADOS.md # Zero-downtime deploy & database migration manual
 │   └── plano_claims_modular.md   # Claims module architecture and permissions design
 ├── tests/
-│   └── test_vendas_contratos.py# Automated tests for sales workflow, extras & insurance rules
+│   ├── test_concurrency_and_deduplication.py# Tests for multi-worker concurrency, idempotency & cleanup
+│   ├── test_motos_v5c_trackers.py      # Tests for V5C document management & GPS trackers
+│   └── test_vendas_contratos.py        # Automated tests for sales workflow, extras & insurance rules
 ├── static/
 │   ├── css/
 │   │   └── styles.css         # Glassmorphism design system & responsive rules
