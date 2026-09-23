@@ -4,6 +4,17 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.2] — 2026-09-23 — *Legal Compliance: Clause 4.12 GPS/Telematics Tracking Devices for Rental and Sales Agreements*
+
+### 📜 Atualização dos Contratos Legais (Print & PDF A4)
+* **Contrato de Aluguel (`contrato_print.html`)**:
+  - Inserida a cláusula **4.12 Vehicle Tracking Devices (GPS/Telematics)** na Página 3, formalizando o consentimento expresso do locatário para fins de segurança, proteção patrimonial e conformidade com o UK GDPR, com autorização de localização e recuperação em casos de inadimplência, furto ou quebra contratual.
+* **Contratos de Venda à Vista e Parcelada (`contrato_venda_print.html`)**:
+  - Inserida a cláusula **4.12 Vehicle Tracking Devices (GPS/Telematics)** contemplando:
+    - **Item a (Venda Parcelada)**: Monitoramento ativo mantido pela FF Motors até a quitação integral do saldo devedor.
+    - **Item b (Venda à Vista)**: Confirmação de cessação imediata de monitoramento após quitação integral, com direito de o comprador remover o dispositivo ou solicitar remoção gratuita na oficina.
+    - Garantia de processamento de dados sob o UK GDPR.
+
 ## [1.9.1] — 2026-09-23 — *Accounting Precision: Due Date Overdue Criterion Alignment & Midnight Normalization*
 
 ### 💰 Alinhamento de Regra de Negócio Contábil para Vencimentos em Atraso (Overdue)
