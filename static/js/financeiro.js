@@ -232,16 +232,23 @@ async function carregarFinanceiro() {
 }
 
 // Payment Modal
+let splitPaymentMgr = null;
+
 function abrirModalPagamento(t) {
     if (!t) return;
     const modal = document.getElementById('pagamentoModal');
     if (!modal) return;
 
+    if (!splitPaymentMgr) {
+        splitPaymentMgr = createSplitPaymentManager({ formatoMoeda });
+    }
+
     document.getElementById('pag_cobranca_id').value = t.id;
     document.getElementById('pag_desc_id').textContent = `#${t.id} (Contract #${t.id_contrato})`;
-    document.getElementById('pag_desc_tipo').textContent = t.tipo;
+    document.getElementById('pag_desc_tipo').textContent = t.descricao || formatarDescricaoTransacao(t.tipo);
     document.getElementById('pag_desc_valor').textContent = formatoMoeda.format(t.valor);
-    document.getElementById('pag_forma').value = 'Cash';
+    
+    splitPaymentMgr.open(t.valor, 'Cash');
 
     modal.classList.add('active');
 }
@@ -432,9 +439,18 @@ document.addEventListener('DOMContentLoaded', () => {
         pagForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const id = document.getElementById('pag_cobranca_id').value;
-            const forma = document.getElementById('pag_forma').value;
             const btnSubmit = document.getElementById('btnConfirmarPag');
             
+            if (!splitPaymentMgr) {
+                splitPaymentMgr = createSplitPaymentManager({ formatoMoeda });
+            }
+
+            const payload = splitPaymentMgr.getPayload();
+            if (payload.valor_pago <= 0) {
+                alert('Please enter a valid payment amount greater than zero.');
+                return;
+            }
+
             btnSubmit.disabled = true;
             btnSubmit.textContent = 'Processing...';
 
@@ -442,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await fetch(`/api/financeiro/pagar/${id}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ forma_pagamento: forma })
+                    body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
@@ -456,7 +472,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Connection error while processing payment.');
             } finally {
                 btnSubmit.disabled = false;
-                btnSubmit.textContent = 'Confirm Payment';
+                splitPaymentMgr.recalculate();
             }
         });
     }

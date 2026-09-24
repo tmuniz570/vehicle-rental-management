@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.7.4--Sales%20Lifecycle%20%26%20Mobile%20Print-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.4--Split%20Payments%20%26%20Multi--Page%20V5C-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -21,7 +21,7 @@
 
 **FF Motors Management System** is an end-to-end web application developed to automate and streamline motorcycle rental operations. Built specifically to handle day-to-day motorcycle fleet management, client agreements, security deposit accounting, and digital vehicle inspections directly from the rental yard using smartphones or desktop computers.
 
-The system features an installable **PWA (Progressive Web App)** interface with a custom **mobile bottom navigation bar**, client-side image compression for mobile cameras, automated recurring weekly rent generation, and instant receipt printing.
+The system features an installable **PWA (Progressive Web App)** interface with a custom **mobile bottom navigation bar**, client-side image compression for mobile cameras, automated recurring weekly rent generation, multi-payment split methods with partial settlements, multi-page V5C logbook uploads, and instant receipt printing.
 
 ---
 
@@ -36,6 +36,13 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`).
 * **UK MOT & Road Tax (VED) Compliance:** Annual MOT test and DVLA Road Tax expiry date tracking with proactive warning badges (🟢 Valid, 🟡 Expiring within 30 days, 🔴 Expired).
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
+* **V5C Logbook Multi-Page Management & Mobile Multi-Shot Camera:**
+  - Dedicated multi-shot camera accumulator (`capture="environment"` and gallery picker) allowing operators to photograph multi-page V5C logbooks (Page 1, Page 2, Page 3...) consecutively on iPhone/Safari without reloading or uploading one-by-one.
+  - Interactive preview grid with thumbnail, file size, and per-page discard button before batch uploading.
+  - Single-click batch upload (`POST /api/motos/<placa>/v5c`) supporting image and digital PDF formats.
+* **GPS Telematics & Tracker Management:**
+  - Multiple GPS trackers per motorbike with ownership classification (`Company` vs `Customer`).
+  - Serial / IMEI tracking and dedicated camera capture for device stickers and wiring installations.
 
 ### 👥 3. Customer Relationship Management
 * **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
@@ -58,7 +65,9 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - Automatic reversal and reopening back to `Active` with audit trail tracking if a completed sale payment is cancelled or reverted.
   - Removal of "Return Mileage" and "Miles driven" rows on vehicle cards for sales contracts, displaying clean "Sale Mileage".
 * **Interactive Itemized Accessories & Extras Builder:** Real-time selector and custom accessory adder (e.g., security trackers, locks, heated grips, weather covers) with dynamic cost summation applied directly to the agreement total.
-* **Printable Formal Agreements & iPhone AirPrint A4 Engine:** Dedicated print templates for both rental agreements and vehicle sales agreements featuring dealership credentials, fixed seller authorization signature, instalment schedule tables, UK vehicle history categorization (`Clear`, `Cat N`, etc.), and strict zero-blank-page pagination across iOS Safari (AirPrint) and desktop browsers.
+* **Printable Formal Agreements & Legal Compliance (UK GDPR Clause 4.12):**
+  - Dedicated print templates for rental agreements and vehicle sales agreements with fixed seller authorization signature, instalment schedule tables, UK vehicle history categorization (`Clear`, `Cat N`), and strict zero-blank-page pagination across iOS Safari (AirPrint) and desktop browsers.
+  - Clause 4.12 Telematics/GPS tracking consent incorporated into rental and sales print agreements.
 * **Smart Insurance Compliance & Exemption:** 15-day recurring government database verification (askMID) for active rentals, with automatic exemption for sold vehicles while preserving the collected insurance policy on file.
 * **Protection Against Incompatible Operations:** Sold motorbikes are automatically protected against rental return inspections (`Check-in`) and excluded from recurring rental billing batches, while allowing warranty and damage logs (`Incident`).
 * **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.
@@ -68,11 +77,13 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Client-Side Image Compression:** Automatic compression via `browser-image-compression` converting high-res smartphone captures to lightweight WebP formats before upload, saving bandwidth and cloud storage.
 * **High-Definition Gallery:** Inspection modals with zoomable image grids and timestamped condition logs.
 
-### 💳 7. Financial Statements, Overdue Reports & Receipts
+### 💳 7. Financial Statements, Multi-Payment (Split) & Partial Settlements
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
-* **Payment Cancellation & Reversal:** Operational ability to cancel a completed payment, revert transaction to pending, and automatically record the action in the employee audit log.
-* **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions. In accordance with UK accounting standards, charges due today remain pending for the entire day and strictly transition to overdue at 00:00:00 of the following day if unpaid.
-* **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, and PDF-friendly styling.
+* **Multi-Payment Methods (Split Payments):** Seamless division of any charge across multiple simultaneous payment forms (Cash, Card, Bank Transfer, Deposit, Other).
+* **Intelligent Partial Settlement:** Clients can pay partial amounts towards any charge; the paid portion is receipted and the outstanding remainder is automatically spun off into a linked child balance transaction with the original due date.
+* **Reversal with Auto-Merge:** Reverting a partial payment automatically re-merges child balance transactions back into the parent, maintaining immaculate ledger accuracy.
+* **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions. Charges due today remain pending for the entire day and strictly transition to overdue at 00:00:00 of the following day if unpaid.
+* **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, itemized multi-payment breakdown, and PDF-friendly styling.
 * **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
 
 ### 📱 8. Mobile-First & PWA Experience

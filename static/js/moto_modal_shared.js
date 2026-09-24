@@ -4,6 +4,7 @@
  */
 
 let currentMotoPlaca = null;
+let selectedV5CFiles = []; // Accumulator for V5C document/page photos (camera + gallery)
 let selectedTrackerPhotos = []; // Accumulator for tracker photos (camera + gallery)
 
 function escapeHtml(str) {
@@ -281,6 +282,12 @@ async function abrirModalMoto(placa, activeTab = 'tabInfo', initialData = null) 
         if (editTax) editTax.value = initialData.vencimento_tax || '';
     }
     
+    // Reset V5C staged accumulator
+    selectedV5CFiles = [];
+    renderV5CStagedPreview();
+    const v5cStatus = document.getElementById('v5cUploadStatus');
+    if (v5cStatus) v5cStatus.style.display = 'none';
+
     // Reset tracker photo accumulator
     selectedTrackerPhotos = [];
     renderTrackerPhotosPreview();
@@ -331,6 +338,84 @@ function renderTrackerPhotosPreview() {
 function removerFotoStaged(index) {
     selectedTrackerPhotos.splice(index, 1);
     renderTrackerPhotosPreview();
+}
+
+// Format bytes helper for V5C staged files
+function formatV5CFileSize(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// V5C Staged pages preview UI (Multi-shot camera accumulator)
+function renderV5CStagedPreview() {
+    const container = document.getElementById('v5cStagedContainer');
+    const previewGrid = document.getElementById('v5cStagedPreview');
+    const stagedCount = document.getElementById('v5cStagedCount');
+    const btnUpload = document.getElementById('btnUploadV5C');
+    const btnClear = document.getElementById('btnClearV5CStaged');
+
+    if (!container || !previewGrid || !btnUpload) return;
+
+    const count = selectedV5CFiles.length;
+    if (stagedCount) stagedCount.textContent = count;
+
+    if (count === 0) {
+        container.style.display = 'none';
+        previewGrid.innerHTML = '';
+        if (btnClear) btnClear.style.display = 'none';
+        btnUpload.disabled = true;
+        btnUpload.innerHTML = '<span>⬆️</span> Upload to V5C (0 pages)';
+        return;
+    }
+
+    container.style.display = 'block';
+    if (btnClear) btnClear.style.display = 'inline-flex';
+    btnUpload.disabled = false;
+    btnUpload.innerHTML = `<span>⬆️</span> Upload to V5C (${count} page${count > 1 ? 's' : ''})`;
+
+    previewGrid.innerHTML = selectedV5CFiles.map((file, idx) => {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        const sizeStr = formatV5CFileSize(file.size);
+        const pageLabel = `Page ${idx + 1}`;
+        const tempUrl = isPdf ? null : URL.createObjectURL(file);
+
+        const visual = isPdf ? `
+            <div style="width: 80px; height: 80px; background: rgba(239,68,68,0.12); display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid rgba(239,68,68,0.3);">
+                <span style="font-size: 1.8rem;">📑</span>
+                <span style="font-size: 0.65rem; font-weight: 700; color: #ef4444; margin-top: 2px;">PDF</span>
+            </div>
+        ` : `
+            <div style="width: 80px; height: 80px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--accent); position: relative;">
+                <img src="${tempUrl}" alt="${pageLabel}" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+        `;
+
+        return `
+            <div style="position: relative; display: flex; flex-direction: column; align-items: center; width: 84px; text-align: center; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 10px; border: 1px solid var(--border-color);">
+                ${visual}
+                <button type="button" onclick="removerV5CStaged(${idx})" style="position: absolute; top: 1px; right: 1px; background: rgba(0,0,0,0.85); color: #ef4444; border: 1px solid rgba(239,68,68,0.5); border-radius: 50%; width: 22px; height: 22px; font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; z-index: 2;" title="Remove this page">&times;</button>
+                <div style="font-size: 0.72rem; font-weight: 600; color: var(--text-primary); margin-top: 4px; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(file.name)}">
+                    ${pageLabel}
+                </div>
+                <div style="font-size: 0.65rem; color: var(--text-secondary);">
+                    ${sizeStr}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function removerV5CStaged(index) {
+    selectedV5CFiles.splice(index, 1);
+    renderV5CStagedPreview();
+}
+
+function limparV5CStaged() {
+    selectedV5CFiles = [];
+    renderV5CStagedPreview();
 }
 
 // Remove Tracker
@@ -390,6 +475,8 @@ window.alternarAba = alternarAba;
 window.removerV5C = removerV5C;
 window.removerTracker = removerTracker;
 window.removerFotoStaged = removerFotoStaged;
+window.removerV5CStaged = removerV5CStaged;
+window.limparV5CStaged = limparV5CStaged;
 
 // Global initializer for modal DOM elements
 document.addEventListener('DOMContentLoaded', () => {
@@ -462,40 +549,67 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // V5C File Selection & Upload
-    const btnChooseV5CFiles = document.getElementById('btnChooseV5CFiles');
-    const v5cFileInput = document.getElementById('v5cFileInput');
-    const v5cSelectedCount = document.getElementById('v5cSelectedCount');
+    // V5C Camera & Gallery Multi-Shot Handlers (Accumulator)
+    const btnV5CCamera = document.getElementById('btnV5CCamera');
+    const v5cCameraInput = document.getElementById('v5cCameraInput');
+    const btnV5CGallery = document.getElementById('btnV5CGallery');
+    const v5cGalleryInput = document.getElementById('v5cGalleryInput');
+    const btnClearV5CStaged = document.getElementById('btnClearV5CStaged');
     const btnUploadV5C = document.getElementById('btnUploadV5C');
     const v5cUploadForm = document.getElementById('v5cUploadForm');
+    const v5cUploadStatus = document.getElementById('v5cUploadStatus');
 
-    if (btnChooseV5CFiles && v5cFileInput) {
-        btnChooseV5CFiles.addEventListener('click', () => v5cFileInput.click());
-        v5cFileInput.addEventListener('change', () => {
-            const files = v5cFileInput.files;
-            if (files && files.length > 0) {
-                v5cSelectedCount.textContent = `${files.length} file(s) selected`;
-                if (btnUploadV5C) btnUploadV5C.disabled = false;
-            } else {
-                v5cSelectedCount.textContent = 'No file chosen';
-                if (btnUploadV5C) btnUploadV5C.disabled = true;
+    if (btnV5CCamera && v5cCameraInput) {
+        btnV5CCamera.addEventListener('click', () => v5cCameraInput.click());
+        v5cCameraInput.addEventListener('change', () => {
+            if (v5cCameraInput.files && v5cCameraInput.files.length > 0) {
+                for (let i = 0; i < v5cCameraInput.files.length; i++) {
+                    selectedV5CFiles.push(v5cCameraInput.files[i]);
+                }
+                v5cCameraInput.value = ''; // Reset so iPhone camera can take multiple page photos consecutively
+                renderV5CStagedPreview();
             }
         });
+    }
+
+    if (btnV5CGallery && v5cGalleryInput) {
+        btnV5CGallery.addEventListener('click', () => v5cGalleryInput.click());
+        v5cGalleryInput.addEventListener('change', () => {
+            if (v5cGalleryInput.files && v5cGalleryInput.files.length > 0) {
+                for (let i = 0; i < v5cGalleryInput.files.length; i++) {
+                    selectedV5CFiles.push(v5cGalleryInput.files[i]);
+                }
+                v5cGalleryInput.value = '';
+                renderV5CStagedPreview();
+            }
+        });
+    }
+
+    if (btnClearV5CStaged) {
+        btnClearV5CStaged.addEventListener('click', limparV5CStaged);
     }
 
     if (v5cUploadForm) {
         v5cUploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!v5cFileInput.files || v5cFileInput.files.length === 0) return;
+            if (!selectedV5CFiles || selectedV5CFiles.length === 0) return;
             if (!currentMotoPlaca) return;
 
+            const count = selectedV5CFiles.length;
             const formData = new FormData();
-            for (let i = 0; i < v5cFileInput.files.length; i++) {
-                formData.append('v5c_arquivos', v5cFileInput.files[i]);
-            }
+            selectedV5CFiles.forEach(file => {
+                formData.append('v5c_arquivos', file);
+            });
 
-            btnUploadV5C.disabled = true;
-            btnUploadV5C.textContent = 'Uploading...';
+            if (btnUploadV5C) {
+                btnUploadV5C.disabled = true;
+                btnUploadV5C.innerHTML = `<span>⏳</span> Uploading ${count} page(s)...`;
+            }
+            if (v5cUploadStatus) {
+                v5cUploadStatus.style.display = 'block';
+                v5cUploadStatus.style.color = '#22d3ee';
+                v5cUploadStatus.textContent = `Uploading ${count} page(s) to motorbike ${currentMotoPlaca}...`;
+            }
 
             try {
                 const res = await fetch(`/api/motos/${encodeURIComponent(currentMotoPlaca)}/v5c`, {
@@ -504,20 +618,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 const result = await res.json();
                 if (res.ok) {
-                    v5cFileInput.value = '';
-                    v5cSelectedCount.textContent = 'No file chosen';
+                    selectedV5CFiles = [];
+                    renderV5CStagedPreview();
+                    if (v5cUploadStatus) {
+                        v5cUploadStatus.style.color = '#4ade80';
+                        v5cUploadStatus.textContent = result.message || result.mensagem || `${count} V5C page(s) uploaded successfully!`;
+                        setTimeout(() => {
+                            if (v5cUploadStatus) v5cUploadStatus.style.display = 'none';
+                        }, 4000);
+                    }
                     await carregarDetalhesMoto(currentMotoPlaca);
                     if (typeof window.onMotoModalUpdated === 'function') {
                         window.onMotoModalUpdated(currentMotoPlaca);
                     }
                 } else {
-                    alert(result.erro || result.error || 'Failed to upload V5C documents');
+                    const errMsg = result.erro || result.error || 'Failed to upload V5C documents';
+                    if (v5cUploadStatus) {
+                        v5cUploadStatus.style.color = '#ef4444';
+                        v5cUploadStatus.textContent = errMsg;
+                    }
+                    alert(errMsg);
                 }
             } catch(err) {
+                if (v5cUploadStatus) {
+                    v5cUploadStatus.style.color = '#ef4444';
+                    v5cUploadStatus.textContent = 'Connection error uploading V5C files';
+                }
                 alert('Connection error uploading V5C files');
             } finally {
-                btnUploadV5C.disabled = false;
-                btnUploadV5C.textContent = 'Upload to V5C';
+                if (btnUploadV5C) {
+                    const remaining = selectedV5CFiles.length;
+                    btnUploadV5C.disabled = remaining === 0;
+                    btnUploadV5C.innerHTML = remaining > 0
+                        ? `<span>⬆️</span> Upload to V5C (${remaining} page${remaining > 1 ? 's' : ''})`
+                        : `<span>⬆️</span> Upload to V5C (0 pages)`;
+                }
             }
         });
     }

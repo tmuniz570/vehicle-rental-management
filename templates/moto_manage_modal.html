@@ -85,15 +85,38 @@
                         Attach photos of the V5C logbook pages (e.g. Page 1, Page 2) or upload the complete digital PDF certificate.
                     </p>
                     
-                    <form id="v5cUploadForm" style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;">
-                        <input type="file" id="v5cFileInput" accept="image/*,application/pdf" multiple style="display: none;">
-                        <button type="button" id="btnChooseV5CFiles" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
-                            <span>📁</span> Choose Photo(s) or PDF
-                        </button>
-                        <span id="v5cSelectedCount" style="font-size: 0.82rem; color: var(--text-secondary);">No file chosen</span>
-                        <button type="submit" id="btnUploadV5C" class="btn-primary" style="padding: 0.65rem 1.2rem; font-size: 0.85rem; margin-left: auto;" disabled>
-                            Upload to V5C
-                        </button>
+                    <form id="v5cUploadForm" style="display: flex; flex-direction: column; gap: 0.85rem;">
+                        <!-- Hidden inputs: Camera (multi-shot environment capture) & File/Gallery picker (multiple) -->
+                        <input type="file" id="v5cCameraInput" accept="image/*" capture="environment" style="display: none;">
+                        <input type="file" id="v5cGalleryInput" accept="image/*,application/pdf" multiple style="display: none;">
+
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;">
+                            <button type="button" id="btnV5CCamera" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(34,211,238,0.4); color: #22d3ee; background: rgba(34,211,238,0.08); font-weight: 600;">
+                                <span>📸</span> Take Page Photo (Camera)
+                            </button>
+                            <button type="button" id="btnV5CGallery" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
+                                <span>📁</span> Photo Library / PDF
+                            </button>
+                            <button type="button" id="btnClearV5CStaged" class="btn-secondary" style="padding: 0.5rem 0.85rem; font-size: 0.78rem; display: none; color: #ef4444; border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08); margin-left: auto;">
+                                <span>🗑️</span> Clear Queued
+                            </button>
+                        </div>
+
+                        <!-- Staged preview container: displays thumbnails of captured pages before upload -->
+                        <div id="v5cStagedContainer" style="display: none; background: rgba(0,0,0,0.25); border: 1px dashed rgba(34,211,238,0.35); border-radius: 10px; padding: 0.75rem;">
+                            <div style="font-size: 0.78rem; font-weight: 600; color: #22d3ee; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Queued Pages (<span id="v5cStagedCount">0</span>) - You can take more photos before uploading:</span>
+                            </div>
+                            <div id="v5cStagedPreview" style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: flex-start;">
+                                <!-- Dynamic thumbnails with remove buttons -->
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; align-items: center;">
+                            <button type="submit" id="btnUploadV5C" class="btn-primary" style="padding: 0.7rem 1.4rem; font-size: 0.88rem; width: 100%; max-width: 280px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" disabled>
+                                <span>⬆️</span> Upload to V5C (0 pages)
+                            </button>
+                        </div>
                     </form>
                     <div id="v5cUploadStatus" style="font-size: 0.82rem; margin-top: 0.5rem; display: none;"></div>
                 </div>

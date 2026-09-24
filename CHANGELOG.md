@@ -4,6 +4,40 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.4] — 2026-09-24 — *Mobile Multi-Shot Camera Accumulator for V5C Multi-Page Document Uploads*
+
+### 📄 Acumulador Multi-Página de Câmera Mobile para V5C (iOS / iPhone)
+* **Solução Definitiva para Upload Multi-Página no iPhone**:
+  - No Safari/iOS, o uso de um único `<input type="file" multiple>` forçava o fechamento da câmera após uma única foto, exigindo uploads individuais e lentos para documentos com frente e verso ou múltiplas páginas.
+  - Implementado o padrão **Multi-Shot Camera Accumulator** no modal compartilhado de gestão de motos (`templates/moto_manage_modal.html` e `static/js/moto_modal_shared.js?v=2`):
+    - **Botão Câmera (`📸 Take Page Photo`)**: aciona diretamente a câmera com `capture="environment"`, permitindo bater foto da Página 1, Página 2, Página 3 sucessivamente sem recarregar nem substituir as anteriores.
+    - **Botão Galeria / PDF (`📁 Photo Library / PDF`)**: permite selecionar múltiplos arquivos ou certificados digitais em PDF de uma só vez.
+    - **Fila Dinâmica de Pré-visualização**: exibe miniaturas das páginas enfileiradas com identificação (`Page 1`, `Page 2`...), tamanho do arquivo e botão individual de descarte (`×`) para refazer fotos desfocadas antes do envio.
+    - **Envio Único e Otimizado**: botão inteligente `Upload to V5C (N pages)` envia todas as páginas acumuladas em uma única requisição POST (`/api/motos/<placa>/v5c`), com processamento e otimização no backend.
+* **Cachebuster Atualizado**:
+  - `moto_modal_shared.js?v=2` em `templates/motos.html` e `templates/detalhe_contrato.html`.
+
+## [1.9.3] — 2026-09-24 — *Multi-Payment Methods (Split Payments) & Partial Settlement Architecture*
+
+### 💳 Múltiplas Formas de Pagamento e Quitação Parcial (Split & Partial Payments)
+* **Flexibilidade Total em Cobranças Financeiras**:
+  - Suporte completo para divisão de pagamentos em múltiplas formas simultâneas (Cash, Card, Bank Transfer, Deposit, Other) para qualquer tipo de lançamento (vendas à vista `Sale_Full`, parcelas `Sale_Installment`, aluguel semanal `Rent`, depósitos e multas).
+  - Suporte a **baixas parciais** inteligentes: se o cliente pagar um valor inferior ao total devido, o valor pago é liquidado com as formas informadas e o saldo restante é lançado automaticamente como uma nova cobrança filha pendente com o mesmo vencimento original e vinculada via `id_transacao_origem`.
+* **Banco de Dados & Auto-Migração (`database.py`)**:
+  - Coluna `FinancialTransaction.forma_pagamento` expandida de `VARCHAR(50)` para `VARCHAR(255)` com migração automática para PostgreSQL e SQLite.
+  - Adicionadas colunas `detalhes_pagamento_json` (TEXT) e `id_transacao_origem` (INTEGER) para rastreabilidade e histórico estruturado de métodos e divisões parciais.
+* **Backend Robusto & Estorno Inteligente (`app.py`)**:
+  - `/api/financeiro/pagar/<id>` e `/api/cobrancas/<id>/pagar`: processam payloads com `metodos_pagamento` ou fallback de método único com validação estrita de valores positivos e limite do montante devido.
+  - Reversão/Estorno (`/api/financeiro/<id>/reverter`): reintegra automaticamente saldos restantes filhos que continuam pendentes de volta ao lançamento original (auto-merge), excluindo a transação filha e restaurando o montante integral.
+  - Finalização de contratos de venda: contratos `Sale_Full` e `Sale_Installment` só transitam para `Completed` quando todas as transações, incluindo saldos parciais, forem integralmente quitadas.
+* **Componente de Frontend Universal (`static/js/app_shared.js`)**:
+  - Função modular `createSplitPaymentManager`: gerencia dinamicamente linhas de formas de pagamento, sugestão automática de saldo restante ao adicionar novo método, cálculo em tempo real de valores pagos e remanescentes, e badges visuais dinâmicos (Full Settlement / Partial Payment / Exceeds Due).
+* **Modais Padronizados & Recibos Aprimorados**:
+  - Modais em `/financeiro` (`static/js/financeiro.js?v=8`) e `/contratos/<id>` (`static/js/detalhe_contrato.js?v=18`): interface interativa e responsiva para smartphone e desktop.
+  - Recibo `/recibo/<id>` (`templates/recibo.html`): exibe o detalhamento discriminado de cada forma de pagamento e valor quando houver múltiplos métodos.
+* **Suíte de Testes Automatizados**:
+  - Novo teste `tests/test_split_partial_payments.py` cobrindo quitação total dividida, pagamentos parciais, estorno com auto-merge, quitação em múltiplos passos e validações de segurança.
+
 ## [1.9.2] — 2026-09-23 — *Legal Compliance: Clause 4.12 GPS/Telematics Tracking Devices for Rental and Sales Agreements*
 
 ### 📜 Atualização dos Contratos Legais (Print & PDF A4)

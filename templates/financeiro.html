@@ -101,10 +101,10 @@
 
 <!-- Modal Confirm Payment -->
 <div id="pagamentoModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 450px;">
+    <div class="modal-card" style="max-width: 480px;">
         <div class="modal-header">
             <h3>Mark Payment</h3>
-            <button id="closePagamentoModal" class="modal-close">&times;</button>
+            <button id="closePagamentoModal" class="modal-close" type="button">&times;</button>
         </div>
         <div class="modal-body">
             <form id="pagamentoForm">
@@ -125,18 +125,37 @@
                     </div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <label for="pag_forma" style="font-size:0.9rem; font-weight:600; color:var(--text-primary); margin-bottom:0.5rem; display:block;">Payment Method *</label>
-                    <select id="pag_forma" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
-                        <option value="Cash">Cash</option>
-                        <option value="Card">Card</option>
-                        <option value="Bank Transfer">Bank Transfer</option>
-                        <option value="Deposit">Deposit (Deducted from Deposit)</option>
-                        <option value="Other">Other</option>
-                    </select>
+                <!-- Dynamic Payment Methods Container -->
+                <div style="margin-bottom: 1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+                        <label style="font-size:0.9rem; font-weight:600; color:var(--text-primary); margin:0;">
+                            Payment Method(s) & Amounts
+                        </label>
+                        <button type="button" id="btnAddPaymentMethod" style="background: rgba(255, 107, 0, 0.15); border: 1px solid rgba(255, 107, 0, 0.35); color: var(--accent, #ff6b00); border-radius: 8px; font-size: 0.8rem; font-weight: 600; padding: 4px 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s ease;">
+                            + Split / Add Method
+                        </button>
+                    </div>
+
+                    <div id="paymentMethodsList" style="display: flex; flex-direction: column; gap: 0.65rem;">
+                        <!-- Payment method rows injected dynamically -->
+                    </div>
                 </div>
 
-                <button type="submit" id="btnConfirmarPag" class="btn-primary" style="background: var(--success); width: 100%; padding: 0.875rem;">
+                <!-- Payment Summary Box -->
+                <div id="paymentSummaryBox" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.35rem;">
+                        <span style="color:var(--text-secondary);">Total Paying Now:</span>
+                        <strong id="sumPayingNow" style="color:var(--text-primary); font-size:0.95rem;">£0.00</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.4rem;">
+                        <span style="color:var(--text-secondary);">Remaining Balance:</span>
+                        <strong id="sumRemaining" style="color:var(--text-primary); font-size:0.95rem;">£0.00</strong>
+                    </div>
+                    <div id="paymentStatusBadge" style="font-size:0.8rem; font-weight:600; text-align:center; padding: 6px 10px; border-radius: 8px;">
+                    </div>
+                </div>
+
+                <button type="submit" id="btnConfirmarPag" class="btn-primary" style="background: var(--success); width: 100%; padding: 0.875rem; font-size: 0.95rem; font-weight: 600;">
                     Confirm Payment
                 </button>
             </form>
@@ -208,6 +227,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/financeiro.js?v=7"></script>
+<script src="/static/js/financeiro.js?v=8"></script>
 {% endblock %}
 

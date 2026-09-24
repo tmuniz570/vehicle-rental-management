@@ -436,3 +436,210 @@ function renderInspectionCarousel(container, photos) {
     el.appendChild(wrapper);
 }
 
+/**
+ * 4. Universal Split & Partial Payment Modal Manager
+ * Manages dynamic payment method rows, real-time balance calculations,
+ * and payload formatting for mark payment modals.
+ */
+function createSplitPaymentManager({
+    containerId = 'paymentMethodsList',
+    btnAddId = 'btnAddPaymentMethod',
+    sumPayingId = 'sumPayingNow',
+    sumRemainingId = 'sumRemaining',
+    badgeId = 'paymentStatusBadge',
+    btnSubmitId = 'btnConfirmarPag',
+    formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
+} = {}) {
+    let currentTotalDue = 0;
+    const container = document.getElementById(containerId);
+    const btnAdd = document.getElementById(btnAddId);
+    const elSumPaying = document.getElementById(sumPayingId);
+    const elSumRemaining = document.getElementById(sumRemainingId);
+    const elBadge = document.getElementById(badgeId);
+    const btnSubmit = document.getElementById(btnSubmitId);
+
+    const PAYMENT_METHODS = [
+        { value: 'Cash', label: 'Cash' },
+        { value: 'Card', label: 'Card' },
+        { value: 'Bank Transfer', label: 'Bank Transfer' },
+        { value: 'Deposit', label: 'Deposit (Deducted)' },
+        { value: 'Other', label: 'Other' }
+    ];
+
+    function renderRow(method = 'Cash', amount = 0) {
+        const row = document.createElement('div');
+        row.className = 'payment-method-row';
+        row.style.cssText = 'display: grid; grid-template-columns: 1fr 130px 36px; gap: 8px; align-items: center;';
+
+        const optionsHtml = PAYMENT_METHODS.map(m => 
+            `<option value="${m.value}" ${m.value === method ? 'selected' : ''}>${m.label}</option>`
+        ).join('');
+
+        row.innerHTML = `
+            <select class="pag-method-select" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.65rem 0.75rem; border-radius: 10px; font-size: 0.9rem; outline: none; width: 100%;">
+                ${optionsHtml}
+            </select>
+            <div style="position: relative; width: 100%;">
+                <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-secondary); font-size: 0.9rem; pointer-events: none;">£</span>
+                <input type="number" step="0.01" min="0.01" class="pag-amount-input" value="${amount > 0 ? amount.toFixed(2) : ''}" placeholder="0.00" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.65rem 0.65rem 0.65rem 1.6rem; border-radius: 10px; font-size: 0.95rem; font-weight: 600; width: 100%; box-sizing: border-box; outline: none;">
+            </div>
+            <button type="button" class="btn-remove-method" title="Remove method" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; width: 36px; height: 38px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s ease;">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+        `;
+
+        const amountInput = row.querySelector('.pag-amount-input');
+        const methodSelect = row.querySelector('.pag-method-select');
+        const btnRemove = row.querySelector('.btn-remove-method');
+
+        amountInput.addEventListener('input', recalculate);
+        methodSelect.addEventListener('change', recalculate);
+        btnRemove.addEventListener('click', () => {
+            row.remove();
+            updateRemoveButtons();
+            recalculate();
+        });
+
+        return row;
+    }
+
+    function updateRemoveButtons() {
+        if (!container) return;
+        const rows = container.querySelectorAll('.payment-method-row');
+        rows.forEach(r => {
+            const btnRemove = r.querySelector('.btn-remove-method');
+            if (btnRemove) {
+                btnRemove.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+            }
+        });
+    }
+
+    function recalculate() {
+        if (!container) return;
+        const rows = container.querySelectorAll('.payment-method-row');
+        let totalPaid = 0;
+
+        rows.forEach(r => {
+            const input = r.querySelector('.pag-amount-input');
+            const val = parseFloat(input?.value) || 0;
+            totalPaid += val;
+        });
+
+        totalPaid = Math.round(totalPaid * 100) / 100;
+        const remaining = Math.max(0, Math.round((currentTotalDue - totalPaid) * 100) / 100);
+
+        if (elSumPaying) elSumPaying.textContent = formatoMoeda.format(totalPaid);
+        if (elSumRemaining) elSumRemaining.textContent = formatoMoeda.format(remaining);
+
+        if (elBadge && btnSubmit) {
+            const diff = Math.round((currentTotalDue - totalPaid) * 100) / 100;
+            if (totalPaid <= 0) {
+                elBadge.innerHTML = `<span style="color:var(--text-secondary);">Enter valid payment amount(s)</span>`;
+                elBadge.style.background = 'rgba(255,255,255,0.04)';
+                elBadge.style.border = '1px solid var(--border-color)';
+                btnSubmit.disabled = true;
+                btnSubmit.textContent = 'Confirm Payment';
+            } else if (diff < -0.009) {
+                elBadge.innerHTML = `<span style="color:#f87171;">✕ Paid amount (${formatoMoeda.format(totalPaid)}) exceeds total due (${formatoMoeda.format(currentTotalDue)})</span>`;
+                elBadge.style.background = 'rgba(239, 68, 68, 0.15)';
+                elBadge.style.border = '1px solid rgba(239, 68, 68, 0.3)';
+                btnSubmit.disabled = true;
+                btnSubmit.textContent = 'Amount Exceeds Due';
+            } else if (diff > 0.009) {
+                elBadge.innerHTML = `<span style="color:#fbbf24;">⚠️ Partial Payment: ${formatoMoeda.format(remaining)} will remain Pending</span>`;
+                elBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+                elBadge.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = `Confirm Partial Payment (${formatoMoeda.format(totalPaid)})`;
+            } else {
+                elBadge.innerHTML = `<span style="color:#34d399;">✓ Full Settlement (${formatoMoeda.format(totalPaid)})</span>`;
+                elBadge.style.background = 'rgba(16, 185, 129, 0.15)';
+                elBadge.style.border = '1px solid rgba(16, 185, 129, 0.3)';
+                btnSubmit.disabled = false;
+                btnSubmit.textContent = `Confirm Payment (${formatoMoeda.format(totalPaid)})`;
+            }
+        }
+    }
+
+    function addRow(suggestedAmount = null, defaultMethod = 'Card') {
+        if (!container) return;
+        if (suggestedAmount === null) {
+            let currentPaid = 0;
+            container.querySelectorAll('.pag-amount-input').forEach(inp => {
+                currentPaid += parseFloat(inp.value) || 0;
+            });
+            const rem = Math.max(0, Math.round((currentTotalDue - currentPaid) * 100) / 100);
+            suggestedAmount = rem > 0 ? rem : 0;
+        }
+
+        const newRow = renderRow(defaultMethod, suggestedAmount);
+        container.appendChild(newRow);
+        updateRemoveButtons();
+        recalculate();
+        const inp = newRow.querySelector('.pag-amount-input');
+        if (inp) {
+            inp.focus();
+            inp.select();
+        }
+    }
+
+    if (btnAdd) {
+        btnAdd.addEventListener('click', (e) => {
+            e.preventDefault();
+            let usedMethods = [];
+            if (container) {
+                container.querySelectorAll('.pag-method-select').forEach(s => usedMethods.push(s.value));
+            }
+            let nextMethod = 'Card';
+            if (usedMethods.includes('Cash') && !usedMethods.includes('Card')) nextMethod = 'Card';
+            else if (usedMethods.includes('Card') && !usedMethods.includes('Bank Transfer')) nextMethod = 'Bank Transfer';
+            else if (usedMethods.includes('Bank Transfer') && !usedMethods.includes('Cash')) nextMethod = 'Cash';
+
+            addRow(null, nextMethod);
+        });
+    }
+
+    function open(totalDue, defaultMethod = 'Cash') {
+        currentTotalDue = parseFloat(totalDue) || 0;
+        if (container) {
+            container.innerHTML = '';
+            container.appendChild(renderRow(defaultMethod, currentTotalDue));
+        }
+        updateRemoveButtons();
+        recalculate();
+    }
+
+    function getPayload() {
+        if (!container) return { metodos_pagamento: [], valor_pago: 0, is_partial: false, saldo_restante: 0 };
+        const rows = container.querySelectorAll('.payment-method-row');
+        const metodos = [];
+        let totalPaid = 0;
+
+        rows.forEach(r => {
+            const forma = r.querySelector('.pag-method-select')?.value || 'Cash';
+            const val = parseFloat(r.querySelector('.pag-amount-input')?.value) || 0;
+            if (forma && val > 0) {
+                metodos.push({ forma, valor: val });
+                totalPaid += val;
+            }
+        });
+
+        totalPaid = Math.round(totalPaid * 100) / 100;
+        const isPartial = (currentTotalDue - totalPaid) > 0.009;
+
+        return {
+            metodos_pagamento: metodos,
+            valor_pago: totalPaid,
+            is_partial: isPartial,
+            saldo_restante: Math.max(0, Math.round((currentTotalDue - totalPaid) * 100) / 100)
+        };
+    }
+
+    return {
+        open,
+        addRow,
+        recalculate,
+        getPayload
+    };
+}
+

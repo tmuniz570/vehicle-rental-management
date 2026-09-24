@@ -180,9 +180,19 @@
                 <span>Payment Date:</span>
                 <span>{{ transacao.data_pagamento.strftime('%d/%m/%Y %H:%M') if transacao.data_pagamento else '-' }}</span>
             </div>
-            <div class="receipt-row">
+            <div class="receipt-row" style="align-items: flex-start;">
                 <span>Payment Method:</span>
-                <span>{{ transacao.forma_pagamento or 'Not specified' }}</span>
+                <div style="text-align: right;">
+                    {% if detalhes_pagamento and detalhes_pagamento|length > 1 %}
+                        {% for m in detalhes_pagamento %}
+                            <div style="font-size: 0.9rem; color: #1e293b; margin-bottom: 2px;">
+                                <strong style="color: #475569;">{{ m.forma }}:</strong> £{{ "%.2f"|format(m.valor) }}
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <span>{{ transacao.forma_pagamento or 'Not specified' }}</span>
+                    {% endif %}
+                </div>
             </div>
 
             <div class="receipt-total">

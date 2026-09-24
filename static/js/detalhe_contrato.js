@@ -1231,6 +1231,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // Pay Modal Logic
+            let splitPaymentMgrContract = null;
+
             document.querySelectorAll('.btn-pagar').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const b = e.target.closest('button');
@@ -1238,9 +1240,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const tipo = b.getAttribute('data-tipo');
                     const valor = parseFloat(b.getAttribute('data-valor')) || 0;
 
+                    if (!splitPaymentMgrContract) {
+                        splitPaymentMgrContract = createSplitPaymentManager({ btnSubmitId: 'btnSubmitPag', formatoMoeda });
+                        window._splitPaymentMgrContract = splitPaymentMgrContract;
+                    }
+
                     document.getElementById('pag_cobranca_id').value = cobId;
-                    document.getElementById('pag_desc_tipo').textContent = tipo;
+                    document.getElementById('pag_desc_tipo').textContent = formatarDescricaoTransacao(tipo);
                     document.getElementById('pag_desc_valor').textContent = formatoMoeda.format(valor);
+                    
+                    splitPaymentMgrContract.open(valor, 'Cash');
                     abrirModal('pagamentoModal');
                 });
             });
@@ -1605,9 +1614,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('pagamentoForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
             const cobId = document.getElementById('pag_cobranca_id').value;
-            const forma = document.getElementById('pag_forma').value;
             const btn = document.getElementById('btnSubmitPag');
             
+            const mgr = window._splitPaymentMgrContract || createSplitPaymentManager({ btnSubmitId: 'btnSubmitPag', formatoMoeda });
+            const payload = mgr.getPayload();
+            if (payload.valor_pago <= 0) {
+                alert('Please enter a valid payment amount greater than zero.');
+                return;
+            }
+
             btn.disabled = true;
             btn.textContent = 'Processing...';
 
@@ -1615,7 +1630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const res = await fetch(`/api/financeiro/pagar/${cobId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ forma_pagamento: forma })
+                    body: JSON.stringify(payload)
                 });
                 if (res.ok) {
                     location.reload();
@@ -1627,7 +1642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Connection error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Confirm Payment';
+                mgr.recalculate();
             }
         });
 

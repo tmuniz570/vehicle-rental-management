@@ -270,7 +270,9 @@ class FinancialTransaction(db.Model):
     data_pagamento = db.Column(db.DateTime, nullable=True, index=True)
     valor = db.Column(db.Numeric(10, 2), nullable=False)
     status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False, index=True)
-    forma_pagamento = db.Column(db.String(50), nullable=True)
+    forma_pagamento = db.Column(db.String(255), nullable=True)
+    detalhes_pagamento_json = db.Column(db.Text, nullable=True)
+    id_transacao_origem = db.Column(db.Integer, nullable=True)
     registrado_por_nome = db.Column(db.String(100), nullable=True)
 
     __table_args__ = (
@@ -487,6 +489,18 @@ def init_db(app):
                     if 'registrado_por_nome' not in cols_t:
                         conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN registrado_por_nome VARCHAR(100)"))
                         conn.commit()
+                    if 'detalhes_pagamento_json' not in cols_t:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN detalhes_pagamento_json TEXT"))
+                        conn.commit()
+                    if 'id_transacao_origem' not in cols_t:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN id_transacao_origem INTEGER"))
+                        conn.commit()
+                    if db.engine.dialect.name == 'postgresql':
+                        try:
+                            conn.execute(db.text("ALTER TABLE financeiro_transacoes ALTER COLUMN forma_pagamento TYPE VARCHAR(255);"))
+                            conn.commit()
+                        except Exception as e_pg_forma:
+                            print(f"[DB Auto-Migration] Postgres alter forma_pagamento info: {e_pg_forma}")
 
                 # Motos
                 if 'motos' in existing_tables:

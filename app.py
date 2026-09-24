@@ -2829,6 +2829,8 @@ def detalhe_contrato(id):
             'valor': float(t.valor),
             'status': t.status,
             'forma_pagamento': t.forma_pagamento,
+            'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
+            'id_transacao_origem': t.id_transacao_origem,
             'registrado_por_nome': t.registrado_por_nome or '',
             'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
             'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None
@@ -2890,26 +2892,10 @@ def criar_cobranca(id):
 
     return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
 
-@app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT'])
+@app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT', 'POST'])
 @alugueis_required
 def pagar_cobranca(id):
-    t = db.session.get(FinancialTransaction, id)
-    if not t:
-        return jsonify({'error': 'Charge not found', 'erro': 'Cobrança não encontrada'}), 404
-        
-    forma_pagamento = request.json.get('forma_pagamento')
-    if not forma_pagamento:
-        return jsonify({'error': 'Payment method is required', 'erro': 'Forma de pagamento é obrigatória'}), 400
-        
-    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    t.status = TransactionStatus.PAID.value
-    t.data_pagamento = get_local_now()
-    t.forma_pagamento = forma_pagamento
-    t.registrado_por_nome = operador_atual
-    
-    db.session.commit()
-    registrar_log('PAYMENT_RECEIVED', 'Transaction', t.id, f"Baixa de £{float(t.valor):.2f} ({t.tipo}) confirmada via {forma_pagamento} por {operador_atual} no Contrato #{t.id_contrato}")
-    return jsonify({'message': 'Payment marked successfully', 'mensagem': 'Baixa realizada com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
+    return pagar_transacao(id)
 
 @app.route('/api/vistorias', methods=['POST'])
 @alugueis_required
@@ -3210,6 +3196,8 @@ def listar_financeiro():
         'valor': float(t.valor),
         'status': t.status,
         'forma_pagamento': t.forma_pagamento or '',
+        'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
+        'id_transacao_origem': t.id_transacao_origem,
         'registrado_por_nome': t.registrado_por_nome or '',
         'placa': t.contrato.placa if t.contrato else '',
         'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else ''
@@ -3229,33 +3217,129 @@ def pagar_transacao(id):
     if not t:
         return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
         
-    forma = 'Cash'
-    if request.is_json and request.json:
-        forma = request.json.get('forma_pagamento', 'Cash')
-    elif request.form and 'forma_pagamento' in request.form:
-        forma = request.form.get('forma_pagamento', 'Cash')
-        
+    if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+        return jsonify({'error': 'Transaction is already paid', 'erro': 'Esta transação já está paga'}), 400
+
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    valor_devido = round(float(t.valor), 2)
+    
+    # Process payment payload (supports split payment methods list and single method fallback)
+    data = {}
+    if request.is_json and request.json:
+        data = request.json
+    elif request.form:
+        data = request.form.to_dict()
+
+    metodos_brutos = data.get('metodos_pagamento')
+    metodos_validos = []
+    
+    if metodos_brutos is not None and isinstance(metodos_brutos, list):
+        for item in metodos_brutos:
+            if not isinstance(item, dict):
+                continue
+            forma = str(item.get('forma') or '').strip()
+            try:
+                v = round(float(item.get('valor', 0)), 2)
+            except (ValueError, TypeError):
+                v = 0.0
+            if forma and v > 0:
+                metodos_validos.append({'forma': forma, 'valor': v})
+    elif 'forma_pagamento' in data or 'forma' in data:
+        forma = str(data.get('forma_pagamento') or data.get('forma') or 'Cash').strip()
+        try:
+            v = round(float(data.get('valor_pago', valor_devido)), 2)
+        except (ValueError, TypeError):
+            v = valor_devido
+        if forma and v > 0:
+            metodos_validos.append({'forma': forma, 'valor': v})
+    else:
+        metodos_validos = [{'forma': 'Cash', 'valor': valor_devido}]
+
+    valor_pago = round(sum(m['valor'] for m in metodos_validos), 2)
+
+    if valor_pago <= 0:
+        return jsonify({'error': 'Payment amount must be greater than zero', 'erro': 'O valor pago deve ser maior que zero'}), 400
+
+    if valor_pago > valor_devido + 0.009:
+        return jsonify({
+            'error': f'Payment amount (£{valor_pago:.2f}) cannot exceed the amount due (£{valor_devido:.2f})',
+            'erro': f'O valor pago (£{valor_pago:.2f}) não pode exceder o valor devido (£{valor_devido:.2f})'
+        }), 400
+
+    saldo_restante = round(valor_devido - valor_pago, 2)
+    is_parcial = saldo_restante > 0.009
+
+    # Generate consolidated forma_pagamento string
+    if len(metodos_validos) == 1:
+        forma_pagamento_consolidada = metodos_validos[0]['forma']
+    else:
+        forma_pagamento_consolidada = " + ".join([f"{m['forma']} (£{m['valor']:.2f})" for m in metodos_validos])
+
+    detalhes_json = json.dumps(metodos_validos)
+
+    # 1. Update current transaction as PAID
+    t.valor = valor_pago
     t.status = TransactionStatus.PAID.value
     t.data_pagamento = get_local_now()
-    t.forma_pagamento = forma
+    t.forma_pagamento = forma_pagamento_consolidada
+    t.detalhes_pagamento_json = detalhes_json
     t.registrado_por_nome = operador_atual
 
-    # Auto-conclusão para contratos de venda quando todas as transações forem quitadas
-    if t.contrato and t.contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
-        contrato_venda = t.contrato
-        transacoes_pendentes = FinancialTransaction.query.filter(
-            FinancialTransaction.id_contrato == contrato_venda.id,
-            FinancialTransaction.id != t.id,
-            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
-        ).count()
-        if transacoes_pendentes == 0 and contrato_venda.status != ContractStatus.COMPLETED.value:
-            contrato_venda.status = ContractStatus.COMPLETED.value
-            registrar_log('CONTRACT_COMPLETED', 'Contract', contrato_venda.id, f"Contrato de venda #{contrato_venda.id} ({contrato_venda.tipo_contrato}) concluído com sucesso após quitação integral.")
+    # 2. If partial payment, generate child transaction for the remaining balance
+    t_restante = None
+    if is_parcial:
+        t_restante = FinancialTransaction(
+            id_contrato=t.id_contrato,
+            tipo=t.tipo,
+            data_vencimento=t.data_vencimento,
+            valor=saldo_restante,
+            status=TransactionStatus.PENDING.value,
+            forma_pagamento=None,
+            detalhes_pagamento_json=None,
+            registrado_por_nome=operador_atual,
+            id_transacao_origem=t.id
+        )
+        db.session.add(t_restante)
+        db.session.flush()
+
+        registrar_log(
+            'PAYMENT_RECEIVED', 
+            'Transaction', 
+            t.id, 
+            f"Baixa PARCIAL de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}. Saldo restante de £{saldo_restante:.2f} lançado na transação #{t_restante.id}."
+        )
+    else:
+        registrar_log(
+            'PAYMENT_RECEIVED', 
+            'Transaction', 
+            t.id, 
+            f"Baixa de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}"
+        )
+
+        # Auto-conclusão para contratos de venda quando todas as transações forem quitadas
+        if t.contrato and t.contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+            contrato_venda = t.contrato
+            transacoes_pendentes = FinancialTransaction.query.filter(
+                FinancialTransaction.id_contrato == contrato_venda.id,
+                FinancialTransaction.id != t.id,
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
+            ).count()
+            if transacoes_pendentes == 0 and contrato_venda.status != ContractStatus.COMPLETED.value:
+                contrato_venda.status = ContractStatus.COMPLETED.value
+                registrar_log('CONTRACT_COMPLETED', 'Contract', contrato_venda.id, f"Contrato de venda #{contrato_venda.id} ({contrato_venda.tipo_contrato}) concluído com sucesso após quitação integral.")
 
     db.session.commit()
-    registrar_log('PAYMENT_RECEIVED', 'Transaction', t.id, f"Baixa de £{float(t.valor):.2f} ({t.tipo}) confirmada via {forma} por {operador_atual} no Contrato #{t.id_contrato}")
-    return jsonify({'message': 'Transaction marked as paid successfully', 'mensagem': 'Transação paga com sucesso', 'forma_pagamento': t.forma_pagamento, 'registrado_por_nome': t.registrado_por_nome}), 200
+
+    return jsonify({
+        'message': 'Payment marked successfully' if not is_parcial else 'Partial payment recorded successfully',
+        'mensagem': 'Baixa realizada com sucesso' if not is_parcial else 'Pagamento parcial registrado com sucesso',
+        'forma_pagamento': t.forma_pagamento,
+        'valor_pago': valor_pago,
+        'saldo_restante': saldo_restante,
+        'is_partial': is_parcial,
+        'id_restante': t_restante.id if t_restante else None,
+        'registrado_por_nome': t.registrado_por_nome
+    }), 200
 
 @app.route('/api/financeiro/<int:id>/reverter', methods=['POST', 'PUT'])
 @app.route('/api/financeiro/reverter/<int:id>', methods=['POST', 'PUT'])
@@ -3271,12 +3355,31 @@ def reverter_pagamento(id):
         
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     forma_anterior = t.forma_pagamento or 'N/A'
+    valor_anterior = float(t.valor)
     data_anterior = t.data_pagamento.strftime('%d/%m/%Y %H:%M') if t.data_pagamento else 'N/A'
     
+    # Se gerou um saldo restante que ainda está pendente, reintegra o saldo e remove a filha
+    filha_pendente = FinancialTransaction.query.filter_by(
+        id_transacao_origem=t.id, 
+        status=TransactionStatus.PENDING.value
+    ).first()
+    
+    if filha_pendente:
+        valor_restante = float(filha_pendente.valor)
+        t.valor = round(valor_anterior + valor_restante, 2)
+        db.session.delete(filha_pendente)
+        registrar_log(
+            'TRANSACTION_MERGED',
+            'Transaction',
+            t.id,
+            f"Saldo restante de £{valor_restante:.2f} (Transação #{filha_pendente.id}) foi reintegrado à Transação #{t.id} devido a estorno."
+        )
+
     # Revert to PENDING
     t.status = TransactionStatus.PENDING.value
     t.data_pagamento = None
     t.forma_pagamento = None
+    t.detalhes_pagamento_json = None
     t.registrado_por_nome = None
 
     # Se o contrato era de venda e estava Completed, reabre para Active
@@ -3297,7 +3400,8 @@ def reverter_pagamento(id):
     return jsonify({
         'message': 'Payment cancelled and reverted to Pending successfully', 
         'mensagem': 'Pagamento cancelado e revertido para Pendente com sucesso',
-        'status': t.status
+        'status': t.status,
+        'valor': float(t.valor)
     }), 200
 
 def obter_descricao_recibo(t, contrato=None):
@@ -3306,10 +3410,11 @@ def obter_descricao_recibo(t, contrato=None):
     tipo = str(t.tipo or '').strip()
     tipo_lower = tipo.lower()
     
+    desc = ""
     if tipo_lower in ['sale_full', 'venda_vista']:
-        return "Vehicle Sale - Full Payment"
+        desc = "Vehicle Sale - Full Payment"
     elif tipo_lower in ['sale_deposit', 'venda_entrada']:
-        return "Vehicle Sale - Down Payment (Deposit)"
+        desc = "Vehicle Sale - Down Payment (Deposit)"
     elif tipo_lower in ['sale_installment', 'venda_parcela']:
         if t.id_contrato:
             try:
@@ -3320,24 +3425,31 @@ def obter_descricao_recibo(t, contrato=None):
                 total = len(parcelas)
                 for idx, p in enumerate(parcelas, 1):
                     if p.id == t.id:
-                        return f"Vehicle Sale - Instalment {idx} of {total}"
+                        desc = f"Vehicle Sale - Instalment {idx} of {total}"
+                        break
             except Exception:
                 pass
-        return "Vehicle Sale - Instalment Payment"
+        if not desc:
+            desc = "Vehicle Sale - Instalment Payment"
     elif tipo_lower in ['rent', 'aluguel']:
-        return "Vehicle Rental Payment"
+        desc = "Vehicle Rental Payment"
     elif tipo_lower in ['deposit', 'deposito']:
-        return "Rental Security Deposit (Refundable)"
+        desc = "Rental Security Deposit (Refundable)"
     elif tipo_lower in ['deposit_refund', 'devolucao_deposito']:
-        return "Security Deposit Refund"
+        desc = "Security Deposit Refund"
     elif tipo_lower in ['fine', 'multa']:
-        return "Traffic / Penalty Charge Notice (PCN)"
+        desc = "Traffic / Penalty Charge Notice (PCN)"
     elif tipo_lower in ['damage', 'dano']:
-        return "Vehicle Damage Repair Charge"
+        desc = "Vehicle Damage Repair Charge"
     elif tipo_lower in ['other', 'outro']:
-        return "Additional Charge"
+        desc = "Additional Charge"
+    else:
+        desc = tipo.replace('_', ' ').title()
+
+    if getattr(t, 'id_transacao_origem', None):
+        desc += " (Remaining Balance)"
     
-    return tipo.replace('_', ' ').title()
+    return desc
 
 def obter_descricao_recibo_simples(tipo):
     tipo_lower = (tipo or '').strip().lower()
@@ -3370,7 +3482,8 @@ def pagina_recibo(id):
     contrato = db.session.get(Contract, t.id_contrato) if t.id_contrato else None
     cliente = db.session.get(Client, contrato.id_cliente) if (contrato and contrato.id_cliente) else None
     descricao = obter_descricao_recibo(t, contrato)
-    return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente, descricao=descricao)
+    detalhes_pagamento = json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None
+    return render_template('recibo.html', transacao=t, contrato=contrato, cliente=cliente, descricao=descricao, detalhes_pagamento=detalhes_pagamento)
 
 @app.route('/api/financeiro/<int:id>', methods=['DELETE'])
 @alugueis_required
