@@ -70,6 +70,11 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - Dedicated print templates for rental agreements and vehicle sales agreements with fixed seller authorization signature, instalment schedule tables, UK vehicle history categorization (`Clear`, `Cat N`), and strict zero-blank-page pagination across iOS Safari (AirPrint) and desktop browsers.
   - Clause 4.12 Telematics/GPS tracking consent incorporated into rental and sales print agreements.
 * **Smart Insurance Compliance & Exemption:** 15-day recurring government database verification (askMID) for active rentals, with automatic exemption for sold vehicles while preserving the collected insurance policy on file.
+* **Pre-Delivery Compliance & Physical Release Checklist:**
+  - Contracts can be completed immediately in `/contratos/novo` without mandatory photos or insurance documents, allowing operators to formalize deals while motorcycles are still being accessorised or customer insurance policies are being finalized.
+  - Strict physical vehicle release safeguards: contracts with pending check-out inspections or insurance certificates display an urgent amber warning banner with 1-click action shortcuts (`Record Check-out Inspection`, `Upload Insurance Document`).
+  - Contracts table features dedicated status badges (`⚠️ Needs Insp + Ins`, `⚠️ Needs Insp`, `⚠️ Needs Ins`) and a quick filter (`⚠️ Pre-Delivery Pending`).
+  - Executive dashboard raises an alert highlighting all motorbikes on the premises awaiting pre-delivery checklist completion.
 * **Protection Against Incompatible Operations:** Sold motorbikes are automatically protected against rental return inspections (`Check-in`) and excluded from recurring rental billing batches, while allowing warranty and damage logs (`Incident`).
 * **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.
 
