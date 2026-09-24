@@ -66,7 +66,9 @@ async function carregarMotos() {
             const milhagemFormatada = Number(m.milhagem_atual || 0).toLocaleString('en-GB') + ' mi';
             
             const motBadge = formatExpiryBadge(m.vencimento_mot);
-            const taxBadge = formatExpiryBadge(m.vencimento_tax);
+            const taxBadge = m.tax_sorn
+                ? `<span class="badge" style="background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.35); font-weight: 700; font-size: 0.78rem;" title="Statutory Off Road Notification (SORN)">🛡️ SORN</span>`
+                : formatExpiryBadge(m.vencimento_tax);
 
             // V5C and Tracker Badges
             const v5cCount = m.v5c_count || 0;
@@ -87,7 +89,7 @@ async function carregarMotos() {
                 <td>${escapeHtml(m.modelo)}</td>
                 <td>${escapeHtml(m.cor)}</td>
                 <td data-sort="${m.milhagem_atual || 0}" style="font-weight: 600; color: #f8fafc;"><span style="color: var(--accent); font-weight:700;">${milhagemFormatada}</span></td>
-                <td data-sort="${m.vencimento_tax || ''}" class="nowrap">${taxBadge}</td>
+                <td data-sort="${m.tax_sorn ? 'SORN' : (m.vencimento_tax || '')}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${m.vencimento_mot || ''}" class="nowrap">${motBadge}</td>
                 <td class="nowrap">
                     <div style="display: inline-flex; gap: 6px; align-items: center; min-height: 36px;">

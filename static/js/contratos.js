@@ -77,6 +77,16 @@ async function carregarContratos() {
             } else {
                 statusBadge = `<span class="badge">${escapeHtml(c.status)}</span>`;
             }
+
+            // Pre-delivery compliance reminder (Missing checkout inspection and/or insurance)
+            let pendingWarningBadge = '';
+            if (c.pendente_liberacao) {
+                let tags = [];
+                if (!c.tem_vistoria_checkout) tags.push('Insp');
+                if (!c.tem_seguro) tags.push('Ins');
+                const tagStr = tags.length > 0 ? tags.join(' + ') : 'Pending';
+                pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Motorbike cannot be released until check-out photos and insurance certificate are registered">⚠️ Needs ${escapeHtml(tagStr)}</span></div>`;
+            }
             
             const nomeCliente = escapeHtml(c.cliente_nome || '-');
             const placa = escapeHtml(c.placa || '-');
@@ -90,7 +100,7 @@ async function carregarContratos() {
                 <td>${dataRetirada}</td>
                 <td>${dueTerms}</td>
                 <td>${amountText}</td>
-                <td>${statusBadge}</td>
+                <td>${statusBadge}${pendingWarningBadge}</td>
                 <td>
                     <a href="/contratos/${c.id}" class="btn-primary" style="padding: 6px 12px; display:inline-flex; align-items:center; justify-content:center; text-decoration:none; font-size:0.8rem; font-weight:500; border-radius:6px; white-space: nowrap;">View Details</a>
                 </td>
@@ -127,6 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (paramStatus && filterStatus) {
         if (paramStatus.toLowerCase() === 'deposit_hold' || paramStatus.toLowerCase() === 'quarentena') {
             filterStatus.value = 'Deposit_Hold';
+        } else if (paramStatus.toLowerCase() === 'pending_release' || paramStatus.toLowerCase() === 'pre-delivery' || paramStatus.toLowerCase() === 'pendente_liberacao') {
+            filterStatus.value = 'pending_release';
         } else if (paramStatus.toLowerCase() === 'active') {
             filterStatus.value = 'Active';
         } else if (paramStatus.toLowerCase() === 'completed') {

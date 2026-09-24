@@ -1551,8 +1551,9 @@ def criar_moto():
         except ValueError:
             pass
 
+    tax_sorn = bool(dados.get('tax_sorn', False))
     vencimento_tax = None
-    if dados.get('vencimento_tax'):
+    if not tax_sorn and dados.get('vencimento_tax'):
         try:
             vencimento_tax = datetime.strptime(dados['vencimento_tax'], "%Y-%m-%d").date()
         except ValueError:
@@ -1565,7 +1566,8 @@ def criar_moto():
         status=dados.get('status', MotoStatus.AVAILABLE.value),
         milhagem_atual=int(dados.get('milhagem_atual') or 0),
         vencimento_mot=vencimento_mot,
-        vencimento_tax=vencimento_tax
+        vencimento_tax=vencimento_tax,
+        tax_sorn=tax_sorn
     )
     db.session.add(nova_moto)
     db.session.commit()
@@ -1711,13 +1713,16 @@ def listar_motos():
         search_clean = search.strip().replace(' ', '')
         search_term = f"%{search.strip()}%"
         search_plate_term = f"%{search_clean}%"
-        query = query.filter(db.or_(
+        search_filters = [
             Motorcycle.placa.ilike(search_plate_term),
             Motorcycle.placa.ilike(search_term),
             Motorcycle.modelo.ilike(search_term),
             Motorcycle.cor.ilike(search_term),
             Motorcycle.status.ilike(search_term)
-        ))
+        ]
+        if search.strip().lower() == 'sorn':
+            search_filters.append(Motorcycle.tax_sorn == True)
+        query = query.filter(db.or_(*search_filters))
         
     sort_map = {
         'placa': Motorcycle.placa,
@@ -1747,6 +1752,7 @@ def listar_motos():
         'milhagem_atual': int(m.milhagem_atual or 0),
         'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
         'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None,
+        'tax_sorn': bool(getattr(m, 'tax_sorn', False)),
         'v5c_count': len(m.v5c_arquivos) if m.v5c_arquivos else 0,
         'trackers_count': len(m.trackers) if m.trackers else 0,
         'trackers_summary': [{
@@ -1790,7 +1796,12 @@ def atualizar_moto(placa):
         else:
             moto.vencimento_mot = None
             
-    if 'vencimento_tax' in dados:
+    if 'tax_sorn' in dados:
+        moto.tax_sorn = bool(dados['tax_sorn'])
+        if moto.tax_sorn:
+            moto.vencimento_tax = None
+
+    if not getattr(moto, 'tax_sorn', False) and 'vencimento_tax' in dados:
         if dados['vencimento_tax']:
             try:
                 moto.vencimento_tax = datetime.strptime(dados['vencimento_tax'], "%Y-%m-%d").date()
@@ -1827,6 +1838,7 @@ def detalhes_moto(placa):
         'milhagem_atual': int(moto.milhagem_atual or 0),
         'vencimento_mot': moto.vencimento_mot.strftime('%Y-%m-%d') if moto.vencimento_mot else None,
         'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if moto.vencimento_tax else None,
+        'tax_sorn': bool(getattr(moto, 'tax_sorn', False)),
         'v5c_arquivos': [{
             'id': v.id,
             'url_arquivo': v.url_arquivo,
@@ -2037,8 +2049,8 @@ def remover_tracker_moto(placa, tracker_id):
 @app.route('/api/contratos', methods=['POST'])
 @alugueis_required
 def criar_contrato():
-    id_cliente = request.form.get('id_cliente')
-    placa = request.form.get('placa')
+    id_cliente = request.form.get('id_cliente') or request.form.get('cliente_id')
+    placa = request.form.get('placa') or request.form.get('moto_placa')
     tipo_contrato = request.form.get('tipo_contrato', ContractType.RENT.value)
     if tipo_contrato not in [ContractType.RENT.value, ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]:
         tipo_contrato = ContractType.RENT.value
@@ -2076,23 +2088,17 @@ def criar_contrato():
         except Exception:
             cronograma_parcelas = []
     
-    if 'fotos' not in request.files:
-        return jsonify({'error': 'Initial check-out inspection photos are required', 'erro': 'A vistoria de saída (foto) é obrigatória'}), 400
-        
-    fotos = request.files.getlist('fotos')
-    if not fotos or fotos[0].filename == '':
-        return jsonify({'error': 'No photos selected for inspection', 'erro': 'Nenhuma foto selecionada'}), 400
-        
-    if 'seguro' not in request.files:
-        return jsonify({'error': 'Insurance certificate document is required to open a contract', 'erro': 'O arquivo do Seguro é obrigatório para abrir um contrato'}), 400
-        
-    # Security: Validate upload file extensions for photos and insurance
+    fotos = request.files.getlist('fotos') if 'fotos' in request.files else []
+    # Filter empty file objects
+    fotos = [f for f in fotos if f and f.filename]
+
+    # Security: Validate upload file extensions for photos and insurance if provided
     for f in fotos:
         if f.filename and not is_allowed_file(f.filename):
             return jsonify({'error': 'Invalid inspection photo format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de foto inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
             
-    arq_seguro_check = request.files['seguro']
-    if arq_seguro_check.filename and not is_allowed_file(arq_seguro_check.filename):
+    arq_seguro_check = request.files.get('seguro')
+    if arq_seguro_check and arq_seguro_check.filename and not is_allowed_file(arq_seguro_check.filename):
         return jsonify({'error': 'Invalid insurance document format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de documento de seguro inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
 
     cliente = db.session.get(Client, id_cliente)
@@ -2107,7 +2113,7 @@ def criar_contrato():
     urls_fotos = []
     timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
     for i, foto in enumerate(fotos):
-        if foto.filename:
+        if foto and foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
             nome_arquivo = f"{timestamp}_{i}_{filename}"
             nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
@@ -2115,10 +2121,10 @@ def criar_contrato():
             
     url_foto_str = ",".join(urls_fotos)
     
-    # Save insurance document
+    # Save insurance document if provided
     url_seguro = None
-    arq_seguro = request.files['seguro']
-    if arq_seguro.filename:
+    arq_seguro = request.files.get('seguro')
+    if arq_seguro and arq_seguro.filename:
         filename_seguro = werkzeug.utils.secure_filename(arq_seguro.filename)
         nome_seguro = f"{timestamp}_seguro_{filename_seguro}"
         nome_salvo = salvar_arquivo_otimizado(arq_seguro, nome_seguro)
@@ -2150,9 +2156,9 @@ def criar_contrato():
         status=ContractStatus.ACTIVE.value,
         criado_por_nome=operador_atual,
         milhagem_inicial=milhagem_inicial,
-        data_ultima_checagem_seguro=get_local_now().date(),
-        status_seguro='Valid',
-        seguro_verificado_por=operador_atual,
+        data_ultima_checagem_seguro=get_local_now().date() if url_seguro else None,
+        status_seguro='Valid' if url_seguro else 'Pending',
+        seguro_verificado_por=operador_atual if url_seguro else None,
         # Immutable Snapshot of Customer at creation time
         cliente_nome=cliente.nome,
         cliente_telefone=cliente.telefone,
@@ -2262,33 +2268,39 @@ def criar_contrato():
             )
             db.session.add(tx_parcela)
     
-    # Create Check-out Inspection with mileage
-    nova_vistoria = Inspection(
-        id_contrato=novo_contrato.id,
-        tipo=InspectionType.CHECK_OUT.value,
-        milhagem=milhagem_inicial,
-        observacoes=observacoes,
-        url_fotos=url_foto_str,
-        realizado_por_nome=operador_atual
-    )
-    db.session.add(nova_vistoria)
+    # Create Check-out Inspection with mileage only if photos were provided
+    if urls_fotos:
+        nova_vistoria = Inspection(
+            id_contrato=novo_contrato.id,
+            tipo=InspectionType.CHECK_OUT.value,
+            milhagem=milhagem_inicial,
+            observacoes=observacoes,
+            url_fotos=url_foto_str,
+            realizado_por_nome=operador_atual
+        )
+        db.session.add(nova_vistoria)
     
     db.session.commit()
     
+    insp_obs = " (Vistoria de saída realizada)" if urls_fotos else " (Aguardando vistoria de saída antes da liberação)"
+    seg_obs = " (Seguro anexado)" if url_seguro else " (Aguardando apólice de seguro antes da liberação)"
+
     if tipo_contrato == ContractType.RENT.value:
-        detalhes_log = f"Contrato de Aluguel #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Milhagem: {milhagem_inicial} mi, Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f})"
+        detalhes_log = f"Contrato de Aluguel #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Milhagem: {milhagem_inicial} mi, Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f}){insp_obs}{seg_obs}"
     elif tipo_contrato == ContractType.SALE_FULL.value:
-        detalhes_log = f"Contrato de Venda à Vista #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Preço: £{valor_total_venda:.2f}, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold)."
+        detalhes_log = f"Contrato de Venda à Vista #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Preço: £{valor_total_venda:.2f}, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold).{insp_obs}{seg_obs}"
     else:
-        detalhes_log = f"Contrato de Venda Parcelada #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Total: £{valor_total_venda:.2f}, Entrada: £{valor_entrada:.2f}, Saldo: £{saldo_devedor:.2f}, {len(cronograma_parcelas)} parcelas, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold)."
+        detalhes_log = f"Contrato de Venda Parcelada #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Total: £{valor_total_venda:.2f}, Entrada: £{valor_entrada:.2f}, Saldo: £{saldo_devedor:.2f}, {len(cronograma_parcelas)} parcelas, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold).{insp_obs}{seg_obs}"
 
     registrar_log('CREATE_CONTRACT', 'Contract', novo_contrato.id, detalhes_log)
     
     return jsonify({
-        'message': 'Contract and initial inspection created successfully', 
-        'mensagem': 'Contrato e vistoria criados com sucesso', 
+        'message': 'Contract registered successfully', 
+        'mensagem': 'Contrato registrado com sucesso', 
         'id': novo_contrato.id,
-        'tipo_contrato': tipo_contrato
+        'tipo_contrato': tipo_contrato,
+        'has_inspection': bool(urls_fotos),
+        'has_insurance': bool(url_seguro)
     }), 201
 
 @app.route('/api/contratos/<int:id>/seguro', methods=['PUT'])
@@ -2298,8 +2310,9 @@ def atualizar_seguro_contrato(id):
     if not contrato:
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
-    if 'seguro' in request.files:
-        f = request.files['seguro']
+    file_key = 'seguro' if 'seguro' in request.files else ('arquivo' if 'arquivo' in request.files else None)
+    if file_key:
+        f = request.files[file_key]
         if f.filename:
             if not is_allowed_file(f.filename):
                 return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
@@ -2577,7 +2590,7 @@ def listar_contratos():
     sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
-    query = Contract.query.join(Client, Contract.id_cliente == Client.id)
+    query = Contract.query.options(selectinload(Contract.vistorias)).join(Client, Contract.id_cliente == Client.id)
     if search:
         search_clean = search.strip().replace(' ', '')
         search_term = f"%{search.strip()}%"
@@ -2601,7 +2614,17 @@ def listar_contratos():
         
     status_filter = request.args.get('status', '', type=str)
     if status_filter:
-        if status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
+        if status_filter.lower() in ['pending_release', 'pendente_liberacao', 'pre-delivery']:
+            # Active contracts with no insurance or no check-out inspection
+            checkout_subq = db.session.query(Inspection.id).filter(
+                Inspection.id_contrato == Contract.id,
+                Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
+            ).exists()
+            query = query.filter(
+                Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+                db.or_(Contract.url_seguro == None, ~checkout_subq)
+            )
+        elif status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
             query = query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']))
         elif status_filter.lower() in ['active', 'ativo']:
             query = query.filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
@@ -2642,23 +2665,32 @@ def listar_contratos():
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
     paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
-    itens = [{
-        'id': c.id, 
-        'id_cliente': c.id_cliente, 
-        'cliente_nome': c.cliente_nome or (c.cliente.nome if c.cliente else 'Customer'), 
-        'placa': c.moto_placa or c.placa,
-        'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
-        'categoria_historico': c.categoria_historico,
-        'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
-        'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
-        'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
-        'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
-        'dia_pagamento_semanal': c.dia_pagamento_semanal,
-        'valor_aluguel_semanal': c.valor_aluguel_semanal,
-        'data_devolucao': c.data_devolucao.isoformat() if c.data_devolucao else None,
-        'status': c.status,
-        'url_seguro': c.url_seguro
-    } for c in paginated.items]
+    itens = []
+    for c in paginated.items:
+        tem_checkout = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in (c.vistorias or []))
+        tem_seguro = bool(c.url_seguro)
+        is_active = (c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
+        pendente_liberacao = is_active and (not tem_checkout or not tem_seguro)
+        itens.append({
+            'id': c.id, 
+            'id_cliente': c.id_cliente, 
+            'cliente_nome': c.cliente_nome or (c.cliente.nome if c.cliente else 'Customer'), 
+            'placa': c.moto_placa or c.placa,
+            'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
+            'categoria_historico': c.categoria_historico,
+            'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
+            'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
+            'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
+            'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
+            'dia_pagamento_semanal': c.dia_pagamento_semanal,
+            'valor_aluguel_semanal': c.valor_aluguel_semanal,
+            'data_devolucao': c.data_devolucao.isoformat() if c.data_devolucao else None,
+            'status': c.status,
+            'url_seguro': c.url_seguro,
+            'tem_vistoria_checkout': tem_checkout,
+            'tem_seguro': tem_seguro,
+            'pendente_liberacao': pendente_liberacao
+        })
     
     return jsonify({
         'itens': itens,
@@ -2686,6 +2718,10 @@ def detalhe_contrato(id):
     
     transacoes = FinancialTransaction.query.filter_by(id_contrato=id).all()
     vistorias = Inspection.query.filter_by(id_contrato=id).all()
+    has_checkout_inspection = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in vistorias)
+    has_insurance_doc = bool(c.url_seguro)
+    is_active = (c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
+    is_pre_release_pending = is_active and (not has_checkout_inspection or not has_insurance_doc)
     
     # Contabilidade do Depósito (Depósito Inicial - Deduções de multas/danos pagos com depósito)
     deposito_pago = 0.0
@@ -2798,6 +2834,7 @@ def detalhe_contrato(id):
         } for a in (c.anexos or [])],
         'vencimento_mot': moto.vencimento_mot.strftime('%Y-%m-%d') if (moto and moto.vencimento_mot) else None,
         'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if (moto and moto.vencimento_tax) else None,
+        'tax_sorn': bool(getattr(moto, 'tax_sorn', False)) if moto else False,
         'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
         'data_devolucao': c.data_devolucao.isoformat() if c.data_devolucao else None,
         'dia_pagamento_semanal': c.dia_pagamento_semanal,
@@ -2805,6 +2842,9 @@ def detalhe_contrato(id):
         'status': c.status,
         'is_completed': is_completed,
         'url_seguro': c.url_seguro,
+        'has_checkout_inspection': has_checkout_inspection,
+        'has_insurance_doc': has_insurance_doc,
+        'is_pre_release_pending': is_pre_release_pending,
         'url_comprovante_deposito': c.url_comprovante_deposito,
         'criado_por_nome': c.criado_por_nome or '',
         'data_ultima_checagem_seguro': c.data_ultima_checagem_seguro.strftime('%Y-%m-%d') if c.data_ultima_checagem_seguro else (c.data_retirada.strftime('%Y-%m-%d') if c.data_retirada else None),
@@ -2900,7 +2940,7 @@ def pagar_cobranca(id):
 @app.route('/api/vistorias', methods=['POST'])
 @alugueis_required
 def criar_vistoria():
-    id_contrato = request.form.get('id_contrato')
+    id_contrato = request.form.get('id_contrato') or request.form.get('contrato_id')
     tipo = request.form.get('tipo')
     observacoes = request.form.get('observacoes')
     
@@ -2978,6 +3018,10 @@ def criar_vistoria():
                 contrato.milhagem_final = milhagem_val
             if moto:
                 moto.status = MotoStatus.MAINTENANCE.value
+    elif str(tipo).strip().lower() in ['check-out', 'checkout', 'saída', 'saida']:
+        if contrato and milhagem_val is not None:
+            if not contrato.milhagem_inicial or contrato.milhagem_inicial == 0:
+                contrato.milhagem_inicial = milhagem_val
                 
     db.session.commit()
     
@@ -3539,9 +3583,10 @@ def get_dashboard():
                     'cliente_nome': cliente_nome
                 })
             
-        # Performance: Single query for active contracts with eager-loaded clients (reused in askMID compliance)
+        # Performance: Single query for active contracts with eager-loaded clients and inspections (reused in askMID compliance & pre-delivery checks)
         contratos_ativos_objs = db.session.query(Contract).options(
-            joinedload(Contract.cliente)
+            joinedload(Contract.cliente),
+            selectinload(Contract.vistorias)
         ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
         contratos_ativos = len(contratos_ativos_objs)
         receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_objs)
@@ -3626,7 +3671,8 @@ def get_dashboard():
             Motorcycle.placa,
             Motorcycle.status,
             Motorcycle.vencimento_tax,
-            Motorcycle.vencimento_mot
+            Motorcycle.vencimento_mot,
+            Motorcycle.tax_sorn
         ).all()
         tax_mot_warnings = 0
         tax_warnings = 0
@@ -3640,8 +3686,9 @@ def get_dashboard():
             has_mot_w = False
             is_m_expired = False
             
-            # Road Tax: checado apenas para frota ativa (motos vendidas são isentas, imposto é pago pelo comprador)
-            if not is_sold and m.vencimento_tax:
+            # Road Tax: checado apenas para frota ativa (motos vendidas e motos registradas como SORN não pagam Road Tax)
+            is_sorn = bool(getattr(m, 'tax_sorn', False))
+            if not is_sold and not is_sorn and m.vencimento_tax:
                 diff_t = (m.vencimento_tax - hoje_date).days
                 if diff_t < 0:
                     has_tax_w = True
@@ -3706,6 +3753,27 @@ def get_dashboard():
                     'mensagem': f"Contract #{ca.id} ({ca.placa} - {cli_nome}) due for 15-day askMID insurance check (last checked {dias_check} days ago)."
                 })
         
+        # Pre-Delivery Compliance: Motorbikes Pending Check-out Inspection or Insurance Certificate before release
+        contratos_pendentes_liberacao = []
+        for ca in contratos_ativos_objs:
+            tem_checkout = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in (ca.vistorias or []))
+            tem_seguro = bool(ca.url_seguro)
+            if not tem_checkout or not tem_seguro:
+                pendencias = []
+                if not tem_checkout: pendencias.append('Check-out Inspection')
+                if not tem_seguro: pendencias.append('Insurance Certificate')
+                cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
+                contratos_pendentes_liberacao.append({
+                    'id': ca.id,
+                    'placa': ca.placa,
+                    'cliente': cli_nome,
+                    'tipo_contrato': getattr(ca, 'tipo_contrato', 'Rent') or 'Rent',
+                    'tem_checkout': tem_checkout,
+                    'tem_seguro': tem_seguro,
+                    'pendencias': pendencias,
+                    'pendencias_txt': " & ".join(pendencias)
+                })
+
         resp_data.update({
             'total_motos': total_motos,
             'motos_disponiveis': motos_disponiveis,
@@ -3721,6 +3789,8 @@ def get_dashboard():
             'seguros_pendentes_count': seguros_pendentes_count,
             'seguros_cancelados_count': seguros_cancelados_count,
             'contratos_seguro_alerta': contratos_seguro_alerta,
+            'pendentes_liberacao_count': len(contratos_pendentes_liberacao),
+            'contratos_pendentes_liberacao': contratos_pendentes_liberacao,
             'contratos_ativos': contratos_ativos,
             'total_clientes': total_clientes,
             'receita_pendente': receita_pendente,

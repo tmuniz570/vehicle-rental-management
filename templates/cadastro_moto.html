@@ -45,9 +45,15 @@
 
         <div class="form-row" style="margin-top: 1rem;">
             <div class="form-group half">
-                <label for="vencimento_tax">Road Tax Expiry Date</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                    <label for="vencimento_tax" style="margin-bottom: 0;">Road Tax Expiry Date</label>
+                    <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.8rem; color: #c084fc; font-weight: 600; margin-bottom: 0; background: rgba(168,85,247,0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(168,85,247,0.25);">
+                        <input type="checkbox" id="tax_sorn" name="tax_sorn" value="1" style="width: 16px; height: 16px; accent-color: #a855f7; cursor: pointer;">
+                        <span>🛡️ SORN</span>
+                    </label>
+                </div>
                 <input type="date" id="vencimento_tax" name="vencimento_tax" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
-                <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">UK DVLA Road Tax (VED)</small>
+                <small id="tax_help_text" style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">UK DVLA Road Tax (VED)</small>
             </div>
 
             <div class="form-group half">
@@ -70,5 +76,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/cadastro_moto.js"></script>
+<script src="/static/js/cadastro_moto.js?v=2"></script>
 {% endblock %}

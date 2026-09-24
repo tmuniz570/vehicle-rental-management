@@ -541,11 +541,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const contractType = getSelectedContractType();
 
-        if (selectedPhotos.length === 0) {
-            showFeedback('Please take or select at least one check-out photo of the motorbike.', 'error');
-            return;
-        }
-
         if (contractType === 'Sale_Installment') {
             const saldo = parseFloat(hiddenSaldoDevedor?.value || 0);
             if (scheduleItems.length === 0 && saldo > 0) {

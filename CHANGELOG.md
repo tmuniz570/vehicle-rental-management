@@ -4,6 +4,52 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.6] — 2026-09-24 — *Pre-Delivery Compliance: Optional Initial Inspection & Insurance with Actionable Release Reminders*
+
+### 🚀 Fluxo de Pré-Entrega e Liberação de Veículos (Pre-Delivery Compliance)
+* **Contratos Imediatos sem Bloqueio de Cadastro**:
+  - No fluxo de vendas e aluguel, motocicletas frequentemente permanecem na oficina para instalação de acessórios extras (baús, suportes de smartphone, alarmes) e os clientes ainda estão cotando ou emitindo suas apólices de seguro.
+  - Removida a exigência obrigatória de envio de fotos de vistoria (`fotos`) e apólice de seguro (`seguro`) no formulário de abertura de contrato (`/contratos/novo`).
+  - Contratos podem ser formalizados, impressos e assinados imediatamente pelo operador sem travar a negociação comercial.
+* **Barreira de Saída e Alertas de Pré-Entrega (Pre-Delivery Checklist)**:
+  - O veículo **não pode deixar a loja/pátio** sem a vistoria de saída e o documento do seguro registrados.
+  - **Banner de Alerta nos Detalhes do Contrato (`/contratos/<id>`)**:
+    - Alerta estilizado em âmbar no topo da página detalhando exatamente o que está pendente (`📷 Check-out Inspection Photos` e/ou `🛡️ Insurance Certificate Document`).
+    - Botões de ação rápida em 1 clique: `Record Check-out Inspection` e `Upload Insurance Document`.
+    - Na aba de vistorias, caso a vistoria de saída esteja pendente, exibe bloco informativo com botão `📷 Take Photos Now` que abre o modal já configurado em modo `Check-out`.
+  - **Badges e Filtro na Listagem de Contratos (`/contratos`)**:
+    - Exibe badges informativos na coluna de status: `⚠️ Needs Insp + Ins`, `⚠️ Needs Insp` ou `⚠️ Needs Ins`.
+    - Novo filtro rápido no dropdown de status: `⚠️ Pre-Delivery Pending (Needs Insp / Ins)` (`status=pending_release`).
+  - **Alerta Proativo no Dashboard (`/`)**:
+    - Alerta dinâmico na central de avisos destacando a quantidade de motocicletas com checklist de pré-entrega pendente com links diretos para cada contrato.
+* **Performance & Backend**:
+  - Otimização com `selectinload(Contract.vistorias)` e `joinedload(Contract.cliente)` em `GET /api/contratos` e `GET /api/dashboard`, eliminando N+1 queries.
+* **Suíte de Testes Automatizados (`tests/test_prerelease_compliance.py`)**:
+  - Teste cobrindo criação sem vistoria/seguro, flags na API, filtros de listagem, visualização no dashboard, anexação posterior de apólice e registro de vistoria de saída com desbloqueio automático do status.
+* **Correção de Renderização nos Detalhes do Contrato (`/contratos/<id>`)**:
+  - Corrigido conflito de escopo no JavaScript onde `stLower` havia sido re-declarado com `const`, gerando um SyntaxError no motor V8 que impedia a execução do listener `DOMContentLoaded`.
+  - Cachebuster atualizado para `detalhe_contrato.js?v=21` garantindo invalidação imediata do cache do navegador.
+* **Cachebusters Atualizados**:
+  - `novo_contrato.js?v=4`, `detalhe_contrato.js?v=21`, `contratos.js?v=6`.
+
+## [1.9.5] — 2026-09-24 — *DVLA SORN (Statutory Off Road Notification) Support & Exemption from Road Tax*
+
+### 🛡️ Suporte a Veículos em SORN (Off Road) & Isenção de Road Tax
+* **Marcação Oficial de SORN (Statutory Off Road Notification)**:
+  - No Reino Unido, veículos parados no pátio ou oficina podem ser registrados como SORN junto à DVLA, ficando legalmente isentos de recolhimento de Road Tax (VED) e sem data de validade de imposto.
+  - Implementado suporte nativo ao status **SORN** no cadastro de motos (`/motos/nova`), edição rápida (`#motoManageModal`), tabela de frotas (`/motos`) e detalhes do contrato (`/contratos/<id>`):
+    - **Toggle / Checkbox Dinâmico (`🛡️ SORN`)**: ao marcar SORN, o seletor de data de Road Tax é desabilitado e limpo automaticamente, com feedback visual indicando que a moto está fora de circulação.
+    - **Isenção de Alertas no Dashboard**: motos ativas com status SORN são automaticamente excluídas dos alertas de vencimento ou atraso de Road Tax (`diff_t < 0` e `diff_t <= 30`), eliminando falsos positivos na operação.
+    - **Badge Exclusivo na Tabela de Frotas**: exibição de badge roxo/violeta estilizado `🛡️ SORN`, com suporte a ordenação e busca direta por palavra-chave (`search=sorn`).
+    - **Visualização em Contratos**: no card do veículo em `/contratos/<id>`, o status de Road Tax exibe claramente `🛡️ SORN (Off Road)` em vez de "Not registered" ou vencimento inválido.
+* **Banco de Dados & Auto-Migração (`database.py`)**:
+  - Nova coluna `Motorcycle.tax_sorn = db.Column(db.Boolean, default=False, nullable=False, index=True)` com auto-migração compatível com PostgreSQL (`DEFAULT FALSE`) e SQLite (`DEFAULT 0`).
+  - Novo índice `idx_motos_tax_sorn` na tabela `motos`.
+* **Suíte de Testes Automatizados (`tests/test_motos_sorn.py`)**:
+  - Teste completo cobrindo cadastro com SORN ativo, consulta de detalhes, busca por palavra-chave `sorn`, alteração de status (ligar/desligar SORN) e isenção de alertas no dashboard.
+* **Cachebusters Atualizados**:
+  - `cadastro_moto.js?v=2`, `motos.js?v=8`, `moto_modal_shared.js?v=3`, `detalhe_contrato.js?v=19`.
+
 ## [1.9.4] — 2026-09-24 — *Mobile Multi-Shot Camera Accumulator for V5C Multi-Page Document Uploads*
 
 ### 📄 Acumulador Multi-Página de Câmera Mobile para V5C (iOS / iPhone)

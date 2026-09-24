@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.4--Split%20Payments%20%26%20Multi--Page%20V5C-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.6--Pre--Delivery%20Compliance%20%26%20SORN-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -35,6 +35,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 ### 🛵 2. Fleet & Vehicle Lifecycle
 * **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`).
 * **UK MOT & Road Tax (VED) Compliance:** Annual MOT test and DVLA Road Tax expiry date tracking with proactive warning badges (🟢 Valid, 🟡 Expiring within 30 days, 🔴 Expired).
+* **DVLA SORN (Statutory Off Road Notification) Support:** Native toggle for vehicles officially declared off-road (SORN) with DVLA. Automatically disables Road Tax expiry dates, displays a distinctive `🛡️ SORN` badge in the fleet list, supports quick search (`search=sorn`), and excludes off-road bikes from false-positive Road Tax dashboard alerts.
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
 * **V5C Logbook Multi-Page Management & Mobile Multi-Shot Camera:**
   - Dedicated multi-shot camera accumulator (`capture="environment"` and gallery picker) allowing operators to photograph multi-page V5C logbooks (Page 1, Page 2, Page 3...) consecutively on iPhone/Safari without reloading or uploading one-by-one.

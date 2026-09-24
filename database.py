@@ -149,6 +149,7 @@ class Motorcycle(db.Model):
     milhagem_atual = db.Column(db.Integer, default=0, nullable=False)
     vencimento_mot = db.Column(db.Date, nullable=True, index=True)
     vencimento_tax = db.Column(db.Date, nullable=True, index=True)
+    tax_sorn = db.Column(db.Boolean, default=False, nullable=False, index=True)
     
     contratos = db.relationship('Contract', backref='moto', lazy=True)
     v5c_arquivos = db.relationship('MotorcycleV5C', backref='moto', lazy=True, cascade='all, delete-orphan')
@@ -511,6 +512,12 @@ def init_db(app):
                     if 'vencimento_tax' not in cols_m:
                         conn.execute(db.text("ALTER TABLE motos ADD COLUMN vencimento_tax DATE"))
                         conn.commit()
+                    if 'tax_sorn' not in cols_m:
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(db.text("ALTER TABLE motos ADD COLUMN tax_sorn BOOLEAN DEFAULT FALSE"))
+                        else:
+                            conn.execute(db.text("ALTER TABLE motos ADD COLUMN tax_sorn BOOLEAN DEFAULT 0"))
+                        conn.commit()
                     if 'milhagem_atual' not in cols_m:
                         conn.execute(db.text("ALTER TABLE motos ADD COLUMN milhagem_atual INTEGER DEFAULT 0"))
                         conn.commit()
@@ -595,6 +602,7 @@ def init_db(app):
                     ("idx_motos_status", "motos", "status"),
                     ("idx_motos_mot", "motos", "vencimento_mot"),
                     ("idx_motos_tax", "motos", "vencimento_tax"),
+                    ("idx_motos_tax_sorn", "motos", "tax_sorn"),
                     ("idx_clientes_nome", "clientes", "nome"),
                     ("idx_clientes_telefone", "clientes", "telefone"),
                     ("idx_claims_number", "claims", "claim_number"),

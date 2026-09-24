@@ -26,6 +26,9 @@
     </div>
 </div>
 
+<!-- Dynamic Pre-Delivery Compliance Alert Banner (Missing Check-out Inspection or Insurance Certificate) -->
+<div id="prerelease_alert_banner" style="display: none; margin-bottom: 1rem;"></div>
+
 <!-- Dynamic Compliance Alert Banner for Expired / Expiring Tax & MOT -->
 <div id="compliance_alert_banner" style="display: none; margin-bottom: 1.5rem;"></div>
 
@@ -497,8 +500,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="oc_obs">Damage Observations / Notes</label>
-                    <textarea id="oc_obs" rows="3" required placeholder="Describe damages, reason for incident or return condition..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;"></textarea>
+                    <label for="oc_obs">Inspection Notes / Observations</label>
+                    <textarea id="oc_obs" rows="3" placeholder="Describe pre-existing condition, damages or notes..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;"></textarea>
                 </div>
                 
                 <button type="submit" id="btnSalvarOcorr" class="btn-primary" style="width: 100%; margin-top: 0.5rem;">Save Inspection</button>
@@ -808,6 +811,6 @@
     const CONTRATO_ID = {{ contrato_id }};
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/moto_modal_shared.js?v=2"></script>
-<script src="/static/js/detalhe_contrato.js?v=18"></script>
+<script src="/static/js/moto_modal_shared.js?v=3"></script>
+<script src="/static/js/detalhe_contrato.js?v=21"></script>
 {% endblock %}

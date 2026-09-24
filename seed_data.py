@@ -143,13 +143,14 @@ def seed():
             ("WP20QWE", "Yamaha NMAX 125", "Anvil Grey", MotoStatus.AVAILABLE.value, 250, 220, 14200),     # AVAILABLE: 100% valid
             ("WR23ZXC", "Honda Vision 110", "Pearl White", MotoStatus.RENTED.value, 360, 330, 7500),
             ("WT21OPL", "Honda PCX 125", "Matte Galaxy Black", MotoStatus.RENTED.value, 190, 170, 11950),
-            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, 250, 17320),      # AVAILABLE: Just returned from contract
+            ("WU22VBN", "Yamaha NMAX 125", "Tech Kamo", MotoStatus.AVAILABLE.value, 280, None, 17320),       # AVAILABLE: Kept on yard under SORN (Off Road)
             ("SL24FUL", "Honda PCX 125", "Pearl White", MotoStatus.SOLD.value, 320, 290, 4800),            # SOLD: Full cash sale with accessories
             ("SL24INS", "Yamaha NMAX 125", "Midnight Black", MotoStatus.SOLD.value, 350, 310, 3200),        # SOLD: Instalment sale with 4-month payment plan
         ]
         
         motos = {}
         for placa, modelo, cor, status, mot_offset, tax_offset, milhagem in motos_data:
+            is_sorn = (tax_offset is None)
             m = Motorcycle(
                 placa=placa,
                 modelo=modelo,
@@ -157,7 +158,8 @@ def seed():
                 status=status,
                 milhagem_atual=milhagem,
                 vencimento_mot=hoje_date + timedelta(days=mot_offset),
-                vencimento_tax=hoje_date + timedelta(days=tax_offset)
+                vencimento_tax=(hoje_date + timedelta(days=tax_offset)) if not is_sorn else None,
+                tax_sorn=is_sorn
             )
             db.session.add(m)
             motos[placa] = m

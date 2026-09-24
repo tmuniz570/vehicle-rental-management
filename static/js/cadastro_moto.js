@@ -25,6 +25,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const taxSornCheckbox = document.getElementById('tax_sorn');
+    const vencimentoTaxInput = document.getElementById('vencimento_tax');
+    const taxHelpText = document.getElementById('tax_help_text');
+
+    function updateTaxSornState() {
+        if (!taxSornCheckbox || !vencimentoTaxInput) return;
+        if (taxSornCheckbox.checked) {
+            vencimentoTaxInput.disabled = true;
+            vencimentoTaxInput.value = '';
+            vencimentoTaxInput.style.opacity = '0.4';
+            if (taxHelpText) taxHelpText.innerHTML = '<span style="color:#c084fc; font-weight:600;">🛡️ SORN (Off Road) - No road tax expiry required</span>';
+        } else {
+            vencimentoTaxInput.disabled = false;
+            vencimentoTaxInput.style.opacity = '1';
+            if (taxHelpText) taxHelpText.textContent = 'UK DVLA Road Tax (VED)';
+        }
+    }
+
+    if (taxSornCheckbox) {
+        taxSornCheckbox.addEventListener('change', updateTaxSornState);
+    }
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -41,6 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.classList.add('hidden');
         loader.classList.remove('hidden');
 
+        const isSorn = taxSornCheckbox ? taxSornCheckbox.checked : false;
+
         // Gather data
         const formData = {
             placa: cleanPlaca,
@@ -48,7 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
             cor: document.getElementById('cor').value.trim(),
             milhagem_atual: document.getElementById('milhagem_atual') ? parseInt(document.getElementById('milhagem_atual').value || '0', 10) : 0,
             vencimento_mot: document.getElementById('vencimento_mot') ? document.getElementById('vencimento_mot').value || null : null,
-            vencimento_tax: document.getElementById('vencimento_tax') ? document.getElementById('vencimento_tax').value || null : null
+            vencimento_tax: isSorn ? null : (vencimentoTaxInput && vencimentoTaxInput.value ? vencimentoTaxInput.value : null),
+            tax_sorn: isSorn
         };
 
         try {
@@ -65,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 showFeedback('Motorbike registered successfully!', 'success');
                 form.reset();
+                updateTaxSornState();
             } else {
                 showFeedback(result.error || result.erro || 'Error registering motorbike', 'error');
             }

@@ -769,7 +769,45 @@
                 </div>`;
             }
 
-            // 5. If no alerts
+            // 6. Pre-Delivery Compliance Warning (Missing Checkout Photos or Insurance Document)
+            if (dashData && dashData.pendentes_liberacao_count > 0) {
+                const pendentes = dashData.contratos_pendentes_liberacao || [];
+                let itemsPendentesHtml = '';
+                pendentes.forEach(p => {
+                    let missing = [];
+                    if (!p.tem_vistoria_checkout) missing.push('📷 Check-out Photos');
+                    if (!p.tem_seguro) missing.push('🛡️ Insurance Document');
+                    const missingText = missing.join(' & ');
+
+                    itemsPendentesHtml += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
+                            <span>⚠️ Contract #${p.id} (<strong style="font-family:monospace; color:var(--text-primary);">${p.placa}</strong> - ${p.cliente}) • <span style="color:#fbbf24; font-weight:600;">Needs ${missingText}</span></span>
+                            <a href="/contratos/${p.id}" style="color:var(--accent); text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Complete Pre-Release &rarr;</a>
+                        </div>
+                    `;
+                });
+
+                html += `
+                <div style="background: rgba(245, 158, 11, 0.12); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: #fbbf24; font-size: 0.95rem;">⚠️ Pre-Delivery Checklist Pending (${dashData.pendentes_liberacao_count})</h4>
+                        <span class="badge badge-warning" style="font-size: 0.75rem;">Vehicle Cannot Leave</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        Motorbike is being accessorised or waiting for customer insurance. Photos and/or certificate must be registered before the customer collects the vehicle.
+                    </p>
+                    <div style="margin-top: 6px;">
+                        ${itemsPendentesHtml}
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <a href="/contratos?status=pending_release" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                            View all pre-delivery pending contracts &rarr;
+                        </a>
+                    </div>
+                </div>`;
+            }
+
+            // 7. If no alerts
             if (!html) {
                 html = `
                     <div style="display: flex; align-items: center; gap: 10px; padding: 1rem; border-radius: 8px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2);">

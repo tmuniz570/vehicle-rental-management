@@ -241,7 +241,14 @@ async function carregarDetalhesMoto(placa) {
         const editMot = document.getElementById('edit_mot');
         if (editMot) editMot.value = data.vencimento_mot || '';
         const editTax = document.getElementById('edit_tax');
-        if (editTax) editTax.value = data.vencimento_tax || '';
+        const editTaxSorn = document.getElementById('edit_tax_sorn');
+        if (editTaxSorn) {
+            editTaxSorn.checked = !!data.tax_sorn;
+            updateModalTaxSornState();
+        }
+        if (!data.tax_sorn && editTax) {
+            editTax.value = data.vencimento_tax || '';
+        }
 
         renderV5CList(data.v5c_arquivos || []);
         renderTrackersList(data.trackers || []);
@@ -279,7 +286,14 @@ async function abrirModalMoto(placa, activeTab = 'tabInfo', initialData = null) 
         const editMot = document.getElementById('edit_mot');
         if (editMot) editMot.value = initialData.vencimento_mot || '';
         const editTax = document.getElementById('edit_tax');
-        if (editTax) editTax.value = initialData.vencimento_tax || '';
+        const editTaxSorn = document.getElementById('edit_tax_sorn');
+        if (editTaxSorn) {
+            editTaxSorn.checked = !!(initialData && initialData.tax_sorn);
+            updateModalTaxSornState();
+        }
+        if (!(initialData && initialData.tax_sorn) && editTax) {
+            editTax.value = (initialData && initialData.vencimento_tax) || '';
+        }
     }
     
     // Reset V5C staged accumulator
@@ -338,6 +352,25 @@ function renderTrackerPhotosPreview() {
 function removerFotoStaged(index) {
     selectedTrackerPhotos.splice(index, 1);
     renderTrackerPhotosPreview();
+}
+
+// SORN Toggle UI State helper for Moto Modal
+function updateModalTaxSornState() {
+    const editTax = document.getElementById('edit_tax');
+    const editTaxSorn = document.getElementById('edit_tax_sorn');
+    const editTaxHelp = document.getElementById('edit_tax_help_text');
+    if (!editTax || !editTaxSorn) return;
+
+    if (editTaxSorn.checked) {
+        editTax.disabled = true;
+        editTax.value = '';
+        editTax.style.opacity = '0.4';
+        if (editTaxHelp) editTaxHelp.innerHTML = '<span style="color:#c084fc; font-weight:600;">🛡️ SORN (Off Road) - No road tax expiry required</span>';
+    } else {
+        editTax.disabled = false;
+        editTax.style.opacity = '1';
+        if (editTaxHelp) editTaxHelp.textContent = 'UK DVLA Road Tax (VED)';
+    }
 }
 
 // Format bytes helper for V5C staged files
@@ -477,6 +510,7 @@ window.removerTracker = removerTracker;
 window.removerFotoStaged = removerFotoStaged;
 window.removerV5CStaged = removerV5CStaged;
 window.limparV5CStaged = limparV5CStaged;
+window.updateModalTaxSornState = updateModalTaxSornState;
 
 // Global initializer for modal DOM elements
 document.addEventListener('DOMContentLoaded', () => {
@@ -517,13 +551,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const btnSave = document.getElementById('btnSaveMotoInfo');
             if (btnSave) btnSave.disabled = true;
 
+            const editTaxSorn = document.getElementById('edit_tax_sorn');
+            const isSorn = editTaxSorn ? editTaxSorn.checked : false;
+
             const data = {
                 modelo: document.getElementById('edit_modelo').value,
                 cor: document.getElementById('edit_cor').value,
                 status: document.getElementById('edit_status').value,
                 milhagem_atual: parseInt(document.getElementById('edit_milhagem').value || '0', 10),
                 vencimento_mot: document.getElementById('edit_mot').value || null,
-                vencimento_tax: document.getElementById('edit_tax').value || null
+                vencimento_tax: isSorn ? null : (document.getElementById('edit_tax').value || null),
+                tax_sorn: isSorn
             };
             
             try {
@@ -547,6 +585,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (btnSave) btnSave.disabled = false;
             }
         });
+    }
+
+    // SORN Checkbox Handler
+    const editTaxSorn = document.getElementById('edit_tax_sorn');
+    if (editTaxSorn) {
+        editTaxSorn.addEventListener('change', updateModalTaxSornState);
     }
 
     // V5C Camera & Gallery Multi-Shot Handlers (Accumulator)

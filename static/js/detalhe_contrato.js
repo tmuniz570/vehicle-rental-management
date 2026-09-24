@@ -235,7 +235,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         cor: corVal,
                         milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
                         vencimento_mot: data.vencimento_mot,
-                        vencimento_tax: data.vencimento_tax
+                        vencimento_tax: data.vencimento_tax,
+                        tax_sorn: data.tax_sorn
                     });
                 }
             };
@@ -265,7 +266,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         cor: corVal,
                         milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
                         vencimento_mot: data.vencimento_mot,
-                        vencimento_tax: data.vencimento_tax
+                        vencimento_tax: data.vencimento_tax,
+                        tax_sorn: data.tax_sorn
                     });
                 } else if (!placaVal || placaVal === '-') {
                     alert('No vehicle registration plate linked to this contract.');
@@ -282,7 +284,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         cor: corVal,
                         milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
                         vencimento_mot: data.vencimento_mot,
-                        vencimento_tax: data.vencimento_tax
+                        vencimento_tax: data.vencimento_tax,
+                        tax_sorn: data.tax_sorn
                     });
                 } else if (!placaVal || placaVal === '-') {
                     alert('No vehicle registration plate linked to this contract.');
@@ -380,6 +383,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </span>
                     </div>
                 `;
+            } else if (evalResult.status === 'sorn') {
+                return `
+                    <div style="background: rgba(168, 85, 247, 0.12); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.72rem; text-transform: uppercase; font-weight: 600; display: block;">${title}</span>
+                            <strong style="color: #c084fc;">Off Road (SORN)</strong>
+                        </div>
+                        <span class="badge" style="background: rgba(168,85,247,0.25); color: #c084fc; border: 1px solid rgba(168,85,247,0.45); font-weight: 700; font-size: 0.72rem; padding: 3px 8px;">
+                            🛡️ SORN
+                        </span>
+                    </div>
+                `;
             } else if (evalResult.status === 'valid') {
                 return `
                     <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); border-radius: 8px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem;">
@@ -406,12 +421,84 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // Road Tax evaluated first, then MOT
-        const taxEval = evaluateCompliance(data.vencimento_tax);
+        const taxEval = data.tax_sorn
+            ? { status: 'sorn', formattedDate: 'SORN (Off Road)', diffDays: 0 }
+            : evaluateCompliance(data.vencimento_tax);
         const motEval = evaluateCompliance(data.vencimento_mot);
 
         const motTaxBox = document.getElementById('info_mot_tax');
         if (motTaxBox) {
-            motTaxBox.innerHTML = renderComplianceRow('Road Tax Expiry', taxEval) + renderComplianceRow('MOT Expiry', motEval);
+            motTaxBox.innerHTML = renderComplianceRow(data.tax_sorn ? 'Road Tax Status' : 'Road Tax Expiry', taxEval) + renderComplianceRow('MOT Expiry', motEval);
+        }
+
+        window._contractData = data;
+        const stLower = (data.status || '').toLowerCase();
+        const isActiveContract = (stLower === 'active' || stLower === 'ativo');
+        const hasCheckoutInsp = (data.vistorias || []).some(v => ['check-out', 'checkout', 'saída', 'saida'].includes((v.tipo || '').toLowerCase()));
+        const hasInsuranceDoc = Boolean(data.url_seguro);
+        const isPreReleasePending = isActiveContract && (!hasCheckoutInsp || !hasInsuranceDoc);
+
+        // Dynamic Pre-Delivery Compliance Alert Banner (Vehicle cannot leave premises without Check-out Inspection and Insurance)
+        const preBanner = document.getElementById('prerelease_alert_banner');
+        if (preBanner) {
+            if (isPreReleasePending) {
+                preBanner.style.display = 'block';
+                const missingList = [];
+                if (!hasCheckoutInsp) missingList.push('Initial Check-out Inspection Photos');
+                if (!hasInsuranceDoc) missingList.push('Customer Insurance Certificate');
+
+                let actionBtnsHtml = '<div style="display: flex; gap: 8px; flex-wrap: wrap;">';
+                if (!hasCheckoutInsp) {
+                    actionBtnsHtml += `
+                        <button type="button" id="btnBannerTakeInspection" class="btn-primary" style="background: #f59e0b; color: #000; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: none; white-space: nowrap;">
+                            <span>📸</span> Record Check-out Inspection
+                        </button>
+                    `;
+                }
+                if (!hasInsuranceDoc) {
+                    actionBtnsHtml += `
+                        <button type="button" id="btnBannerAttachInsurance" class="btn-primary" style="background: #3b82f6; color: #fff; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: none; white-space: nowrap;">
+                            <span>🛡️</span> Upload Insurance Document
+                        </button>
+                    `;
+                }
+                actionBtnsHtml += '</div>';
+
+                preBanner.innerHTML = `
+                    <div style="background: rgba(245, 158, 11, 0.12); border: 1.5px solid rgba(245, 158, 11, 0.5); border-left: 6px solid #f59e0b; border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <span style="font-size: 2rem;">⚠️</span>
+                            <div>
+                                <strong style="color: #fbbf24; font-size: 1rem; display: block; letter-spacing: 0.02em;">
+                                    VEHICLE PRE-DELIVERY PENDING: Cannot be released yet!
+                                </strong>
+                                <span style="color: var(--text-primary); font-size: 0.88rem; line-height: 1.4; display: block; margin-top: 2px;">
+                                    This motorbike <strong>(${escapeHtml(data.placa)})</strong> cannot leave shop premises without: <strong style="color: #fde047;">${missingList.join(' and ')}</strong>.
+                                </span>
+                            </div>
+                        </div>
+                        ${actionBtnsHtml}
+                    </div>
+                `;
+
+                const btnBInsp = document.getElementById('btnBannerTakeInspection');
+                if (btnBInsp) {
+                    btnBInsp.onclick = () => {
+                        if (typeof window.abrirModalCheckOutVistoria === 'function') window.abrirModalCheckOutVistoria();
+                    };
+                }
+
+                const btnBIns = document.getElementById('btnBannerAttachInsurance');
+                if (btnBIns) {
+                    btnBIns.onclick = () => {
+                        const fileInput = document.getElementById('update_seguro_file');
+                        if (fileInput) fileInput.click();
+                    };
+                }
+            } else {
+                preBanner.style.display = 'none';
+                preBanner.innerHTML = '';
+            }
         }
 
         // Top Compliance Warning Banner
@@ -427,7 +514,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             else if (motEval.status === 'warning') warningList.push(`MOT (due in ${motEval.diffDays}d on ${motEval.formattedDate})`);
 
             // Include Insurance status in top banner (only for rentals, sales don't monitor 15-day insurance)
-            const isVendaContrato = (data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment');
             if (!isVendaContrato) {
                 if (data.status_seguro === 'Cancelled') {
                     expiredList.push('Motor Insurance (FLAGGED CANCELLED ON askMID)');
@@ -536,7 +622,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnReportarSeguroCancelado) btnReportarSeguroCancelado.style.display = 'block';
 
             if (badgeSeguro) {
-                if (data.status_seguro === 'Cancelled') {
+                if (!data.url_seguro) {
+                    badgeSeguro.className = 'badge badge-warning';
+                    badgeSeguro.innerHTML = '⚠️ No Document (Pre-Release)';
+                    badgeSeguro.style.cssText = 'background: rgba(245,158,11,0.2); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-weight:700;';
+                    if (boxSeguro) {
+                        boxSeguro.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                        boxSeguro.style.background = 'rgba(245, 158, 11, 0.05)';
+                    }
+                } else if (data.status_seguro === 'Cancelled') {
                     badgeSeguro.className = 'badge badge-danger';
                     badgeSeguro.innerHTML = '🚨 CANCELLED / UNINSURED';
                     badgeSeguro.style.cssText = 'background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); font-weight:700;';
@@ -755,7 +849,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         let statusBadge = '';
-        const stLower = (data.status || '').toLowerCase();
         if (stLower === 'active' || stLower === 'ativo') statusBadge = '<span class="badge badge-success">ACTIVE</span>';
         else if (stLower === 'deposit_hold' || stLower === 'quarentena_deposito') statusBadge = '<span class="badge badge-warning">DEPOSIT HOLD</span>';
         else if (stLower === 'completed' || stLower === 'finalizado') statusBadge = '<span class="badge badge-secondary">COMPLETED</span>';
@@ -1340,8 +1433,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         const vistContainer = document.getElementById('vistoriasList');
         vistContainer.innerHTML = '';
         
+        if (!hasCheckoutInsp && isActiveContract) {
+            const checkoutPrompt = document.createElement('div');
+            checkoutPrompt.style.cssText = "background: rgba(245, 158, 11, 0.12); border: 1px dashed rgba(245, 158, 11, 0.45); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;";
+            checkoutPrompt.innerHTML = `
+                <div>
+                    <strong style="color: #fbbf24; font-size: 0.85rem; display: block;">⚠️ Check-out Inspection Pending</strong>
+                    <span style="color: var(--text-secondary); font-size: 0.78rem;">Take initial photos before vehicle collection / release.</span>
+                </div>
+                <button type="button" class="btn-action btn-trigger-checkout-insp" style="background: #f59e0b; color: #000; font-weight: 700; font-size: 0.78rem; padding: 6px 12px; border-radius: 6px; cursor: pointer; border: none;">
+                    📸 Take Photos Now
+                </button>
+            `;
+            vistContainer.appendChild(checkoutPrompt);
+            checkoutPrompt.querySelector('.btn-trigger-checkout-insp').onclick = () => {
+                if (typeof window.abrirModalCheckOutVistoria === 'function') window.abrirModalCheckOutVistoria();
+            };
+        }
+        
         if (!data.vistorias || data.vistorias.length === 0) {
-            vistContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem 0;">No inspections recorded for this contract.</p>';
+            const noInspMsg = document.createElement('p');
+            noInspMsg.style.cssText = 'color: var(--text-secondary); text-align: center; padding: 1.5rem 0; font-size: 0.85rem;';
+            noInspMsg.textContent = 'No inspections recorded for this contract.';
+            vistContainer.appendChild(noInspMsg);
         } else {
             data.vistorias.forEach(v => {
                 const dataVist = v.data_vistoria ? new Date(v.data_vistoria).toLocaleString('en-GB') : '-';
@@ -1536,20 +1650,55 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderOcPreviews();
         };
 
+        function abrirModalCheckOutVistoria() {
+            document.getElementById('ocorrenciaModalTitle').textContent = 'Pre-Delivery Check-out Inspection';
+            document.getElementById('oc_tipo').value = 'Check-out';
+            const ocObs = document.getElementById('oc_obs');
+            if (ocObs) {
+                ocObs.placeholder = 'Initial check-out condition, tyre notes, pre-existing scratches (optional)...';
+            }
+            const ocMilhagem = document.getElementById('oc_milhagem');
+            if (ocMilhagem && (!ocMilhagem.value || ocMilhagem.value == '0') && (window._contractData && window._contractData.milhagem_inicial)) {
+                ocMilhagem.value = window._contractData.milhagem_inicial;
+            }
+            resetOcPhotos();
+            abrirModal('ocorrenciaModal');
+        }
+        window.abrirModalCheckOutVistoria = abrirModalCheckOutVistoria;
+
         // New Incident Button
         document.getElementById('btnNovaOcorr')?.addEventListener('click', () => {
             document.getElementById('ocorrenciaModalTitle').textContent = 'New Inspection (Incident)';
             document.getElementById('oc_tipo').value = 'Incident';
+            const ocObs = document.getElementById('oc_obs');
+            if (ocObs) {
+                ocObs.placeholder = 'Describe damages, reason for incident...';
+            }
             resetOcPhotos();
             abrirModal('ocorrenciaModal');
         });
 
-        // Submit Incident Form
+        const btnNovaVistoriaLink = document.getElementById('btnNovaVistoriaLink');
+        if (btnNovaVistoriaLink && !hasCheckoutInsp && isActiveContract) {
+            btnNovaVistoriaLink.onclick = (e) => {
+                e.preventDefault();
+                abrirModalCheckOutVistoria();
+            };
+        }
+
+        // Submit Inspection Form
         document.getElementById('ocorrenciaForm')?.addEventListener('submit', async (e) => {
             e.preventDefault();
 
             if (ocSelectedPhotos.length === 0) {
                 alert('Please take or select at least one vehicle photo.');
+                return;
+            }
+
+            const ocTipoVal = document.getElementById('oc_tipo').value;
+            const ocObsVal = (document.getElementById('oc_obs').value || '').trim();
+            if (ocTipoVal !== 'Check-out' && !ocObsVal) {
+                alert('Please describe damage observations or reason for incident.');
                 return;
             }
 
@@ -1559,12 +1708,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const formData = new FormData();
             formData.append('id_contrato', CONTRATO_ID);
-            formData.append('tipo', document.getElementById('oc_tipo').value);
+            formData.append('tipo', ocTipoVal);
             const ocMilhagem = document.getElementById('oc_milhagem');
             if (ocMilhagem && ocMilhagem.value) {
                 formData.append('milhagem', ocMilhagem.value);
             }
-            formData.append('observacoes', document.getElementById('oc_obs').value);
+            formData.append('observacoes', ocObsVal);
             
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const compOptions = {

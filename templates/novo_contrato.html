@@ -245,16 +245,26 @@
         </div>
         
         <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 2rem 0;">
-        <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Documentation & Initial Check-out Inspection</h3>
+        <h3 style="margin-bottom: 0.35rem; color: var(--text-primary);">Documentation & Initial Check-out Inspection</h3>
+        <p style="color: var(--text-secondary); font-size: 0.84rem; margin-bottom: 1.25rem; line-height: 1.4;">
+            Inspection photos and customer insurance can be attached now or completed later (e.g. while installing accessories). <strong style="color: #fbbf24;">Note: The motorbike cannot leave premises without them.</strong>
+        </p>
         
         <div class="form-group">
-            <label for="seguro">Motorbike Insurance Certificate (Photo/PDF) - Mandatory</label>
-            <input type="file" id="seguro" name="seguro" accept="image/*,.pdf" required style="padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <label for="seguro" style="margin: 0; font-weight: 600;">Motorbike Insurance Certificate (Photo/PDF)</label>
+                <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-size: 0.72rem; padding: 2px 8px; border-radius: 6px;">Optional at creation</span>
+            </div>
+            <input type="file" id="seguro" name="seguro" accept="image/*,.pdf" style="padding-top: 10px;">
+            <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Attach policy document now if available, or upload later in Contract Details before customer collection.</small>
         </div>
         
         <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <label style="margin: 0; font-weight: 600;">Motorbike Check-out Photos *</label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label style="margin: 0; font-weight: 600;">Motorbike Check-out Photos</label>
+                    <span class="badge" style="background: rgba(255,255,255,0.06); color: var(--text-secondary); font-size: 0.72rem; padding: 2px 8px; border-radius: 6px;">Optional at creation</span>
+                </div>
                 <span id="photoCountBadge" class="badge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-size: 0.75rem;">0 photos added</span>
             </div>
             
@@ -271,7 +281,7 @@
             </div>
             
             <small style="color: var(--text-secondary); display: block; margin-top: 0.4rem;">
-                Tap <strong>Take Photo</strong> repeatedly to snap multiple angles (front, rear, sides, odometer).
+                Tap <strong>Take Photo</strong> repeatedly to snap multiple angles. If bike is still in workshop, photos can be recorded upon completion before release.
             </small>
 
             <div id="previewContainer" class="photo-grid" style="display:none; margin-top: 0.75rem;"></div>
@@ -353,5 +363,5 @@
 
 {% block scripts %}
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/novo_contrato.js?v=3"></script>
+<script src="/static/js/novo_contrato.js?v=4"></script>
 {% endblock %}
