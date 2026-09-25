@@ -84,6 +84,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - Contracts table features dedicated status badges (`⚠️ Needs Insp + Ins`, `⚠️ Needs Insp`, `⚠️ Needs Ins`) and a quick filter (`⚠️ Pre-Delivery Pending`).
   - Executive dashboard raises an alert highlighting all motorbikes on the premises awaiting pre-delivery checklist completion.
 * **Protection Against Incompatible Operations:** Sold motorbikes are automatically protected against rental return inspections (`Check-in`) and excluded from recurring rental billing batches, while allowing warranty and damage logs (`Incident`).
+* **Active Rental Weekly Payment Due Day Customization:** Interactive modal on contract details (`/contratos/<id>`) allowing operators to alter the recurring payment day of the week (Monday through Sunday) for active rental agreements, with optional automatic shift of pending rent due dates to align with the new schedule and instant synchronization with the 01:00 AM recurring billing scheduler.
 * **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.
 
 ### 🔍 6. Digital Mobile Inspections & Incident Logging

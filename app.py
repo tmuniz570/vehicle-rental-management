@@ -2630,6 +2630,94 @@ def cancelar_contrato(id):
             'erro': f'Erro ao cancelar contrato: {str(e)}'
         }), 500
 
+@app.route('/api/contratos/<int:id>/dia-pagamento', methods=['PUT', 'POST'])
+@alugueis_required
+def alterar_dia_pagamento_contrato(id):
+    """
+    Altera o dia da semana de cobrança de contratos de aluguel ativos (0=Monday a 6=Sunday).
+    Opcionalmente ajusta a data de vencimento de cobranças pendentes de aluguel.
+    """
+    contrato = db.session.get(Contract, id)
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+
+    # Validar se o contrato é ativo
+    if contrato.status not in [ContractStatus.ACTIVE.value, 'Active', 'Ativo']:
+        return jsonify({
+            'error': 'Payment due day can only be changed for active contracts',
+            'erro': 'O dia de pagamento semanal só pode ser alterado para contratos ativos'
+        }), 400
+
+    # Validar se é contrato de aluguel
+    tipo_contrato = getattr(contrato, 'tipo_contrato', 'Rent') or 'Rent'
+    if tipo_contrato not in [ContractType.RENT.value, 'Rent', 'Aluguel']:
+        return jsonify({
+            'error': 'Weekly payment day only applies to rental contracts',
+            'erro': 'O dia de pagamento semanal se aplica apenas a contratos de aluguel'
+        }), 400
+
+    data = request.get_json(silent=True) or request.form
+    novo_dia_raw = data.get('dia_pagamento_semanal')
+    if novo_dia_raw is None or str(novo_dia_raw).strip() == '':
+        return jsonify({'error': 'Weekly payment due day is required', 'erro': 'O dia de pagamento semanal é obrigatório'}), 400
+
+    try:
+        novo_dia = int(novo_dia_raw)
+        if novo_dia < 0 or novo_dia > 6:
+            raise ValueError()
+    except (ValueError, TypeError):
+        return jsonify({
+            'error': 'Invalid day of week (must be between 0 for Monday and 6 for Sunday)',
+            'erro': 'Dia da semana inválido (deve ser entre 0 para Segunda e 6 para Domingo)'
+        }), 400
+
+    dia_anterior = contrato.dia_pagamento_semanal
+    dias_nomes_en = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    dias_nomes_pt = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+
+    nome_antigo = f"{dias_nomes_en[dia_anterior]} ({dias_nomes_pt[dia_anterior]})" if (dia_anterior is not None and 0 <= dia_anterior <= 6) else 'Not set'
+    nome_novo = f"{dias_nomes_en[novo_dia]} ({dias_nomes_pt[novo_dia]})"
+
+    contrato.dia_pagamento_semanal = novo_dia
+
+    # Ajuste opcional de cobranças pendentes de aluguel
+    ajustar_pendentes = data.get('ajustar_pendentes') in [True, 'true', '1', 'on']
+    cobrancas_ajustadas = 0
+
+    if ajustar_pendentes and dia_anterior is not None:
+        cobrancas_pendentes = FinancialTransaction.query.filter(
+            FinancialTransaction.id_contrato == contrato.id,
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+            FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel'])
+        ).all()
+
+        for t in cobrancas_pendentes:
+            if t.data_vencimento:
+                venc_dia_semana = t.data_vencimento.weekday()
+                diff_dias = (novo_dia - venc_dia_semana)
+                if diff_dias != 0:
+                    t.data_vencimento = t.data_vencimento + timedelta(days=diff_dias)
+                    cobrancas_ajustadas += 1
+
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    detalhes_ajuste = f" com ajuste de {cobrancas_ajustadas} cobrança(s) pendente(s)" if cobrancas_ajustadas > 0 else ""
+    registrar_log(
+        'CONTRACT_DUE_DAY_UPDATED',
+        'Contract',
+        str(contrato.id),
+        f"Dia de cobrança semanal do contrato #{contrato.id} ({contrato.cliente_nome or 'Cliente'}) alterado de {nome_antigo} para {nome_novo} por {operador_atual}{detalhes_ajuste}"
+    )
+
+    db.session.commit()
+
+    return jsonify({
+        'message': f"Weekly payment due day updated to {dias_nomes_en[novo_dia]}",
+        'mensagem': f"Dia de vencimento semanal alterado com sucesso para {dias_nomes_en[novo_dia]} ({dias_nomes_pt[novo_dia]})",
+        'dia_pagamento_semanal': novo_dia,
+        'dia_nome': dias_nomes_en[novo_dia],
+        'cobrancas_ajustadas': cobrancas_ajustadas
+    }), 200
+
 @app.route('/api/contratos', methods=['GET'])
 @alugueis_required
 def listar_contratos():

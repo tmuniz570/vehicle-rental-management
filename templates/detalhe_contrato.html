@@ -185,8 +185,11 @@
                     <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; display: block;">Weekly Rent</span>
                     <strong id="info_aluguel" style="font-size: 1.35rem; color: var(--accent);">-</strong>
                 </div>
-                <div style="color: var(--text-secondary); font-size: 0.9rem;">
-                    Due Day: <strong id="info_dia_venc" style="color: var(--text-primary);">-</strong>
+                <div style="color: var(--text-secondary); font-size: 0.9rem; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                    <div>Due Day: <strong id="info_dia_venc" style="color: var(--text-primary);">-</strong></div>
+                    <button type="button" id="btnAlterarDiaVenc" class="btn-action" style="padding: 3px 9px; font-size: 0.78rem; border-radius: 6px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.28); color: #fbbf24; cursor: pointer; display: none; align-items: center; gap: 4px; font-weight: 600;" title="Change weekly payment due day">
+                        <span>✏️ Change Due Day</span>
+                    </button>
                 </div>
             </div>
 
@@ -815,6 +818,61 @@
     </div>
 </div>
 
+<!-- Modal: Change Weekly Payment Due Day -->
+<div id="modalAlterarDiaVenc" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalDiaVencTitle">
+    <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+            <h3 id="modalDiaVencTitle" style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.1rem; color: #fbbf24;">
+                <span>📅</span> Change Weekly Payment Due Day
+            </h3>
+            <button type="button" id="closeDiaVencModal" class="modal-close" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 1.25rem 1.5rem 1.5rem;">
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0; margin-bottom: 1rem; line-height: 1.45;">
+                Select the new weekday for recurring weekly rent generation for this contract. Future weekly rent charges will be scheduled on this day.
+            </p>
+
+            <form id="formAlterarDiaVenc" class="modern-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="form-group" style="margin-bottom: 1.25rem;">
+                    <label for="select_novo_dia_venc" style="font-weight: 600; display: block; margin-bottom: 0.4rem;">
+                        New Due Day of the Week *
+                    </label>
+                    <select id="select_novo_dia_venc" name="dia_pagamento_semanal" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%; font-size: 0.95rem; cursor: pointer;">
+                        <option value="0">Monday (Segunda-feira)</option>
+                        <option value="1">Tuesday (Terça-feira)</option>
+                        <option value="2">Wednesday (Quarta-feira)</option>
+                        <option value="3">Thursday (Quinta-feira)</option>
+                        <option value="4">Friday (Sexta-feira)</option>
+                        <option value="5">Saturday (Sábado)</option>
+                        <option value="6">Sunday (Domingo)</option>
+                    </select>
+                </div>
+
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem;">
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 0.88rem; color: var(--text-primary); margin: 0;">
+                        <input type="checkbox" id="check_ajustar_pendentes" name="ajustar_pendentes" checked style="margin-top: 3px; accent-color: var(--accent); cursor: pointer; width: 17px; height: 17px;">
+                        <span>
+                            <strong>Adjust pending weekly rent charge(s)</strong>
+                            <small style="display: block; color: var(--text-secondary); font-size: 0.78rem; margin-top: 2px;">
+                                Also shifts the due date of any existing unpaid rent charges to align with the new weekday.
+                            </small>
+                        </span>
+                    </label>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.25rem;">
+                    <button type="button" id="btnDismissDiaVenc" class="btn-secondary" style="padding: 0.75rem 1.25rem;">Cancel</button>
+                    <button type="submit" id="btnSalvarDiaVenc" class="btn-primary" style="padding: 0.75rem 1.25rem; font-weight: 600;">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% include 'moto_manage_modal.html' %}
 {% endblock %}
 
@@ -824,5 +882,5 @@
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
 <script src="/static/js/moto_modal_shared.js?v=5"></script>
-<script src="/static/js/detalhe_contrato.js?v=23"></script>
+<script src="/static/js/detalhe_contrato.js?v=25"></script>
 {% endblock %}

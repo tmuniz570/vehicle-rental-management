@@ -965,6 +965,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 : '-';
             const elDiaVenc = document.getElementById('info_dia_venc');
             if (elDiaVenc) elDiaVenc.textContent = diaVencTexto;
+
+            // Toggle Change Due Day button for active rental agreements
+            const btnAlterarDia = document.getElementById('btnAlterarDiaVenc');
+            if (btnAlterarDia) {
+                const isRental = (!data.tipo_contrato || data.tipo_contrato === 'Rent');
+                const isActive = (data.status === 'Active' || data.status === 'Ativo');
+                if (isRental && isActive) {
+                    btnAlterarDia.style.display = 'inline-flex';
+                    btnAlterarDia.dataset.currentDay = (data.dia_pagamento_semanal !== undefined && data.dia_pagamento_semanal !== null) ? data.dia_pagamento_semanal : 0;
+                } else {
+                    btnAlterarDia.style.display = 'none';
+                }
+            }
         }
         
         const boxCriado = document.getElementById('box_criado_por');
@@ -1919,7 +1932,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         ['closeDetalheSignatureModal', 'modalDetalheSignaturePad'],
         ['btnDetalheCancelSig', 'modalDetalheSignaturePad'],
         ['closeCancelarModal', 'modalCancelarContrato'],
-        ['btnCancelDismiss', 'modalCancelarContrato']
+        ['btnCancelDismiss', 'modalCancelarContrato'],
+        ['closeDiaVencModal', 'modalAlterarDiaVenc'],
+        ['btnDismissDiaVenc', 'modalAlterarDiaVenc']
     ];
 
     closeMapping.forEach(([btnId, modalId]) => {
@@ -2279,6 +2294,71 @@ document.addEventListener('DOMContentLoaded', async () => {
         formCancelarContrato.addEventListener('submit', (e) => {
             e.preventDefault();
             executarCancelamentoContrato();
+        });
+    }
+
+    // Change Weekly Payment Due Day modal logic
+    const btnAlterarDiaVenc = document.getElementById('btnAlterarDiaVenc');
+    const selectNovoDia = document.getElementById('select_novo_dia_venc');
+    const formAlterarDiaVenc = document.getElementById('formAlterarDiaVenc');
+
+    if (btnAlterarDiaVenc) {
+        btnAlterarDiaVenc.addEventListener('click', () => {
+            const currentDay = btnAlterarDiaVenc.dataset.currentDay !== undefined ? btnAlterarDiaVenc.dataset.currentDay : '0';
+            if (selectNovoDia) selectNovoDia.value = currentDay;
+            abrirModal('modalAlterarDiaVenc');
+        });
+    }
+
+    if (formAlterarDiaVenc) {
+        formAlterarDiaVenc.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const novoDia = selectNovoDia ? selectNovoDia.value : '0';
+            const checkAjustar = document.getElementById('check_ajustar_pendentes');
+            const ajustar = checkAjustar ? checkAjustar.checked : false;
+            const btnSalvar = document.getElementById('btnSalvarDiaVenc');
+            const origText = btnSalvar ? btnSalvar.textContent : 'Save Changes';
+
+            const csrfInput = document.querySelector('#formAlterarDiaVenc input[name="csrf_token"]') || document.querySelector('input[name="csrf_token"]');
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = (csrfInput && csrfInput.value) || (csrfMeta ? csrfMeta.getAttribute('content') : '');
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (csrfToken) headers['X-CSRFToken'] = csrfToken;
+
+            if (btnSalvar) {
+                btnSalvar.disabled = true;
+                btnSalvar.textContent = 'Saving...';
+            }
+
+            try {
+                const res = await fetch(`/api/contratos/${CONTRATO_ID}/dia-pagamento`, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: JSON.stringify({
+                        dia_pagamento_semanal: parseInt(novoDia, 10),
+                        ajustar_pendentes: ajustar,
+                        csrf_token: csrfToken
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    fecharModal('modalAlterarDiaVenc');
+                    alert(data.mensagem || data.message || 'Weekly payment due day updated successfully.');
+                    window.location.reload();
+                } else {
+                    alert(data.erro || data.error || 'Failed to update weekly payment due day.');
+                }
+            } catch (err) {
+                console.error('Error updating payment due day:', err);
+                alert('Connection error updating payment due day.');
+            } finally {
+                if (btnSalvar) {
+                    btnSalvar.disabled = false;
+                    btnSalvar.textContent = origText;
+                }
+            }
         });
     }
 

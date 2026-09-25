@@ -4,7 +4,16 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
-## [1.9.8] — 2026-09-25 — *Active Fleet Filter, Out-of-Operation Dashboard Indicator, Tracker IMEI Duplicate Protection & Client URL Search*
+## [1.9.8] — 2026-09-25 — *Active Fleet Filter, Out-of-Operation Dashboard Indicator, Tracker IMEI Duplicate Protection, Client URL Search & Rental Due Day Management*
+
+### 📅 Alteração de Dia de Vencimento Semanal para Contratos de Aluguel Ativos
+* **Ajuste Dinâmico do Dia de Cobrança Semanal (`PUT /api/contratos/<id>/dia-pagamento`)**:
+  - Implementado botão **`✏️ Change Due Day`** no card de termos contratuais em `/contratos/<id>`, exibido exclusivamente para contratos de aluguel ativos (`Rent` + `Active`).
+  - Modal dedicado (`#modalAlterarDiaVenc`) com design dark glassmorphism permitindo ao operador selecionar o novo dia da semana para o vencimento (Segunda a Domingo / `0..6`).
+  - **Ajuste Opcional de Cobranças Pendentes**: Caixa de seleção que, quando marcada, recalcula e realinha a data de vencimento de cobranças semanais de aluguel pendentes para o novo dia da semana.
+  - **Sincronização com o Cron Job do APScheduler**: A rotina noturna `gerar_cobrancas_recorrentes()` (à 01:00 AM London Time) passa a gerar as faturas semanais futuras automaticamente no novo dia configurado (`dia_pagamento_semanal == dia_semana_atual`).
+  - **Correção Estrutural de Renderização**: Corrigido fechamento de tag `</div>` de `.modal-overlay` em `detalhe_contrato.html`, garantindo exibição nítida do modal e recarregamento limpo pós-salvamento (`window.location.reload()`) com bump de versão para `detalhe_contrato.js?v=25`.
+  - Registro de auditoria (`CONTRACT_DUE_DAY_UPDATED`) com trilha completa: operador, dia anterior, novo dia e total de cobranças ajustadas.
 
 ### 🛵 Indicador de Motos Fora de Operação no Card "Total Fleet" (Dashboard)
 * **Visão Consolidada de Frota Ativa e Veículos Fora de Operação**:
