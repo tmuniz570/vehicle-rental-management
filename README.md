@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.7--Exchange%20%26%20Pound%20Fleet%20Controls-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.8--Active%20Fleet%20Controls%20%26%20Tracker%20Protection-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -29,11 +29,13 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 📊 1. Executive Dashboard & Fleet Allocation
 * **Live KPI Counters:** Real-time visibility into total fleet, available bikes, active rentals, motorcycles in maintenance, registered customers, and expected weekly revenue.
+* **Out-of-Operation Visibility:** Total Fleet card shows active bikes in operation alongside an interactive out-of-operation badge (`🏛️ [N] OUT OF OP`) with 1-click navigation to `/motos?status=Pound`.
 * **Interactive Fleet Allocation Bar:** Visual percentage breakdown of available, rented, workshop-held, and impounded (`Pound`) motorbikes.
 * **Instant Overdue Alerts:** Immediate notification of late payments and actionable shortcuts.
 * **Missing V5C Logbook Alarm:** Real-time dashboard alert listing all fleet vehicles without an attached V5C logbook document with 1-click links to upload documents.
 
 ### 🛵 2. Fleet & Vehicle Lifecycle
+* **Default Active Fleet View:** Fleet table (`/motos`) defaults to `⚡ Active Fleet (In Operation)` excluding sold and impounded vehicles, with an explicit `All Statuses` dropdown option for full historical audit.
 * **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`, `Pound`, `Sold`).
 * **Pound Status & MOT/Tax Exemption:** Dedicated status (`Pound`) for motorbikes outside operation (e.g., impounded by police or held in external compounds). Motorbikes in this status are strictly exempt from MOT and Road Tax alerts on the executive dashboard and display `Exempt (Pound)` in fleet tables.
 * **UK MOT & Road Tax (VED) Compliance:** Annual MOT test and DVLA Road Tax expiry date tracking with proactive warning badges (🟢 Valid, 🟡 Expiring within 30 days, 🔴 Expired).
@@ -44,12 +46,15 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - Dedicated multi-shot camera accumulator (`capture="environment"` and gallery picker) allowing operators to photograph multi-page V5C logbooks (Page 1, Page 2, Page 3...) consecutively on iPhone/Safari without reloading or uploading one-by-one.
   - Interactive preview grid with thumbnail, file size, and per-page discard button before batch uploading.
   - Single-click batch upload (`POST /api/motos/<placa>/v5c`) supporting image and digital PDF formats.
-* **GPS Telematics & Tracker Management:**
+* **GPS Telematics & Tracker Duplicate Protection:**
   - Multiple GPS trackers per motorbike with ownership classification (`Company` vs `Customer`).
+  - **Fleet-Wide Serial/IMEI Uniqueness:** Prevents duplicate tracker registration across vehicles, returning a descriptive error informing which plate currently holds the hardware.
+  - **Mobile Numeric Keypad:** Input field equipped with `inputmode="numeric"` and `pattern="[0-9]*"` for effortless IMEI typing on iPhone and touchscreen devices.
   - Serial / IMEI tracking and dedicated camera capture for device stickers and wiring installations.
 
 ### 👥 3. Customer Relationship Management
 * **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
+* **Deep-Link Customer Search & ID Match:** Direct URL parameter filtering (`/clientes?search=...`) with exact ID match prioritization (`db.case`), enabling instant customer discovery when clicking "View Client" from any contract detail screen.
 * **1-Tap WhatsApp Integration:** Automatic normalization and international formatting of UK phone numbers (`+447...`) allowing instant WhatsApp chat links from any contract or customer card.
 
 ### 📁 4. Claims & Storage Management (Accident & Insurance Referrals)
