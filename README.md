@@ -95,7 +95,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Receipt Printing & Payment Notes:** Optional payment note and reference field captured upon marking charges as paid (e.g. part-exchange bike details, bank transfer reference, discount authorizations). Notes appear on printable payment receipts, transaction ledgers, and audit logs.
 * **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
 
-### 📱 8. Mobile-First & PWA Experience
+### 📱 8. UI, Mobile-First & PWA Experience
+* **Collapsible Slim Sidebar (Desktop):** Flexible desktop sidebar toggle button (`#sidebarToggleBtn`) with `Shift + S` shortcut. Operators can collapse the sidebar into a slim icon bar (`74px`) displaying centered vector SVG icons, dynamic FF logo monogram, and floating glassmorphism tooltips, maximizing horizontal data table real estate. State persists across pages via `localStorage` with zero-flicker preloading.
 * **Native-Style Bottom Navigation:** High-usability bottom navigation bar enabled exclusively on mobile viewports (`<= 768px`) with iOS Safe Area Insets support.
 * **Installable App:** Manifest configuration (`manifest.json`) and app icons allowing home screen installation on iOS (Safari) and Android (Chrome).
 

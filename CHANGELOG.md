@@ -4,7 +4,21 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
-## [1.9.7] — 2026-09-25 — *Vehicle Part-Exchange Payment, Pound Status (MOT/Tax Exemption) & Missing V5C Alerts*
+## [1.9.7] — 2026-09-25 — *Collapsible Slim Sidebar, Vehicle Part-Exchange Payment, Pound Status & Missing V5C Alerts*
+
+### 📱 Menu Lateral Compactável / Fino (Collapsible Slim Sidebar)
+* **Modo Compacto / Slim com Ícones Centralizados (`.sidebar.collapsed`)**:
+  - Implementado botão de alternância suave (`#sidebarToggleBtn`) no cabeçalho do menu lateral com ícone de chevron dinâmico (`<<` para recolher, `>>` para expandir).
+  - No modo recolhido, a barra lateral transita de `260px` para `74px`, convertendo todos os links para ícones vetoriais modernos (SVG) centralizados em cor laranja FF Motors.
+  - O logotipo alterna automaticamente entre o logo completo (`logo.png`) e o emblema/monograma alado compacto (`icon.png`).
+  - O conteúdo principal (`.main-content`) expande dinamicamente para ocupar todo o espaço liberado em tela, proporcionando visualização maximizada de tabelas e dashboards.
+* **Tooltips Flutuantes no Hover & Atalho de Teclado**:
+  - Ao passar o mouse sobre qualquer link de navegação ou botão no modo fino, um tooltip flutuante com acabamento em vidro escuro e borda âmbar exibe o nome do módulo (`Dashboard`, `Fleet`, `Customers`, `Contracts`, etc.).
+  - Adicionado atalho de teclado `Shift + S` no desktop para alternar a barra lateral instantaneamente com uma só mão.
+* **Persistência de Estado e Proteção contra FOUC**:
+  - A preferência do operador é salva no `localStorage` (`ffmotors_sidebar_collapsed`) e restaurada automaticamente ao navegar entre qualquer página da aplicação.
+  - Script preloader inline em `<head>` elimina 100% de qualquer piscamento ou salto visual de tela (FOUC).
+  - Responsividade preservada no Mobile (<768px): dispositivos móveis continuam usando o drawer off-canvas e a barra inferior nativa sem interferência.
 
 ### 🔄 Forma de Pagamento "Exchange" (Trade-In / Troca com Outra Moto)
 * **Novo Método de Pagamento Nativo (`Exchange`)**:
