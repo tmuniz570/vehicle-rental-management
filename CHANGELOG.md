@@ -4,6 +4,31 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.9] — 2026-09-25 — *Contract Details Clipboard Shortcuts & Financial Statement Sorting and Pagination*
+
+### 📋 Botões de Copiar para Área de Transferência (Clipboard Shortcuts)
+* **Atalhos Rápidos de Cópia nos Detalhes do Contrato (`/contratos/<id>`)**:
+  - Implementados botões discretos e elegantes com ícone `📋` (`.btn-copy`) para cópia instantânea de informações essenciais com um único clique.
+  - **Dados do Cliente**: Botões ao lado do **Nome**, **Telefone**, **E-mail** e no cabeçalho do box de **Endereço Cadastrado**.
+  - **Dados da Motocicleta**: Botão de cópia posicionado diretamente ao lado da placa (`#info_placa` / `.badge-plate`).
+  - **Micro-interação e Feedback Visual**: Ao clicar, o botão transiciona suavemente para o ícone `✓` em tom verde esmeralda com contorno sutil (`#10b981`), retornando automaticamente ao estado original após 1,8 segundos.
+  - **Compatibilidade Ampla**: Suporte nativo à API moderna `navigator.clipboard.writeText` com fallback transparente via `document.execCommand('copy')` para ambientes legados ou sem contexto seguro.
+
+### 💳 Ordenação e Paginação no Extrato Financeiro (Financial Statement)
+* **Ordenação Interativa Multi-Coluna (Sorting)**:
+  - Cabeçalhos da tabela `#extratoTable` atualizados para classes `.sortable-th` com indicadores de direção (`⇅`, `▲`, `▼`).
+  - Suporte a ordenação ascendente e descendente nas colunas:
+    - **Type**: Ordem alfabética da categoria da transação.
+    - **Amount**: Ordenação numérica real do montante devido.
+    - **Due Date / Payment Date**: Conversão e ordenação cronológica exata por timestamp de data.
+    - **Status**: Ordenação contextual de urgência operacional (`Overdue` > `Pending` > `Paid`).
+* **Paginação com Seletor de Registros**:
+  - Controles de paginação adicionados abaixo da tabela (`#extratoPaginationContainer`) com botões **« Previous** e **Next »**.
+  - Indicador dinâmico de registros (ex.: *"Showing 1 to 10 of 28 charges (Page 1 of 3)"*).
+  - Seletor de quantidade por página com opções de **10** (padrão), **25**, **50** e **All**.
+  - **Cálculo Consolidado dos Totais**: Os cartões de resumo do extrato (*Total Paid*, *Total Pending*, etc.) continuam computados sobre o histórico integral do contrato, mantendo a integridade contábil independentemente da página selecionada.
+* **Cache Buster Bump**: Atualizado script para `detalhe_contrato.js?v=26`.
+
 ## [1.9.8] — 2026-09-25 — *Active Fleet Filter, Out-of-Operation Dashboard Indicator, Tracker IMEI Duplicate Protection, Client URL Search & Rental Due Day Management*
 
 ### 📅 Alteração de Dia de Vencimento Semanal para Contratos de Aluguel Ativos

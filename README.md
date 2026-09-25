@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.8--Active%20Fleet%20Controls%20%26%20Tracker%20Protection-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.9--Clipboard%20Shortcuts%20%26%20Statement%20Sorting-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -85,6 +85,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - Executive dashboard raises an alert highlighting all motorbikes on the premises awaiting pre-delivery checklist completion.
 * **Protection Against Incompatible Operations:** Sold motorbikes are automatically protected against rental return inspections (`Check-in`) and excluded from recurring rental billing batches, while allowing warranty and damage logs (`Incident`).
 * **Active Rental Weekly Payment Due Day Customization:** Interactive modal on contract details (`/contratos/<id>`) allowing operators to alter the recurring payment day of the week (Monday through Sunday) for active rental agreements, with optional automatic shift of pending rent due dates to align with the new schedule and instant synchronization with the 01:00 AM recurring billing scheduler.
+* **Instant Clipboard Copy Shortcuts:** One-click copy buttons (`📋`) positioned next to customer contact data (Name, Phone, Email, Registered Address) and motorcycle plate with green checkmark (`✓`) visual feedback.
 * **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.
 
 ### 🔍 6. Digital Mobile Inspections & Incident Logging
@@ -94,6 +95,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 💳 7. Financial Statements, Multi-Payment (Split) & Partial Settlements
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
+* **Financial Statement Sorting & Pagination:** Interactive multi-column table sorting (Type, Amount, Due Date, Payment Date, Status) with directional indicator arrows, and smart pagination (10, 25, 50, All) while preserving contract-wide financial summary calculations.
 * **Multi-Payment Methods (Split Payments & Part-Exchange):** Seamless division of any charge across multiple simultaneous payment forms (Cash, Card, Bank Transfer, Exchange (Vehicle Trade-in), Deposit, Other).
 * **Intelligent Partial Settlement:** Clients can pay partial amounts towards any charge; the paid portion is receipted and the outstanding remainder is automatically spun off into a linked child balance transaction with the original due date.
 * **Reversal with Auto-Merge:** Reverting a partial payment automatically re-merges child balance transactions back into the parent, maintaining immaculate ledger accuracy.

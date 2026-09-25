@@ -44,14 +44,26 @@
                 </div>
                 <span style="font-size: 1.2rem;">👤</span>
             </div>
-            <div id="info_cliente" style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">-</div>
-            <div id="info_tel" style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 0.25rem;">-</div>
-            <div id="info_email" style="color: var(--text-secondary); font-size: 0.88rem; word-break: break-all; margin-bottom: 0.5rem;">-</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.5rem;">
+                <div id="info_cliente" style="font-size: 1.35rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">-</div>
+                <button type="button" id="btnCopyClienteNome" class="btn-copy" title="Copy Customer Name">📋</button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.25rem;">
+                <div id="info_tel" style="color: var(--text-secondary); font-size: 0.95rem;">-</div>
+                <button type="button" id="btnCopyClienteTel" class="btn-copy" title="Copy Phone Number">📋</button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 0.5rem;">
+                <div id="info_email" style="color: var(--text-secondary); font-size: 0.88rem; word-break: break-all;">-</div>
+                <button type="button" id="btnCopyClienteEmail" class="btn-copy" title="Copy Email">📋</button>
+            </div>
 
             <!-- Address Box -->
             <div id="box_endereco" style="margin-top: 0.65rem; padding: 0.65rem 0.85rem; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); font-size: 0.82rem; line-height: 1.4;">
-                <span style="display: block; font-size: 0.7rem; text-transform: uppercase; font-weight: 600; color: var(--text-secondary); margin-bottom: 2px;">📍 Registered Address</span>
-                <span id="info_endereco" style="color: var(--text-primary); font-weight: 500;">-</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span style="font-size: 0.7rem; text-transform: uppercase; font-weight: 600; color: var(--text-secondary);">📍 Registered Address</span>
+                    <button type="button" id="btnCopyClienteEndereco" class="btn-copy" title="Copy Address">📋</button>
+                </div>
+                <span id="info_endereco" style="color: var(--text-primary); font-weight: 500; display: block;">-</span>
             </div>
 
             <!-- Customer Documents Box -->
@@ -74,8 +86,9 @@
                 <span class="stat-title" style="text-transform: uppercase; letter-spacing: 0.05em;">Vehicle</span>
                 <span style="font-size: 1.2rem;">🏍️</span>
             </div>
-            <div style="margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem;">
                 <span id="info_placa" class="badge-plate" style="font-size: 1.35rem; padding: 0.3rem 0.75rem;">-</span>
+                <button type="button" id="btnCopyPlaca" class="btn-copy" title="Copy Registration Plate">📋</button>
             </div>
             <div id="info_modelo_cor" style="color: var(--text-primary); font-weight: 500; font-size: 1rem; margin-bottom: 0.25rem;">-</div>
             <div id="info_data_retirada" style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 0.75rem;">Collection Date: -</div>
@@ -375,11 +388,11 @@
         <table id="extratoTable">
             <thead>
                 <tr>
-                    <th>Type</th>
-                    <th>Amount</th>
-                    <th>Due Date</th>
-                    <th>Payment Date</th>
-                    <th>Status</th>
+                    <th class="sortable-th" data-sort-field="tipo" title="Click to sort by Type">Type <span class="sort-indicator">⇅</span></th>
+                    <th class="sortable-th" data-sort-field="valor" title="Click to sort by Amount">Amount <span class="sort-indicator">⇅</span></th>
+                    <th class="sortable-th" data-sort-field="data_vencimento" title="Click to sort by Due Date">Due Date <span class="sort-indicator">⇅</span></th>
+                    <th class="sortable-th" data-sort-field="data_pagamento" title="Click to sort by Payment Date">Payment Date <span class="sort-indicator">⇅</span></th>
+                    <th class="sortable-th" data-sort-field="status" title="Click to sort by Status">Status <span class="sort-indicator">⇅</span></th>
                     <th style="text-align: right;">Actions</th>
                 </tr>
             </thead>
@@ -389,6 +402,26 @@
                 </tr>
             </tbody>
         </table>
+    </div>
+
+    <!-- Financial Statement Pagination Controls -->
+    <div id="extratoPaginationContainer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" id="btnExtratoPrev" class="btn-primary" style="padding: 6px 14px; width: auto; min-width: 80px; font-size: 0.85rem;" disabled>&laquo; Previous</button>
+            <button type="button" id="btnExtratoNext" class="btn-primary" style="padding: 6px 14px; width: auto; min-width: 80px; font-size: 0.85rem;" disabled>Next &raquo;</button>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="extratoPaginationInfo" style="color: var(--text-secondary); font-size: 0.88rem;"></span>
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--text-secondary);">
+                <span>Show:</span>
+                <select id="selectExtratoPageSize" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.82rem; cursor: pointer;">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="all">All</option>
+                </select>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -882,5 +915,5 @@
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
 <script src="/static/js/moto_modal_shared.js?v=5"></script>
-<script src="/static/js/detalhe_contrato.js?v=25"></script>
+<script src="/static/js/detalhe_contrato.js?v=26"></script>
 {% endblock %}

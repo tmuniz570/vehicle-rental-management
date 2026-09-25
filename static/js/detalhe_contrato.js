@@ -58,6 +58,108 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
+function copyToClipboard(text, triggerBtn) {
+    if (!text || text === '-' || text === 'null') return;
+    const cleanText = String(text).trim();
+    if (!cleanText) return;
+
+    function showSuccess() {
+        if (!triggerBtn) return;
+        const origHtml = triggerBtn.innerHTML;
+        const origTitle = triggerBtn.title;
+        triggerBtn.innerHTML = '<span style="color:#4ade80; font-weight:bold;">✓</span>';
+        triggerBtn.title = 'Copied to clipboard!';
+        triggerBtn.style.borderColor = 'rgba(74, 222, 128, 0.6)';
+        triggerBtn.style.color = '#4ade80';
+        triggerBtn.style.background = 'rgba(74, 222, 128, 0.15)';
+        setTimeout(() => {
+            triggerBtn.innerHTML = origHtml;
+            triggerBtn.title = origTitle;
+            triggerBtn.style.borderColor = '';
+            triggerBtn.style.color = '';
+            triggerBtn.style.background = '';
+        }, 1800);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cleanText).then(showSuccess).catch(() => fallbackCopy(cleanText));
+    } else {
+        fallbackCopy(cleanText);
+    }
+
+    function fallbackCopy(str) {
+        try {
+            const temp = document.createElement('textarea');
+            temp.value = str;
+            temp.setAttribute('readonly', '');
+            temp.style.position = 'fixed';
+            temp.style.left = '-9999px';
+            temp.style.top = '-9999px';
+            document.body.appendChild(temp);
+            temp.select();
+            document.execCommand('copy');
+            document.body.removeChild(temp);
+            showSuccess();
+        } catch (e) {
+            console.error('Fallback copy failed:', e);
+        }
+    }
+}
+
+function sortExtrato(transacoes, field, order) {
+    const list = [...transacoes];
+    const mult = (order === 'asc') ? 1 : -1;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    list.sort((a, b) => {
+        if (field === 'valor') {
+            const vA = parseFloat(a.valor) || 0;
+            const vB = parseFloat(b.valor) || 0;
+            return (vA - vB) * mult;
+        }
+
+        if (field === 'data_vencimento' || field === 'data_pagamento') {
+            const tA = a[field] ? new Date(a[field]).getTime() : 0;
+            const tB = b[field] ? new Date(b[field]).getTime() : 0;
+            if (!tA && !tB) return 0;
+            if (!tA) return 1;
+            if (!tB) return -1;
+            return (tA - tB) * mult;
+        }
+
+        if (field === 'status') {
+            const getRank = (item) => {
+                const s = (item.status || '').toLowerCase();
+                const isPaid = s === 'paid' || s === 'pago';
+                const isPending = s === 'pending' || s === 'pendente';
+                const dV = item.data_vencimento ? new Date(item.data_vencimento) : null;
+                const isOverdue = isPending && dV && dV < now;
+                if (isOverdue) return 1;
+                if (isPending) return 2;
+                if (isPaid) return 3;
+                return 4;
+            };
+            const rA = getRank(a);
+            const rB = getRank(b);
+            if (rA !== rB) return (rA - rB) * mult;
+            return ((b.id || 0) - (a.id || 0));
+        }
+
+        if (field === 'tipo') {
+            const descA = (a.descricao || (typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(a.tipo) : a.tipo) || '').toLowerCase();
+            const descB = (b.descricao || (typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(b.tipo) : b.tipo) || '').toLowerCase();
+            return descA.localeCompare(descB) * mult;
+        }
+
+        const rawA = String(a[field] || '').toLowerCase();
+        const rawB = String(b[field] || '').toLowerCase();
+        return rawA.localeCompare(rawB) * mult;
+    });
+
+    return list;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
     const diasSemana = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -122,6 +224,56 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
             } else {
                 elEndereco.textContent = 'No registered address';
+            }
+        }
+
+        // Copy buttons for Customer Card
+        const clienteNomeVal = data.cliente || data.cliente_nome || '';
+        const btnCopyNome = document.getElementById('btnCopyClienteNome');
+        if (btnCopyNome) {
+            if (clienteNomeVal && clienteNomeVal !== '-') {
+                btnCopyNome.onclick = (e) => {
+                    e.stopPropagation();
+                    copyToClipboard(clienteNomeVal, btnCopyNome);
+                };
+            } else {
+                btnCopyNome.style.display = 'none';
+            }
+        }
+
+        const btnCopyTel = document.getElementById('btnCopyClienteTel');
+        if (btnCopyTel) {
+            if (telVal && telVal !== '-') {
+                btnCopyTel.onclick = (e) => {
+                    e.stopPropagation();
+                    copyToClipboard(telVal, btnCopyTel);
+                };
+            } else {
+                btnCopyTel.style.display = 'none';
+            }
+        }
+
+        const btnCopyEmail = document.getElementById('btnCopyClienteEmail');
+        if (btnCopyEmail) {
+            if (emailVal && emailVal !== '-') {
+                btnCopyEmail.onclick = (e) => {
+                    e.stopPropagation();
+                    copyToClipboard(emailVal, btnCopyEmail);
+                };
+            } else {
+                btnCopyEmail.style.display = 'none';
+            }
+        }
+
+        const btnCopyEnd = document.getElementById('btnCopyClienteEndereco');
+        if (btnCopyEnd) {
+            if (endVal && endVal !== '-') {
+                btnCopyEnd.onclick = (e) => {
+                    e.stopPropagation();
+                    copyToClipboard(endVal, btnCopyEnd);
+                };
+            } else {
+                btnCopyEnd.style.display = 'none';
             }
         }
 
@@ -241,6 +393,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             };
         }
+
+        const btnCopyPlaca = document.getElementById('btnCopyPlaca');
+        if (btnCopyPlaca) {
+            if (placaVal && placaVal !== '-') {
+                btnCopyPlaca.onclick = (e) => {
+                    e.stopPropagation();
+                    copyToClipboard(placaVal, btnCopyPlaca);
+                };
+            } else {
+                btnCopyPlaca.style.display = 'none';
+            }
+        }
+
         document.getElementById('info_modelo_cor').textContent = `${modeloVal} • ${corVal}`;
         
         if (data.data_retirada) {
@@ -1253,45 +1418,122 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // 4. Financial Statement
-        const tbody = document.querySelector('#extratoTable tbody');
-        tbody.innerHTML = '';
-        
+        // 4. Financial Statement State & Logic
+        const extratoState = {
+            transacoes: data.transacoes || [],
+            sortField: 'data_vencimento',
+            sortOrder: 'desc',
+            currentPage: 1,
+            pageSize: 10
+        };
+
+        // Compute overall financial totals across all transactions
         let totalPendente = 0;
         let totalPago = 0;
+        const hojeZero = new Date();
+        hojeZero.setHours(0, 0, 0, 0);
 
-        if (!data.transacoes || data.transacoes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges recorded for this contract.</td></tr>';
-        } else {
-            const hoje = new Date();
-            hoje.setHours(0, 0, 0, 0);
+        extratoState.transacoes.forEach(t => {
+            const tStatusLower = (t.status || '').toLowerCase();
+            const tipoLower = (t.tipo || '').toLowerCase();
+            const isPaid = tStatusLower === 'paid' || tStatusLower === 'pago';
+            const isPending = tStatusLower === 'pending' || tStatusLower === 'pendente';
+            const tValor = parseFloat(t.valor) || 0;
+            if (isPaid && tipoLower !== 'deposit_refund' && tipoLower !== 'devolucao_deposito') {
+                totalPago += tValor;
+            } else if (isPending) {
+                totalPendente += tValor;
+            }
+        });
 
-            data.transacoes.forEach(t => {
+        const resumoExtrato = document.getElementById('resumoExtrato');
+        if (resumoExtrato) {
+            let depSummary = '';
+            if (depOriginal > 0) {
+                depSummary = ` &bull; Deposit Balance: <strong style="color:${isCompleted ? 'var(--text-secondary)' : 'var(--success)'};">${formatoMoeda.format(depSaldo)}</strong>`;
+            }
+            resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>${depSummary}`;
+        }
+
+        let splitPaymentMgrContract = null;
+
+        function renderExtrato() {
+            const tbody = document.querySelector('#extratoTable tbody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const paginationContainer = document.getElementById('extratoPaginationContainer');
+            const paginationInfo = document.getElementById('extratoPaginationInfo');
+            const btnPrev = document.getElementById('btnExtratoPrev');
+            const btnNext = document.getElementById('btnExtratoNext');
+
+            if (!extratoState.transacoes || extratoState.transacoes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges recorded for this contract.</td></tr>';
+                if (paginationContainer) paginationContainer.style.display = 'none';
+                return;
+            }
+
+            if (paginationContainer) paginationContainer.style.display = 'flex';
+
+            // 1. Sort transactions
+            const sorted = sortExtrato(extratoState.transacoes, extratoState.sortField, extratoState.sortOrder);
+
+            // Update Header sort indicators
+            const headers = document.querySelectorAll('#extratoTable thead th[data-sort-field]');
+            headers.forEach(th => {
+                const f = th.getAttribute('data-sort-field');
+                const ind = th.querySelector('.sort-indicator');
+                if (f === extratoState.sortField) {
+                    th.classList.remove('sorted-asc', 'sorted-desc');
+                    th.classList.add(extratoState.sortOrder === 'desc' ? 'sorted-desc' : 'sorted-asc');
+                    if (ind) ind.textContent = extratoState.sortOrder === 'desc' ? '▼' : '▲';
+                } else {
+                    th.classList.remove('sorted-asc', 'sorted-desc');
+                    if (ind) ind.textContent = '⇅';
+                }
+            });
+
+            // 2. Paginate transactions
+            const totalItems = sorted.length;
+            const pageSizeNum = extratoState.pageSize === 'all' ? totalItems : parseInt(extratoState.pageSize, 10);
+            const totalPages = Math.max(1, Math.ceil(totalItems / pageSizeNum));
+
+            if (extratoState.currentPage > totalPages) extratoState.currentPage = totalPages;
+            if (extratoState.currentPage < 1) extratoState.currentPage = 1;
+
+            const startIdx = (extratoState.currentPage - 1) * pageSizeNum;
+            const endIdx = Math.min(startIdx + pageSizeNum, totalItems);
+            const pageItems = sorted.slice(startIdx, endIdx);
+
+            if (paginationInfo) {
+                const startLabel = totalItems > 0 ? (startIdx + 1) : 0;
+                paginationInfo.textContent = `Showing ${startLabel} to ${endIdx} of ${totalItems} charges (Page ${extratoState.currentPage} of ${totalPages})`;
+            }
+
+            if (btnPrev) btnPrev.disabled = (extratoState.currentPage <= 1);
+            if (btnNext) btnNext.disabled = (extratoState.currentPage >= totalPages);
+
+            // 3. Render rows for current page
+            pageItems.forEach(t => {
                 const tr = document.createElement('tr');
-                
+
                 const dataVencObj = t.data_vencimento ? new Date(t.data_vencimento) : null;
                 const vencZero = dataVencObj ? new Date(dataVencObj.getFullYear(), dataVencObj.getMonth(), dataVencObj.getDate()) : null;
                 const dataVenc = dataVencObj ? dataVencObj.toLocaleDateString('en-GB') : '-';
-                
+
                 const tStatusLower = (t.status || '').toLowerCase();
                 const tipoLower = (t.tipo || '').toLowerCase();
                 const isPaid = tStatusLower === 'paid' || tStatusLower === 'pago';
                 const isPending = tStatusLower === 'pending' || tStatusLower === 'pendente';
-                const isVencido = isPending && vencZero && vencZero < hoje;
+                const isVencido = isPending && vencZero && vencZero < hojeZero;
 
                 const dataPag = t.data_pagamento ? new Date(t.data_pagamento).toLocaleDateString('en-GB') : '-';
-                
-                if (isPaid && tipoLower !== 'deposit_refund' && tipoLower !== 'devolucao_deposito') {
-                    totalPago += t.valor;
-                } else if (isPending) {
-                    totalPendente += t.valor;
-                }
 
                 let statusBadge = '';
                 if (isPaid) statusBadge = '<span class="badge badge-success">PAID</span>';
                 else if (isVencido) statusBadge = '<span class="badge badge-danger">OVERDUE</span>';
                 else statusBadge = '<span class="badge badge-warning">PENDING</span>';
-                
+
                 // Type Badges
                 let tipoBadge = '';
                 if (tipoLower === 'rent' || tipoLower === 'aluguel') tipoBadge = '<span class="badge badge-info">Rent</span>';
@@ -1317,13 +1559,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>
                     `;
                 } else if (isPaid) {
-                    const descFinal = t.descricao || formatarDescricaoTransacao(t.tipo);
+                    const descFinal = t.descricao || (typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(t.tipo) : t.tipo);
                     acoesHtml = `
                         <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
-                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" data-nota="${escapeHtml(t.nota || '')}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
+                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${parseFloat(t.valor).toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" data-nota="${escapeHtml(t.nota || '')}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
                                 🧾 Receipt
                             </button>
-                            <button class="btn-action btn-reverter-pagamento" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 9px; font-size:0.8rem; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
+                            <button class="btn-action btn-reverter-pagamento" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${parseFloat(t.valor).toFixed(2)}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 9px; font-size:0.8rem; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
                                 ↩ Cancel / Revert
                             </button>
                         </div>
@@ -1358,21 +1600,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 `;
                 tbody.appendChild(tr);
             });
-            
-            // Statement Summary Header
-            const resumoExtrato = document.getElementById('resumoExtrato');
-            if (resumoExtrato) {
-                let depSummary = '';
-                if (depOriginal > 0) {
-                    depSummary = ` &bull; Deposit Balance: <strong style="color:${isCompleted ? 'var(--text-secondary)' : 'var(--success)'};">${formatoMoeda.format(depSaldo)}</strong>`;
-                }
-                resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>${depSummary}`;
-            }
 
-            // Pay Modal Logic
-            let splitPaymentMgrContract = null;
-
-            document.querySelectorAll('.btn-pagar').forEach(btn => {
+            // Bind Pay Buttons for current page
+            tbody.querySelectorAll('.btn-pagar').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const b = e.target.closest('button');
                     const cobId = b.getAttribute('data-id');
@@ -1385,25 +1615,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     document.getElementById('pag_cobranca_id').value = cobId;
-                    document.getElementById('pag_desc_tipo').textContent = formatarDescricaoTransacao(tipo);
+                    document.getElementById('pag_desc_tipo').textContent = typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(tipo) : tipo;
                     document.getElementById('pag_desc_valor').textContent = formatoMoeda.format(valor);
-                    
+
                     splitPaymentMgrContract.open(valor, 'Cash');
                     abrirModal('pagamentoModal');
                 });
             });
-            
-            // Receipt Modal Logic
-            document.querySelectorAll('.btn-recibo').forEach(btn => {
+
+            // Bind Receipt Buttons for current page
+            tbody.querySelectorAll('.btn-recibo').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const b = e.target.closest('button');
                     const id = b.getAttribute('data-id');
                     const tipo = b.getAttribute('data-tipo');
-                    const descricao = b.getAttribute('data-descricao') || formatarDescricaoTransacao(tipo);
+                    const descricao = b.getAttribute('data-descricao') || (typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(tipo) : tipo);
                     const valor = parseFloat(b.getAttribute('data-valor')) || 0;
                     const forma = b.getAttribute('data-forma') || 'Not specified';
                     const dataStr = b.getAttribute('data-data');
-
                     const nota = b.getAttribute('data-nota') || '';
 
                     document.getElementById('rec_id').textContent = `#${id}`;
@@ -1433,8 +1662,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            // Revert / Cancel Payment Logic
-            document.querySelectorAll('.btn-reverter-pagamento').forEach(btn => {
+            // Bind Revert Buttons for current page
+            tbody.querySelectorAll('.btn-reverter-pagamento').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const b = e.target.closest('button');
                     const cobId = b.getAttribute('data-id');
@@ -1468,8 +1697,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
 
-            // Delete Charge Logic
-            document.querySelectorAll('.btn-remover').forEach(btn => {
+            // Bind Delete Buttons for current page
+            tbody.querySelectorAll('.btn-remover').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const tid = e.target.closest('button').dataset.id;
                     if (confirm('Are you sure you want to delete this charge?')) {
@@ -1487,6 +1716,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
+
+        // Setup Header Sort Click Handlers
+        const extratoHeaders = document.querySelectorAll('#extratoTable thead th[data-sort-field]');
+        extratoHeaders.forEach(th => {
+            th.addEventListener('click', () => {
+                const field = th.getAttribute('data-sort-field');
+                if (extratoState.sortField === field) {
+                    extratoState.sortOrder = extratoState.sortOrder === 'asc' ? 'desc' : 'asc';
+                } else {
+                    extratoState.sortField = field;
+                    extratoState.sortOrder = (field === 'valor' || field.includes('data')) ? 'desc' : 'asc';
+                }
+                extratoState.currentPage = 1;
+                renderExtrato();
+            });
+        });
+
+        // Setup Pagination Controls
+        const btnExtratoPrev = document.getElementById('btnExtratoPrev');
+        if (btnExtratoPrev) {
+            btnExtratoPrev.addEventListener('click', () => {
+                if (extratoState.currentPage > 1) {
+                    extratoState.currentPage--;
+                    renderExtrato();
+                }
+            });
+        }
+
+        const btnExtratoNext = document.getElementById('btnExtratoNext');
+        if (btnExtratoNext) {
+            btnExtratoNext.addEventListener('click', () => {
+                const totalItems = extratoState.transacoes.length;
+                const pageSizeNum = extratoState.pageSize === 'all' ? totalItems : parseInt(extratoState.pageSize, 10);
+                const totalPages = Math.max(1, Math.ceil(totalItems / pageSizeNum));
+                if (extratoState.currentPage < totalPages) {
+                    extratoState.currentPage++;
+                    renderExtrato();
+                }
+            });
+        }
+
+        const selectPageSize = document.getElementById('selectExtratoPageSize');
+        if (selectPageSize) {
+            selectPageSize.addEventListener('change', () => {
+                extratoState.pageSize = selectPageSize.value;
+                extratoState.currentPage = 1;
+                renderExtrato();
+            });
+        }
+
+        // Initial render of Financial Statement table
+        renderExtrato();
         
         // 5. Recorded Inspections
         const vistContainer = document.getElementById('vistoriasList');

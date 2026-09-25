@@ -1767,5 +1767,35 @@ th.sortable-th.sorted-desc .sort-indicator {
     }
 }
 
+/* Quick Copy to Clipboard Buttons */
+.btn-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 3px 6px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    line-height: 1;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.btn-copy:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.btn-copy:active {
+    transform: translateY(0);
+}
+
 
 
