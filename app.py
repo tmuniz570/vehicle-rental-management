@@ -685,8 +685,12 @@ def imprimir_contrato(id):
         )
 
     # Contrato de Aluguel (Motorcycle Rental Agreement)
+    # IMPORTANTE: O documento do contrato impresso é estritamente imutável (legalmente assinado).
+    # O dia de pagamento no documento impresso reflete sempre o dia originalmente assinado no snapshot
+    # (dia_pagamento_semanal_original), mesmo se a agenda de cobranças futuras for alterada no sistema.
+    dia_assinado = contrato.dia_pagamento_semanal_original if contrato.dia_pagamento_semanal_original is not None else contrato.dia_pagamento_semanal
     dias_nomes = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    dia_pagamento_nome = dias_nomes[contrato.dia_pagamento_semanal] if (contrato.dia_pagamento_semanal is not None and 0 <= contrato.dia_pagamento_semanal <= 6) else 'Monday'
+    dia_pagamento_nome = dias_nomes[dia_assinado] if (dia_assinado is not None and 0 <= dia_assinado <= 6) else 'Monday'
     
     # Depósito original registrado (prioriza valor_deposito congelado no contrato)
     dep_tx = FinancialTransaction.query.filter_by(
@@ -2221,7 +2225,8 @@ def criar_contrato():
         # Immutable Snapshot of Motorbike at creation time
         moto_modelo=moto.modelo,
         moto_cor=moto.cor,
-        moto_placa=moto.placa
+        moto_placa=moto.placa,
+        dia_pagamento_semanal_original=dia_pagamento_semanal
     )
     db.session.add(novo_contrato)
     
@@ -2677,6 +2682,9 @@ def alterar_dia_pagamento_contrato(id):
 
     nome_antigo = f"{dias_nomes_en[dia_anterior]} ({dias_nomes_pt[dia_anterior]})" if (dia_anterior is not None and 0 <= dia_anterior <= 6) else 'Not set'
     nome_novo = f"{dias_nomes_en[novo_dia]} ({dias_nomes_pt[novo_dia]})"
+    # Preserva o dia originalmente assinado no documento do contrato caso ainda não esteja congelado
+    if getattr(contrato, 'dia_pagamento_semanal_original', None) is None and dia_anterior is not None:
+        contrato.dia_pagamento_semanal_original = dia_anterior
 
     contrato.dia_pagamento_semanal = novo_dia
 
@@ -2916,6 +2924,22 @@ def detalhe_contrato(id):
         except Exception:
             cronograma_parsed = []
 
+    # Na tela operacional de detalhes do contrato, os dados do cliente e da moto devem
+    # refletir as informações ATUALIZADAS dos respectivos cadastros (telefone, email, endereço, docs, modelo, cor),
+    # enquanto o documento impresso do contrato permanece 100% imutável no snapshot original.
+    current_cliente_nome = (cliente.nome if cliente and cliente.nome else c.cliente_nome) or 'Customer'
+    current_cliente_telefone = cliente.telefone if (cliente and cliente.telefone) else c.cliente_telefone
+    current_cliente_email = cliente.email if (cliente and cliente.email) else c.cliente_email
+    current_cliente_endereco = cliente.endereco if (cliente and cliente.endereco) else c.cliente_endereco
+    current_url_habilitacao = cliente.url_habilitacao if (cliente and cliente.url_habilitacao) else c.url_habilitacao
+    current_url_habilitacao_verso = cliente.url_habilitacao_verso if (cliente and cliente.url_habilitacao_verso) else c.url_habilitacao_verso
+    current_url_cbt = cliente.url_cbt if (cliente and cliente.url_cbt) else c.url_cbt
+    current_url_comprovante_endereco = cliente.url_comprovante_endereco if (cliente and cliente.url_comprovante_endereco) else c.url_comprovante_endereco
+
+    current_moto_placa = moto.placa if (moto and moto.placa) else (c.moto_placa or c.placa)
+    current_moto_modelo = (moto.modelo if moto and moto.modelo else c.moto_modelo) or '-'
+    current_moto_cor = (moto.cor if moto and moto.cor else c.moto_cor) or '-'
+
     return jsonify({
         'id': c.id,
         'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
@@ -2928,23 +2952,33 @@ def detalhe_contrato(id):
         'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
         'cronograma_parcelas': cronograma_parsed,
         'id_cliente': c.id_cliente,
-        'cliente': c.cliente_nome or (cliente.nome if cliente else 'Customer'),
-        'cliente_nome': c.cliente_nome or (cliente.nome if cliente else 'Customer'),
-        'telefone': c.cliente_telefone or (cliente.telefone if cliente else None),
-        'cliente_telefone': c.cliente_telefone or (cliente.telefone if cliente else None),
-        'endereco': c.cliente_endereco or (cliente.endereco if cliente else None),
-        'cliente_endereco': c.cliente_endereco or (cliente.endereco if cliente else None),
-        'email': c.cliente_email or (cliente.email if cliente else None),
-        'cliente_email': c.cliente_email or (cliente.email if cliente else None),
-        'url_habilitacao': c.url_habilitacao or (cliente.url_habilitacao if cliente else None),
-        'url_habilitacao_verso': c.url_habilitacao_verso or (cliente.url_habilitacao_verso if cliente else None),
-        'url_cbt': c.url_cbt or (cliente.url_cbt if cliente else None),
-        'url_comprovante_endereco': c.url_comprovante_endereco or (cliente.url_comprovante_endereco if cliente else None),
-        'placa': c.moto_placa or c.placa,
-        'modelo': c.moto_modelo or (moto.modelo if moto else '-'),
-        'moto_modelo': c.moto_modelo or (moto.modelo if moto else '-'),
-        'cor': c.moto_cor or (moto.cor if moto else '-'),
-        'moto_cor': c.moto_cor or (moto.cor if moto else '-'),
+        'cliente': current_cliente_nome,
+        'cliente_nome': current_cliente_nome,
+        'telefone': current_cliente_telefone,
+        'cliente_telefone': current_cliente_telefone,
+        'endereco': current_cliente_endereco,
+        'cliente_endereco': current_cliente_endereco,
+        'email': current_cliente_email,
+        'cliente_email': current_cliente_email,
+        'url_habilitacao': current_url_habilitacao,
+        'url_habilitacao_verso': current_url_habilitacao_verso,
+        'url_cbt': current_url_cbt,
+        'url_comprovante_endereco': current_url_comprovante_endereco,
+        'placa': current_moto_placa,
+        'modelo': current_moto_modelo,
+        'moto_modelo': current_moto_modelo,
+        'cor': current_moto_cor,
+        'moto_cor': current_moto_cor,
+        'dia_pagamento_semanal': c.dia_pagamento_semanal,
+        'dia_pagamento_semanal_original': c.dia_pagamento_semanal_original if getattr(c, 'dia_pagamento_semanal_original', None) is not None else c.dia_pagamento_semanal,
+        # Snapshot imutável preservado para integridade jurídica e auditoria
+        'snapshot_cliente_nome': c.cliente_nome,
+        'snapshot_cliente_telefone': c.cliente_telefone,
+        'snapshot_cliente_email': c.cliente_email,
+        'snapshot_cliente_endereco': c.cliente_endereco,
+        'snapshot_moto_modelo': c.moto_modelo,
+        'snapshot_moto_cor': c.moto_cor,
+        'snapshot_moto_placa': c.moto_placa,
         'milhagem_atual_moto': int(moto.milhagem_atual or 0) if moto else 0,
         'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
         'milhagem_final': c.milhagem_final,

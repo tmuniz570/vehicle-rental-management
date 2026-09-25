@@ -1129,7 +1129,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ? (diasSemana[data.dia_pagamento_semanal] || `Day ${data.dia_pagamento_semanal}`)
                 : '-';
             const elDiaVenc = document.getElementById('info_dia_venc');
-            if (elDiaVenc) elDiaVenc.textContent = diaVencTexto;
+            if (elDiaVenc) {
+                if (data.dia_pagamento_semanal_original !== undefined && data.dia_pagamento_semanal_original !== null && data.dia_pagamento_semanal_original !== data.dia_pagamento_semanal) {
+                    const diaOriginalNome = diasSemana[data.dia_pagamento_semanal_original] || `Day ${data.dia_pagamento_semanal_original}`;
+                    elDiaVenc.innerHTML = `${escapeHtml(diaVencTexto)} <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;" title="Originally signed in contract document as ${escapeHtml(diaOriginalNome)}">(Signed: ${escapeHtml(diaOriginalNome)})</span>`;
+                } else {
+                    elDiaVenc.textContent = diaVencTexto;
+                }
+            }
 
             // Toggle Change Due Day button for active rental agreements
             const btnAlterarDia = document.getElementById('btnAlterarDiaVenc');

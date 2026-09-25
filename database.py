@@ -235,6 +235,7 @@ class Contract(db.Model):
     moto_cor = db.Column(db.String(50), nullable=True)
     moto_placa = db.Column(db.String(10), nullable=True)
     valor_deposito = db.Column(db.Numeric(10, 2), nullable=True)
+    dia_pagamento_semanal_original = db.Column(db.Integer, nullable=True) # Snapshot: dia da semana originalmente assinado no documento impresso
     
     vistorias = db.relationship('Inspection', backref='contrato', lazy=True)
     transacoes = db.relationship('FinancialTransaction', backref='contrato', lazy=True)
@@ -405,6 +406,7 @@ def init_db(app):
                         ('moto_cor', 'VARCHAR(50)'),
                         ('moto_placa', 'VARCHAR(10)'),
                         ('valor_deposito', 'NUMERIC(10, 2)'),
+                        ('dia_pagamento_semanal_original', 'INTEGER'),
                     ]
                     for col_name, col_type in snapshot_cols:
                         if col_name not in cols_c:
@@ -451,6 +453,13 @@ def init_db(app):
                                 moto_cor = (SELECT cor FROM motos WHERE motos.placa = contratos.placa),
                                 moto_placa = contratos.placa
                             WHERE cliente_nome IS NULL;
+                        """))
+                        conn.commit()
+
+                        conn.execute(db.text("""
+                            UPDATE contratos
+                            SET dia_pagamento_semanal_original = dia_pagamento_semanal
+                            WHERE dia_pagamento_semanal_original IS NULL AND dia_pagamento_semanal IS NOT NULL;
                         """))
                         conn.commit()
 

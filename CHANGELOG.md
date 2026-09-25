@@ -4,6 +4,23 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.10] — 2026-09-25 — *Signed Contract Legal Immutability & Live Operational Details Screen*
+
+### ⚖️ Imutabilidade Jurídica do Documento do Contrato Assinado (`/contratos/<id>/imprimir`)
+* **Preservação Rígida do Snapshot Legal Pós-Assinatura**:
+  - Modificar termos de um contrato após sua assinatura digital é legalmente inadmissível. O documento formal impresso e PDF gerado (`contrato_print.html` e `contrato_venda_print.html`) mantém congelados permanentemente todos os dados do ato de contratação: nome, telefone, e-mail, endereço registrado, CNH (DVLA), CBT, modelo, cor, placa e valores.
+  - **Preservação do Dia de Vencimento Original Assinado (`dia_pagamento_semanal_original`)**:
+    - Adicionada a coluna `dia_pagamento_semanal_original` no modelo `Contract` com auto-migração e backfill seguro em PostgreSQL e SQLite.
+    - Na criação do contrato (`POST /api/contratos`), o dia da semana assinado é permanentemente arquivado em `dia_pagamento_semanal_original`.
+    - Ao alterar o dia de cobrança no sistema (`PUT /api/contratos/<id>/dia-pagamento`), a agenda ativa `dia_pagamento_semanal` e o agendador de cobranças recorrentes são atualizados para as faturas futuras, mas o documento formal de contrato gerado/impresso **nunca é modificado**, continuando a exibir com fidelidade jurídica o dia de vencimento assinado pelo cliente.
+
+### 📱 Dados Vivos e Atualizados na Tela Operacional de Detalhes (`/contratos/<id>`)
+* **Sincronização em Tempo Real com Cadastros de Clientes e Motocicletas**:
+  - A tela de detalhes do contrato (`/contratos/<id>`) é a ferramenta de trabalho diário da equipe para contato, atendimento e pós-venda.
+  - O endpoint `/api/contratos/<id>` foi refatorado para priorizar as **informações atualizadas em tempo real** dos cadastros de `Client` (telefone para chamadas/WhatsApp, e-mail, endereço atualizado para correspondência, fotos de CNH/CBT) e `Motorcycle` (modelo, cor, placa), com fallback seguro para os dados do snapshot caso o registro seja excluído.
+  - No card de termos contratuais, a interface agora informa com clareza o dia de cobrança atual da agenda com anotação contextual do dia assinado caso tenha ocorrido alteração posterior (ex.: `Friday (Signed: Wednesday)`).
+  - Bump de versão de script para `detalhe_contrato.js?v=27`.
+
 ## [1.9.9] — 2026-09-25 — *Contract Details Clipboard Shortcuts & Financial Statement Sorting and Pagination*
 
 ### 📋 Botões de Copiar para Área de Transferência (Clipboard Shortcuts)
