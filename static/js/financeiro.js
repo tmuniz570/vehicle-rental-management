@@ -105,15 +105,20 @@ async function carregarFinanceiro() {
             
             // Payment Cell
             let celulaPagamento = '<span style="color:var(--text-secondary); opacity:0.6;">-</span>';
-            if (isPaid) {
+            if (isPaid || t.data_pagamento) {
                 const isDepositDeduction = t.forma_pagamento === 'Deposit';
+                const isExchange = t.forma_pagamento && t.forma_pagamento.includes('Exchange');
                 const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
-                const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
+                let colorStyle = 'color:var(--text-secondary);';
+                if (isDepositDeduction) colorStyle = 'color:#60a5fa; font-weight:600;';
+                else if (isExchange) colorStyle = 'color:#34d399; font-weight:600;';
                 const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.7rem; color:#a855f7; margin-top:2px;">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
+                const notaHtml = t.nota ? `<span style="display:block; font-size:0.75rem; color:#cbd5e1; background:rgba(255,255,255,0.06); border-left:2px solid var(--accent, #ff6b00); padding:2px 6px; border-radius:3px; margin-top:3px; word-break:break-word;" title="Payment note">📝 ${escapeHtml(t.nota)}</span>` : '';
                 celulaPagamento = `<div>
                     <span style="font-weight:500;">${pagamento}</span>
-                    <small style="display:block; ${colorStyle} font-size:0.75rem;">${formaLabel}</small>
+                    <small style="display:block; ${colorStyle} font-size:0.75rem;">${escapeHtml(formaLabel)}</small>
                     ${staffHtml}
+                    ${notaHtml}
                 </div>`;
             }
 
@@ -289,6 +294,17 @@ function abrirModalRecibo(t) {
     document.getElementById('rec_data').textContent = dataPag;
     document.getElementById('rec_forma').textContent = t.forma_pagamento || 'Not specified';
     document.getElementById('rec_valor').textContent = formatoMoeda.format(t.valor);
+
+    const rowNota = document.getElementById('rec_row_nota');
+    const elNota = document.getElementById('rec_nota');
+    if (rowNota && elNota) {
+        if (t.nota) {
+            elNota.textContent = t.nota;
+            rowNota.style.display = 'flex';
+        } else {
+            rowNota.style.display = 'none';
+        }
+    }
 
     const btnLink = document.getElementById('btnLinkRecibo');
     if (btnLink) btnLink.href = `/recibo/${t.id}`;

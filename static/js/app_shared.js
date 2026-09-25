@@ -462,6 +462,7 @@ function createSplitPaymentManager({
         { value: 'Cash', label: 'Cash' },
         { value: 'Card', label: 'Card' },
         { value: 'Bank Transfer', label: 'Bank Transfer' },
+        { value: 'Exchange', label: 'Exchange (Vehicle Trade-in)' },
         { value: 'Deposit', label: 'Deposit (Deducted)' },
         { value: 'Other', label: 'Other' }
     ];
@@ -605,12 +606,14 @@ function createSplitPaymentManager({
             container.innerHTML = '';
             container.appendChild(renderRow(defaultMethod, currentTotalDue));
         }
+        const elNota = document.getElementById('pag_nota');
+        if (elNota) elNota.value = '';
         updateRemoveButtons();
         recalculate();
     }
 
     function getPayload() {
-        if (!container) return { metodos_pagamento: [], valor_pago: 0, is_partial: false, saldo_restante: 0 };
+        if (!container) return { metodos_pagamento: [], valor_pago: 0, is_partial: false, saldo_restante: 0, nota: '' };
         const rows = container.querySelectorAll('.payment-method-row');
         const metodos = [];
         let totalPaid = 0;
@@ -626,12 +629,15 @@ function createSplitPaymentManager({
 
         totalPaid = Math.round(totalPaid * 100) / 100;
         const isPartial = (currentTotalDue - totalPaid) > 0.009;
+        const elNota = document.getElementById('pag_nota');
+        const nota = elNota ? elNota.value.trim() : '';
 
         return {
             metodos_pagamento: metodos,
             valor_pago: totalPaid,
             is_partial: isPartial,
-            saldo_restante: Math.max(0, Math.round((currentTotalDue - totalPaid) * 100) / 100)
+            saldo_restante: Math.max(0, Math.round((currentTotalDue - totalPaid) * 100) / 100),
+            nota: nota
         };
     }
 

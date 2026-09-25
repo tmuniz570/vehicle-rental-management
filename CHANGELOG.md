@@ -4,6 +4,59 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.7] — 2026-09-25 — *Vehicle Part-Exchange Payment, Pound Status (MOT/Tax Exemption) & Missing V5C Alerts*
+
+### 🔄 Forma de Pagamento "Exchange" (Trade-In / Troca com Outra Moto)
+* **Novo Método de Pagamento Nativo (`Exchange`)**:
+  - Implementado suporte nativo ao método `Exchange` quando o cliente entrega outra motocicleta como parte de pagamento na compra ou aluguel de veículo.
+  - Disponível em todo o ecossistema de liquidação financeira (`PAYMENT_METHODS`):
+    - Pagamentos manuais e baixas de transação (`/api/financeiro/pagar/<id>`).
+    - Pagamentos fracionados / múltiplos (Split Payments: ex: `Exchange (£1,500.00) + Cash (£500.00)`).
+    - Tabelas do financeiro (`/financeiro`), recibos e histórico do contrato (`/contratos/<id>`).
+    - Destaque visual com badge verde-esmeralda estilizado (`#34d399` / `#10b981`).
+
+### 📝 Campo de Observações/Notas ao Receber Pagamentos (Payment Notes)
+* **Campo de Nota Opcional no Modal de Pagamento**:
+  - Adicionado campo de texto `Payment Note / Reference (Optional)` nos modais de pagamento de `/financeiro` e `/contratos/<id>`.
+  - Permite aos operadores registrarem detalhes cruciais no ato do recebimento (ex: detalhes da moto entregue em trade-in `Exchange`, referência de transferência bancária, observações de desconto ou autorização do Fernando).
+* **Armazenamento e Auto-Migração (`database.py` & `app.py`)**:
+  - Nova coluna `nota TEXT` na tabela `financeiro_transacoes` com auto-migração transparente para PostgreSQL e SQLite.
+  - Log de auditoria (`AuditLog`) enriquecido com o registro da nota inserida.
+* **Visualização no Extrato e Recibos**:
+  - Extrato financeiro (`/financeiro`) e tabela de transações do contrato (`/contratos/<id>`): exibe linha de nota com ícone `📝` destacada na coluna de pagamento.
+  - Recibo impresso (`/recibo/<id>`) e modal pop-up de recibo: exibe linha dedicada `Payment Note:` quando preenchida.
+  - Busca inteligente: o campo de busca de transações também permite filtrar e encontrar pagamentos pelo texto da nota.
+
+### 🏛️ Novo Status "Pound" para Motos Fora de Operação
+* **Status "Pound" no Ciclo de Vida da Frota (`database.py` & `MotoStatus.POUND`)**:
+  - Para veículos apreendidos pela polícia, apreendidos em pátios oficiais ou temporariamente retidos fora de operação.
+  - **Isenção Estrita de Alertas de MOT e Road Tax**:
+    - Motocicletas com status `Pound` são **automaticamente desconsideradas** dos alertas de validade de MOT e Road Tax no Dashboard (`/api/dashboard`), evitando falsos positivos operacionais.
+    - Na tabela de frotas (`/motos`), as colunas de Road Tax e MOT exibem o selo informativo `Exempt (Pound)` em tom neutro.
+  - **Filtros e Alocação da Frota**:
+    - Novo filtro `🏛️ Pound (Outside Operation)` no dropdown da tabela de frotas (`#statusFilter`) e suporte a busca via URL (`/motos?status=Pound`).
+    - Barra de Alocação da Frota no Dashboard atualizada com segmento e contagem dedicada para motos em `Pound`.
+
+### ⚠️ Central de Alertas e Filtros para Motos sem V5C (Missing V5C)
+* **Detecção e Alerta no Dashboard (`/`)**:
+  - Novo card de alerta prioritário na Central de Avisos: **"📄 Motorbikes Missing V5C Logbook"**, exibindo a contagem e as placas clicáveis que levam diretamente ao gerenciador do veículo.
+  - Botão de atalho rápido direto para `/motos?v5c=missing`.
+* **Visualização e Gestão na Tabela de Frotas (`/motos`)**:
+  - Veículos ativos da frota sem documentos V5C cadastrados passam a exibir badge chamativo `⚠️ No V5C` na coluna *V5C & Trackers*, com atalho direto ao modal na aba de V5C.
+  - Novo filtro rápido no seletor de status: `⚠️ Missing V5C`, exibindo apenas as motos sem documento de porte/registro.
+  - Suporte à query string `?v5c=missing` com carregamento automático no `DOMContentLoaded`.
+* **Sinalização nos Detalhes do Contrato (`/contratos/<id>`)**:
+  - O botão de atalho `#btnShortcutV5C` no card do veículo passa a alertar visualmente em vermelho suave quando o veículo vinculado não possui nenhum V5C anexado (`0`), com atualização em tempo real após upload.
+
+### 🧪 Testes Automatizados & Otimização
+* **Nova Suíte de Testes (`tests/test_exchange_pound_v5c.py`)**:
+  - Testes integrados cobrindo:
+    1. Cadastro de moto em `Pound` com MOT/Tax vencidos e garantia de isenção de alertas no `/api/dashboard`.
+    2. Detecção precisa de motos sem V5C e filtros de busca `?v5c=missing`.
+    3. Registro e baixa de transação com split payment utilizando método `Exchange`.
+* **Cachebusters Atualizados**:
+  - `app_shared.js?v=5`, `financeiro.js?v=11`, `detalhe_contrato.js?v=23`, `motos.js?v=9`, `moto_modal_shared.js?v=4`.
+
 ## [1.9.6] — 2026-09-24 — *Pre-Delivery Compliance: Optional Initial Inspection & Insurance with Actionable Release Reminders*
 
 ### 🚀 Fluxo de Pré-Entrega e Liberação de Veículos (Pre-Delivery Compliance)

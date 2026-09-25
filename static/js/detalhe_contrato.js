@@ -248,10 +248,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // V5C & GPS Trackers Shortcuts
-        const badgeV5C = document.getElementById('badge_v5c_count');
-        if (badgeV5C) {
-            badgeV5C.textContent = (data.v5c_count !== undefined && data.v5c_count !== null) ? data.v5c_count : 0;
+        function updateV5CButtonState(count) {
+            const bV5C = document.getElementById('badge_v5c_count');
+            const bBtn = document.getElementById('btnShortcutV5C');
+            const c = Number(count || 0);
+            if (bV5C) {
+                bV5C.textContent = c;
+                if (c === 0) {
+                    bV5C.style.background = 'rgba(239, 68, 68, 0.35)';
+                    bV5C.style.color = '#fecaca';
+                    bV5C.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+                } else {
+                    bV5C.style.background = 'rgba(6, 182, 212, 0.25)';
+                    bV5C.style.color = '#22d3ee';
+                    bV5C.style.border = '1px solid rgba(6, 182, 212, 0.4)';
+                }
+            }
+            if (bBtn) {
+                if (c === 0) {
+                    bBtn.style.background = 'rgba(239, 68, 68, 0.12)';
+                    bBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    bBtn.style.color = '#fca5a5';
+                    bBtn.title = '⚠️ Missing V5C Logbook! Click to attach';
+                } else {
+                    bBtn.style.background = 'rgba(6, 182, 212, 0.12)';
+                    bBtn.style.borderColor = 'rgba(6, 182, 212, 0.35)';
+                    bBtn.style.color = '#22d3ee';
+                    bBtn.title = 'View and manage V5C logbook documents for this vehicle';
+                }
+            }
         }
+
+        updateV5CButtonState(data.v5c_count);
+
         const badgeTrk = document.getElementById('badge_trackers_count');
         if (badgeTrk) {
             badgeTrk.textContent = (data.trackers_count !== undefined && data.trackers_count !== null) ? data.trackers_count : 0;
@@ -299,9 +328,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const res = await fetch(`/api/motos/${encodeURIComponent(placa)}/detalhes`);
                 if (res.ok) {
                     const d = await res.json();
-                    const bV5C = document.getElementById('badge_v5c_count');
+                    const v5cTotal = (d.v5c_arquivos || []).length;
+                    updateV5CButtonState(v5cTotal);
                     const bTrk = document.getElementById('badge_trackers_count');
-                    if (bV5C) bV5C.textContent = (d.v5c_arquivos || []).length;
                     if (bTrk) bTrk.textContent = (d.trackers || []).length;
                 }
             } catch(err) {
@@ -1278,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const descFinal = t.descricao || formatarDescricaoTransacao(t.tipo);
                     acoesHtml = `
                         <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
-                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
+                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${t.valor.toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" data-nota="${escapeHtml(t.nota || '')}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
                                 🧾 Receipt
                             </button>
                             <button class="btn-action btn-reverter-pagamento" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor.toFixed(2)}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 9px; font-size:0.8rem; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
@@ -1291,10 +1320,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 let celulaPagamento = `<span style="color:var(--text-secondary); opacity:0.5;">-</span>`;
                 if (isPaid) {
                     const isDepositDeduction = t.forma_pagamento === 'Deposit';
+                    const isExchange = t.forma_pagamento && t.forma_pagamento.includes('Exchange');
                     const formaLabel = isDepositDeduction ? 'Deposit (Deduction)' : (t.forma_pagamento || '');
-                    const colorStyle = isDepositDeduction ? 'color:#60a5fa; font-weight:600;' : 'color:var(--text-secondary);';
+                    let colorStyle = 'color:var(--text-secondary);';
+                    if (isDepositDeduction) colorStyle = 'color:#60a5fa; font-weight:600;';
+                    else if (isExchange) colorStyle = 'color:#34d399; font-weight:600;';
                     const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.7rem; color:#c084fc; margin-top:2px;">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
-                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${escapeHtml(formaLabel)}</small>${staffHtml}</span>`;
+                    const notaHtml = t.nota ? `<span style="display:block; font-size:0.73rem; color:#cbd5e1; background:rgba(255,255,255,0.06); border-left:2px solid var(--accent, #ff6b00); padding:2px 6px; border-radius:3px; margin-top:3px; word-break:break-word;" title="Payment note">📝 ${escapeHtml(t.nota)}</span>` : '';
+                    celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${escapeHtml(formaLabel)}</small>${staffHtml}${notaHtml}</span>`;
                 }
 
                 let celulaVencimento = `<span>${dataVenc}</span>`;
@@ -1358,6 +1391,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const forma = b.getAttribute('data-forma') || 'Not specified';
                     const dataStr = b.getAttribute('data-data');
 
+                    const nota = b.getAttribute('data-nota') || '';
+
                     document.getElementById('rec_id').textContent = `#${id}`;
                     document.getElementById('rec_contrato_id').textContent = `Contract #${CONTRATO_ID}`;
                     document.getElementById('rec_cliente').textContent = data.cliente || '-';
@@ -1366,6 +1401,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('rec_valor').textContent = formatoMoeda.format(valor);
                     document.getElementById('rec_forma').textContent = forma;
                     document.getElementById('rec_data').textContent = dataStr && dataStr !== '-' ? new Date(dataStr).toLocaleString('en-GB') : '-';
+
+                    const rowNota = document.getElementById('rec_row_nota');
+                    const elNota = document.getElementById('rec_nota');
+                    if (rowNota && elNota) {
+                        if (nota) {
+                            elNota.textContent = nota;
+                            rowNota.style.display = 'flex';
+                        } else {
+                            rowNota.style.display = 'none';
+                        }
+                    }
 
                     const recLink = document.getElementById('rec_link_page');
                     if (recLink) recLink.href = `/recibo/${id}`;

@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.6--Pre--Delivery%20Compliance%20%26%20SORN-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.7--Exchange%20%26%20Pound%20Fleet%20Controls-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -29,13 +29,16 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 📊 1. Executive Dashboard & Fleet Allocation
 * **Live KPI Counters:** Real-time visibility into total fleet, available bikes, active rentals, motorcycles in maintenance, registered customers, and expected weekly revenue.
-* **Interactive Fleet Allocation Bar:** Visual percentage breakdown of available, rented, and workshop-held motorbikes.
+* **Interactive Fleet Allocation Bar:** Visual percentage breakdown of available, rented, workshop-held, and impounded (`Pound`) motorbikes.
 * **Instant Overdue Alerts:** Immediate notification of late payments and actionable shortcuts.
+* **Missing V5C Logbook Alarm:** Real-time dashboard alert listing all fleet vehicles without an attached V5C logbook document with 1-click links to upload documents.
 
 ### 🛵 2. Fleet & Vehicle Lifecycle
-* **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`).
+* **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`, `Pound`, `Sold`).
+* **Pound Status & MOT/Tax Exemption:** Dedicated status (`Pound`) for motorbikes outside operation (e.g., impounded by police or held in external compounds). Motorbikes in this status are strictly exempt from MOT and Road Tax alerts on the executive dashboard and display `Exempt (Pound)` in fleet tables.
 * **UK MOT & Road Tax (VED) Compliance:** Annual MOT test and DVLA Road Tax expiry date tracking with proactive warning badges (🟢 Valid, 🟡 Expiring within 30 days, 🔴 Expired).
 * **DVLA SORN (Statutory Off Road Notification) Support:** Native toggle for vehicles officially declared off-road (SORN) with DVLA. Automatically disables Road Tax expiry dates, displays a distinctive `🛡️ SORN` badge in the fleet list, supports quick search (`search=sorn`), and excludes off-road bikes from false-positive Road Tax dashboard alerts.
+* **Missing V5C Tracking & Alerts:** Fleet vehicles without V5C registration logbooks feature an eye-catching `⚠️ No V5C` badge in the fleet table, quick filtering (`/motos?v5c=missing`), and an amber alert badge on contract cards.
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
 * **V5C Logbook Multi-Page Management & Mobile Multi-Shot Camera:**
   - Dedicated multi-shot camera accumulator (`capture="environment"` and gallery picker) allowing operators to photograph multi-page V5C logbooks (Page 1, Page 2, Page 3...) consecutively on iPhone/Safari without reloading or uploading one-by-one.
@@ -85,11 +88,11 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 💳 7. Financial Statements, Multi-Payment (Split) & Partial Settlements
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
-* **Multi-Payment Methods (Split Payments):** Seamless division of any charge across multiple simultaneous payment forms (Cash, Card, Bank Transfer, Deposit, Other).
+* **Multi-Payment Methods (Split Payments & Part-Exchange):** Seamless division of any charge across multiple simultaneous payment forms (Cash, Card, Bank Transfer, Exchange (Vehicle Trade-in), Deposit, Other).
 * **Intelligent Partial Settlement:** Clients can pay partial amounts towards any charge; the paid portion is receipted and the outstanding remainder is automatically spun off into a linked child balance transaction with the original due date.
 * **Reversal with Auto-Merge:** Reverting a partial payment automatically re-merges child balance transactions back into the parent, maintaining immaculate ledger accuracy.
 * **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions. Charges due today remain pending for the entire day and strictly transition to overdue at 00:00:00 of the following day if unpaid.
-* **Receipt Printing:** Printable payment confirmation receipts with branded layout, transaction reference, itemized multi-payment breakdown, and PDF-friendly styling.
+* **Receipt Printing & Payment Notes:** Optional payment note and reference field captured upon marking charges as paid (e.g. part-exchange bike details, bank transfer reference, discount authorizations). Notes appear on printable payment receipts, transaction ledgers, and audit logs.
 * **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
 
 ### 📱 8. Mobile-First & PWA Experience

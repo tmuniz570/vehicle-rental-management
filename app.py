@@ -1702,6 +1702,8 @@ def listar_motos():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
+    status_filter = request.args.get('status', '', type=str).strip()
+    v5c_filter = request.args.get('v5c', '', type=str).strip().lower()
     sort_by = request.args.get('sort_by', 'placa', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'asc', type=str).strip().lower()
     
@@ -1709,6 +1711,18 @@ def listar_motos():
         selectinload(Motorcycle.v5c_arquivos),
         selectinload(Motorcycle.trackers)
     )
+
+    if status_filter:
+        if status_filter.lower() == 'sorn':
+            query = query.filter(Motorcycle.tax_sorn == True)
+        elif status_filter.lower() in ['missing_v5c', 'no_v5c', 'sem_v5c']:
+            query = query.filter(~Motorcycle.v5c_arquivos.any(), ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']))
+        else:
+            query = query.filter(Motorcycle.status.ilike(status_filter))
+
+    if v5c_filter in ['missing', 'none', 'sem', '0']:
+        query = query.filter(~Motorcycle.v5c_arquivos.any(), ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']))
+
     if search:
         search_clean = search.strip().replace(' ', '')
         search_term = f"%{search.strip()}%"
@@ -1722,6 +1736,8 @@ def listar_motos():
         ]
         if search.strip().lower() == 'sorn':
             search_filters.append(Motorcycle.tax_sorn == True)
+        elif search.strip().lower() in ['missing_v5c', 'missing v5c', 'no v5c', 'sem v5c']:
+            search_filters.append(db.and_(~Motorcycle.v5c_arquivos.any(), ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])))
         query = query.filter(db.or_(*search_filters))
         
     sort_map = {
@@ -2871,6 +2887,7 @@ def detalhe_contrato(id):
             'forma_pagamento': t.forma_pagamento,
             'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
             'id_transacao_origem': t.id_transacao_origem,
+            'nota': t.nota,
             'registrado_por_nome': t.registrado_por_nome or '',
             'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
             'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None
@@ -3143,6 +3160,7 @@ def listar_financeiro():
             FinancialTransaction.tipo.ilike(search_term),
             FinancialTransaction.status.ilike(search_term),
             FinancialTransaction.forma_pagamento.ilike(search_term),
+            FinancialTransaction.nota.ilike(search_term),
             FinancialTransaction.valor.cast(db.String).ilike(search_term),
             Contract.placa.ilike(search_plate_term),
             Contract.placa.ilike(search_term),
@@ -3242,6 +3260,7 @@ def listar_financeiro():
         'forma_pagamento': t.forma_pagamento or '',
         'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
         'id_transacao_origem': t.id_transacao_origem,
+        'nota': t.nota,
         'registrado_por_nome': t.registrado_por_nome or '',
         'placa': t.contrato.placa if t.contrato else '',
         'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else ''
@@ -3321,16 +3340,20 @@ def pagar_transacao(id):
 
     detalhes_json = json.dumps(metodos_validos)
 
+    nota = str(data.get('nota') or '').strip() or None
+
     # 1. Update current transaction as PAID
     t.valor = valor_pago
     t.status = TransactionStatus.PAID.value
     t.data_pagamento = get_local_now()
     t.forma_pagamento = forma_pagamento_consolidada
     t.detalhes_pagamento_json = detalhes_json
+    t.nota = nota
     t.registrado_por_nome = operador_atual
 
     # 2. If partial payment, generate child transaction for the remaining balance
     t_restante = None
+    nota_log = f" (Nota: {nota})" if nota else ""
     if is_parcial:
         t_restante = FinancialTransaction(
             id_contrato=t.id_contrato,
@@ -3340,6 +3363,7 @@ def pagar_transacao(id):
             status=TransactionStatus.PENDING.value,
             forma_pagamento=None,
             detalhes_pagamento_json=None,
+            nota=None,
             registrado_por_nome=operador_atual,
             id_transacao_origem=t.id
         )
@@ -3350,14 +3374,14 @@ def pagar_transacao(id):
             'PAYMENT_RECEIVED', 
             'Transaction', 
             t.id, 
-            f"Baixa PARCIAL de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}. Saldo restante de £{saldo_restante:.2f} lançado na transação #{t_restante.id}."
+            f"Baixa PARCIAL de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}. Saldo restante de £{saldo_restante:.2f} lançado na transação #{t_restante.id}.{nota_log}"
         )
     else:
         registrar_log(
             'PAYMENT_RECEIVED', 
             'Transaction', 
             t.id, 
-            f"Baixa de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}"
+            f"Baixa de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}.{nota_log}"
         )
 
         # Auto-conclusão para contratos de venda quando todas as transações forem quitadas
@@ -3424,6 +3448,7 @@ def reverter_pagamento(id):
     t.data_pagamento = None
     t.forma_pagamento = None
     t.detalhes_pagamento_json = None
+    t.nota = None
     t.registrado_por_nome = None
 
     # Se o contrato era de venda e estava Completed, reabre para Active
@@ -3553,12 +3578,13 @@ def get_dashboard():
     pode_alugueis = current_user.is_authenticated and current_user.pode_alugueis()
 
     if pode_alugueis:
-        # Total Fleet exclui motos vendidas (frota ativa = disponíveis + alugadas + manutenção)
-        total_motos = Motorcycle.query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).count()
         motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
         motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
         motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
+        motos_pound = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound'])).count()
         motos_vendidas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).count()
+        # Total Fleet = frota ativa operacional (disponíveis + alugadas + manutenção; exclui vendidas e pound)
+        total_motos = Motorcycle.query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound'])).count()
         
         # Detalhes das motos em manutenção (otimizado com batch query de contratos)
         motos_manutencao_lista = []
@@ -3682,6 +3708,12 @@ def get_dashboard():
         
         for m in todas_motos:
             is_sold = (m.status in [MotoStatus.SOLD.value, 'Sold', 'Vendida'])
+            is_pound = (m.status in [MotoStatus.POUND.value, 'Pound'])
+
+            # Motos com status "Pound" estão fora de operação: NÃO emitem alerta de MOT e nem Road Tax
+            if is_pound:
+                continue
+
             has_tax_w = False
             has_mot_w = False
             is_m_expired = False
@@ -3774,12 +3806,33 @@ def get_dashboard():
                     'pendencias_txt': " & ".join(pendencias)
                 })
 
+        # Compliance: Motos sem Documento V5C (Logbook)
+        # Monitora a frota da empresa (Available, Rented, Maintenance, Pound), excluindo apenas motos vendidas
+        motos_sem_v5c_objs = db.session.query(Motorcycle).options(
+            selectinload(Motorcycle.v5c_arquivos)
+        ).filter(
+            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])
+        ).order_by(Motorcycle.placa.asc()).all()
+
+        motos_sem_v5c = []
+        for mv in motos_sem_v5c_objs:
+            if not mv.v5c_arquivos or len(mv.v5c_arquivos) == 0:
+                motos_sem_v5c.append({
+                    'placa': mv.placa,
+                    'modelo': mv.modelo,
+                    'status': mv.status
+                })
+        motos_sem_v5c_count = len(motos_sem_v5c)
+
         resp_data.update({
             'total_motos': total_motos,
             'motos_disponiveis': motos_disponiveis,
             'motos_alugadas': motos_alugadas,
             'motos_manutencao': motos_manutencao,
+            'motos_pound': motos_pound,
             'motos_vendidas': motos_vendidas,
+            'motos_sem_v5c_count': motos_sem_v5c_count,
+            'motos_sem_v5c': motos_sem_v5c,
             'motos_manutencao_lista': motos_manutencao_lista,
             'tax_mot_warnings': tax_mot_warnings,
             'tax_mot_expired': tax_mot_expired,

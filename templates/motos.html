@@ -8,8 +8,18 @@
     <a href="/motos/nova" class="btn-primary" style="width: auto; display: inline-flex;">+ Add Motorbike</a>
 </div>
 
-<div style="margin-bottom: 1.5rem;">
-    <input type="text" id="searchInput" placeholder="Search by reg plate, model, status..." style="width: 100%; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+<div style="margin-bottom: 1.5rem; display: flex; gap: 10px; flex-wrap: wrap;">
+    <input type="text" id="searchInput" placeholder="Search by reg plate, model, colour..." style="flex: 1; min-width: 240px; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+    <select id="statusFilter" style="padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.9rem; outline: none; cursor: pointer;">
+        <option value="">All Statuses</option>
+        <option value="Available">Available</option>
+        <option value="Rented">Rented</option>
+        <option value="Maintenance">Maintenance</option>
+        <option value="Pound">🏛️ Pound (Outside Operation)</option>
+        <option value="Sold">Sold</option>
+        <option value="missing_v5c">⚠️ Missing V5C</option>
+        <option value="sorn">🛡️ SORN</option>
+    </select>
 </div>
 
 <div class="table-container">
@@ -62,6 +72,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/moto_modal_shared.js?v=3"></script>
-<script src="/static/js/motos.js?v=8"></script>
+<script src="/static/js/moto_modal_shared.js?v=4"></script>
+<script src="/static/js/motos.js?v=9"></script>
 {% endblock %}

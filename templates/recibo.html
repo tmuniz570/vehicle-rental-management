@@ -195,6 +195,13 @@
                 </div>
             </div>
 
+            {% if transacao.nota %}
+            <div class="receipt-row" style="align-items: flex-start;">
+                <span>Payment Note:</span>
+                <span style="font-weight: 500; color: #475569; font-style: italic; text-align: right; max-width: 65%;">{{ transacao.nota }}</span>
+            </div>
+            {% endif %}
+
             <div class="receipt-total">
                 <span>Amount Paid:</span>
                 <span>£{{ "%.2f"|format(transacao.valor) }}</span>

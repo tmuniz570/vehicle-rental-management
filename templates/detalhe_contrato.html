@@ -548,6 +548,14 @@
                     </div>
                 </div>
 
+                <!-- Optional Payment Note -->
+                <div style="margin-bottom: 1rem;">
+                    <label for="pag_nota" style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.35rem;">
+                        Payment Note / Reference (Optional):
+                    </label>
+                    <textarea id="pag_nota" rows="2" placeholder="e.g. Paid via bike exchange (PCX 125 AB12CDE), Bank reference, discount note..." style="width: 100%; box-sizing: border-box; background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); border-radius: 8px; padding: 0.6rem 0.75rem; font-size: 0.88rem; outline: none; resize: vertical;"></textarea>
+                </div>
+
                 <!-- Payment Summary Box -->
                 <div id="paymentSummaryBox" style="background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.25rem;">
                     <div style="display:flex; justify-content:space-between; font-size:0.85rem; margin-bottom:0.35rem;">
@@ -611,6 +619,10 @@
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
                         <span style="color:#64748b;">Payment Method:</span>
                         <strong id="rec_forma" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div id="rec_row_nota" style="display:none; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem; align-items:flex-start;">
+                        <span style="color:#64748b;">Payment Note:</span>
+                        <strong id="rec_nota" style="color:#0f172a; font-style:italic; max-width:65%; text-align:right; font-weight:500;">-</strong>
                     </div>
 
                     <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 2px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center;">
@@ -811,6 +823,6 @@
     const CONTRATO_ID = {{ contrato_id }};
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/moto_modal_shared.js?v=3"></script>
-<script src="/static/js/detalhe_contrato.js?v=21"></script>
+<script src="/static/js/moto_modal_shared.js?v=4"></script>
+<script src="/static/js/detalhe_contrato.js?v=23"></script>
 {% endblock %}

@@ -157,6 +157,7 @@
         <div id="barRented" class="fleet-bar-segment" style="background: var(--accent); width: 0%;" title="Rented"></div>
         <div id="barAvailable" class="fleet-bar-segment" style="background: var(--success); width: 0%;" title="Available"></div>
         <div id="barMaintenance" class="fleet-bar-segment" style="background: #f59e0b; width: 0%;" title="Maintenance"></div>
+        <div id="barPound" class="fleet-bar-segment" style="background: #ef4444; width: 0%; display: none;" title="Pound"></div>
     </div>
     <div class="fleet-bar-legend">
         <div class="fleet-bar-legend-item">
@@ -170,6 +171,10 @@
         <div class="fleet-bar-legend-item">
             <span class="fleet-bar-dot" style="background: #f59e0b;"></span>
             <span>In Maintenance: <strong id="legendMaintenance" style="color: var(--text-primary);">0</strong></span>
+        </div>
+        <div class="fleet-bar-legend-item" id="legendItemPound" style="display: none;">
+            <span class="fleet-bar-dot" style="background: #ef4444;"></span>
+            <span>Pound: <strong id="legendPound" style="color: var(--text-primary);">0</strong></span>
         </div>
     </div>
 </div>
@@ -414,6 +419,7 @@
                 const alugadas = data.motos_alugadas || 0;
                 const disponiveis = data.motos_disponiveis || 0;
                 const manutencao = data.motos_manutencao || 0;
+                const pound = data.motos_pound || 0;
 
                 const elLegRented = document.getElementById('legendRented');
                 if (elLegRented) elLegRented.textContent = alugadas;
@@ -421,6 +427,10 @@
                 if (elLegAvail) elLegAvail.textContent = disponiveis;
                 const elLegManut = document.getElementById('legendMaintenance');
                 if (elLegManut) elLegManut.textContent = manutencao;
+                const elLegPound = document.getElementById('legendPound');
+                if (elLegPound) elLegPound.textContent = pound;
+                const legItemPound = document.getElementById('legendItemPound');
+                if (legItemPound) legItemPound.style.display = pound > 0 ? 'inline-flex' : 'none';
 
                 const elBarAvail = document.getElementById('barAvailable');
                 const elBarManut = document.getElementById('barMaintenance');
@@ -434,9 +444,13 @@
                     elBarRented.style.width = `${pRented}%`;
                     if (elBarAvail) elBarAvail.style.width = `${pAvail}%`;
                     if (elBarManut) elBarManut.style.width = `${pManut}%`;
-                    if (elFleetSum) elFleetSum.textContent = `${pRented}% Rented • ${pAvail}% Available • ${pManut}% Maintenance`;
+                    let summaryText = `${pRented}% Rented • ${pAvail}% Available • ${pManut}% Maintenance`;
+                    if (pound > 0) {
+                        summaryText += ` • ${pound} in Pound (off-road)`;
+                    }
+                    if (elFleetSum) elFleetSum.textContent = summaryText;
                 } else {
-                    if (elFleetSum) elFleetSum.textContent = 'No motorbikes in fleet';
+                    if (elFleetSum) elFleetSum.textContent = pound > 0 ? `${pound} bike(s) in Pound` : 'No motorbikes in fleet';
                 }
             }
 
@@ -807,7 +821,48 @@
                 </div>`;
             }
 
-            // 7. If no alerts
+            // 7. Check for Missing V5C Logbook Alerts
+            if (dashData && dashData.motos_sem_v5c_count > 0) {
+                const motosSemV5C = dashData.motos_sem_v5c || [];
+                let itemsV5CHtml = '<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">';
+                const displayMotos = motosSemV5C.slice(0, 10);
+                displayMotos.forEach(m => {
+                    itemsV5CHtml += `
+                        <a href="/motos?search=${encodeURIComponent(m.placa)}" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(0,0,0,0.3); border:1px solid rgba(239,68,68,0.35); padding:4px 8px; border-radius:6px; font-size:0.78rem; transition:all 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='rgba(239,68,68,0.35)'">
+                            <strong style="font-family:monospace; color:var(--text-primary);">${escapeHtml(m.placa)}</strong>
+                            <span style="color:var(--text-secondary); font-size:0.72rem;">${escapeHtml(m.modelo || 'Moto')}</span>
+                            <span class="badge" style="background:rgba(239,68,68,0.25); color:#f87171; font-size:0.68rem; padding:1px 5px;">No V5C</span>
+                        </a>
+                    `;
+                });
+                if (motosSemV5C.length > 10) {
+                    itemsV5CHtml += `
+                        <span style="align-self:center; font-size:0.75rem; color:var(--text-secondary); padding:2px 6px;">
+                            +${motosSemV5C.length - 10} more
+                        </span>
+                    `;
+                }
+                itemsV5CHtml += '</div>';
+
+                html += `
+                <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: #f87171; font-size: 0.95rem;">📄 Motorbikes Missing V5C Logbook (${dashData.motos_sem_v5c_count})</h4>
+                        <span class="badge badge-danger" style="font-size: 0.75rem;">Registration Missing</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        Motorbikes in the active fleet without any registration certificate (V5C) documents or photos on file.
+                    </p>
+                    ${itemsV5CHtml}
+                    <div style="margin-top: 8px;">
+                        <a href="/motos?v5c=missing" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                            View all motorbikes missing V5C in Fleet &rarr;
+                        </a>
+                    </div>
+                </div>`;
+            }
+
+            // 8. If no alerts
             if (!html) {
                 html = `
                     <div style="display: flex; align-items: center; gap: 10px; padding: 1rem; border-radius: 8px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2);">

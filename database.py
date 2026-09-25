@@ -61,6 +61,7 @@ class MotoStatus(str, Enum):
     RENTED = "Rented"
     MAINTENANCE = "Maintenance"
     SOLD = "Sold"
+    POUND = "Pound"
     # Legacy aliases
     DISPONIVEL = "Available"
     ALUGADA = "Rented"
@@ -273,6 +274,7 @@ class FinancialTransaction(db.Model):
     status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False, index=True)
     forma_pagamento = db.Column(db.String(255), nullable=True)
     detalhes_pagamento_json = db.Column(db.Text, nullable=True)
+    nota = db.Column(db.Text, nullable=True)
     id_transacao_origem = db.Column(db.Integer, nullable=True)
     registrado_por_nome = db.Column(db.String(100), nullable=True)
 
@@ -495,6 +497,9 @@ def init_db(app):
                         conn.commit()
                     if 'id_transacao_origem' not in cols_t:
                         conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN id_transacao_origem INTEGER"))
+                        conn.commit()
+                    if 'nota' not in cols_t:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN nota TEXT"))
                         conn.commit()
                     if db.engine.dialect.name == 'postgresql':
                         try:
