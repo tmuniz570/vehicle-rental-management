@@ -141,8 +141,36 @@ def test_v5c_and_trackers():
         assert res.status_code == 201
         tracker2_data = res.get_json()['tracker']
         tracker2_id = tracker2_data['id']
-        assert tracker2_data['tipo_propriedade'] == 'Customer'
         print(f"✓ Customer tracker added (ID: {tracker2_id})")
+
+        # 7b. Test duplicate tracker rejection across motorbikes
+        test_placa_2 = "TRK_DUP_MOTO"
+        moto_2 = db.session.get(Motorcycle, test_placa_2)
+        if not moto_2:
+            moto_2 = Motorcycle(
+                placa=test_placa_2,
+                modelo="Yamaha NMAX 125",
+                cor="Black",
+                milhagem_atual=5000,
+                status=MotoStatus.AVAILABLE.value
+            )
+            db.session.add(moto_2)
+            db.session.commit()
+            
+        dup_payload = {
+            'numero': 'FF-TRK-987654321', # same as tracker 1 on test_placa
+            'tipo_propriedade': 'Company'
+        }
+        res_dup = client.post(f"/api/motos/{test_placa_2}/trackers", data=dup_payload, content_type='multipart/form-data')
+        assert res_dup.status_code == 400
+        dup_json = res_dup.get_json()
+        assert test_placa in (dup_json.get('erro') or dup_json.get('error'))
+        print(f"✓ Duplicate tracker across motorbikes successfully blocked! Informed plate: {test_placa}")
+
+        # 7c. Test duplicate tracker rejection on the same motorbike
+        res_dup_same = client.post(f"/api/motos/{test_placa}/trackers", data=dup_payload, content_type='multipart/form-data')
+        assert res_dup_same.status_code == 400
+        print(f"✓ Duplicate tracker on the same motorbike successfully blocked!")
 
         # 8. Check details endpoint reflects both trackers
         res = client.get(f"/api/motos/{test_placa}/detalhes")
@@ -220,6 +248,8 @@ def test_v5c_and_trackers():
         client.delete(f"/api/motos/{test_placa}/trackers/{tracker2_id}")
         client.delete(f"/api/motos/{test_placa}/v5c/{img_rec.id}")
         db.session.delete(moto)
+        if moto_2:
+            db.session.delete(moto_2)
         db.session.commit()
         print("✓ Cleaned up test data cleanly")
 

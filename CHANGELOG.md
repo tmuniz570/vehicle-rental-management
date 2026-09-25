@@ -4,6 +4,38 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.8] — 2026-09-25 — *Active Fleet Filter, Out-of-Operation Dashboard Indicator, Tracker IMEI Duplicate Protection & Client URL Search*
+
+### 🛵 Indicador de Motos Fora de Operação no Card "Total Fleet" (Dashboard)
+* **Visão Consolidada de Frota Ativa e Veículos Fora de Operação**:
+  - O card de estatística **Total Fleet** no Dashboard (`/`) agora exibe o total ativo em operação como métrica principal (`total_motos`) e sinaliza simultaneamente a contagem de motos fora de operação (`Pound`).
+  - Adicionado badge estilizado `🏛️ [N] OUT OF OP` em tom âmbar suave ao lado do valor principal, com link direto para `/motos?status=Pound`.
+  - A linha descritiva informa em tempo real: `Active in operation • [N] outside operation` (ou `0 outside operation` se toda a frota estiver ativa).
+
+### 📡 Proteção contra Duplicidade de Trackers / IMEIs na Frota & Teclado Numérico Mobile
+* **Bloqueio Rigoroso de Tracker Duplicado com Identificação de Placa**:
+  - Implementada validação no backend (`/api/motos/<placa>/trackers`) para impedir o cadastro do mesmo número Serial ou IMEI em mais de uma motocicleta.
+  - Ao tentar inserir um número já cadastrado em outra moto, a requisição é recusada (`400 Bad Request`) e uma mensagem de alerta detalhada informa explicitamente qual a placa do veículo em que o rastreador já está instalado (ex: *"Este tracker (1234567890) já está cadastrado na moto BK22NMX. Remova-o da moto BK22NMX primeiro para vinculá-lo a outro veículo."*).
+  - O campo de entrada `#tracker_numero` é focado e realçado em vermelho suave ao ocorrer erro.
+* **Teclado Numérico Otimizado para iPhone / Mobile**:
+  - O campo `#tracker_numero` recebeu os atributos `inputmode="numeric"` e `pattern="[0-9]*"`, acionando o teclado numérico de 10 teclas nativo no iOS (iPhone/iPad) e Android, acelerando e simplificando a digitação de números longos de IMEI no balcão e oficina.
+
+### ⚡ Frota Ativa como Filtro Padrão no Fleet (`/motos`)
+* **Visualização Focada na Operação Ativa**:
+  - A tela de frotas (`/motos`) agora define como filtro padrão **`⚡ Active Fleet (In Operation)`** (`status=operational`).
+  - Esse filtro exibe automaticamente apenas veículos operacionais em circulação (`Available`, `Rented` e `Maintenance`), ocultando motos fora de operação (`Pound`) e veículos vendidos (`Sold`).
+  - Adicionada opção explícita no dropdown: `All Statuses (Incl. Sold & Pound)` (`value="all"`), permitindo aos operadores consultar o histórico completo de todas as motos cadastradas a qualquer momento.
+  - Backend (`app.py` / `/api/motos`) atualizado para suportar o filtro de status `operational` / `in_operation` via negação `~Motorcycle.status.in_(['Sold', 'Vendida', 'Pound'])`.
+
+### 👥 Navegação do Contrato para Clientes com Filtro Automático (`/clientes?search=...`)
+* **Filtragem Automática por URL no Módulo de Clientes**:
+  - Ao clicar no botão **`👥 View Client`** na tela de detalhes do contrato (`/contratos/<id>`), o operador é redirecionado para `/clientes?search=[ID_cliente]`.
+  - Corrigido o script `clientes.js` para ler os parâmetros da query string (`?search=`, `?q=`, `?id=`) no carregamento da página (`DOMContentLoaded`), preenchendo o campo de busca (`#searchInput`) e disparando a consulta automaticamente.
+  - **Suporte a Busca por ID e Prioridade de Correspondência**:
+    - Backend (`app.py` / `/api/clientes`) atualizado para reconhecer buscas numéricas e identificadores com hash (ex: `12` ou `#12`), buscando diretamente em `Client.id == int(clean_num)`.
+    - Ordenação inteligente com `db.case`: a correspondência exata do ID do cliente é garantida como o **primeiro registro no topo da tabela**, mesmo que outros contatos compartilhem dígitos no telefone ou e-mail.
+  - Placeholder do campo de busca atualizado para: `"Search by name, phone, email or #ID..."`.
+
 ## [1.9.7] — 2026-09-25 — *Collapsible Slim Sidebar, Vehicle Part-Exchange Payment, Pound Status & Missing V5C Alerts*
 
 ### 📱 Menu Lateral Compactável / Fino (Collapsible Slim Sidebar)
@@ -52,11 +84,12 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
     - Barra de Alocação da Frota no Dashboard atualizada com segmento e contagem dedicada para motos em `Pound`.
 
 ### ⚠️ Central de Alertas e Filtros para Motos sem V5C (Missing V5C)
-* **Detecção e Alerta no Dashboard (`/`)**:
-  - Novo card de alerta prioritário na Central de Avisos: **"📄 Motorbikes Missing V5C Logbook"**, exibindo a contagem e as placas clicáveis que levam diretamente ao gerenciador do veículo.
-  - Botão de atalho rápido direto para `/motos?v5c=missing`.
+* **Detecção Universal (Inclusive Motos Vendidas)**:
+  - Corrigida anomalia onde motocicletas com status `Sold` sem documento V5C exibiam um traço (`-`) em vez do badge de alerta.
+  - Como o V5C logbook é crucial para transferência legal ao comprador e auditoria da DVLA, **motos vendidas sem V5C agora exibem o badge chamativo `⚠️ No V5C`** e são integralmente contabilizadas no card de alerta prioritário do Dashboard (`motos_sem_v5c`).
+  - O filtro de busca de frotas (`/motos?v5c=missing` ou `status=missing_v5c`) agora lista todas as motos sem documento, sem exceção de status.
 * **Visualização e Gestão na Tabela de Frotas (`/motos`)**:
-  - Veículos ativos da frota sem documentos V5C cadastrados passam a exibir badge chamativo `⚠️ No V5C` na coluna *V5C & Trackers*, com atalho direto ao modal na aba de V5C.
+  - Toda motocicleta sem documentos V5C cadastrados passa a exibir badge chamativo `⚠️ No V5C` na coluna *V5C & Trackers*, com atalho direto ao modal na aba de V5C para anexação imediata.
   - Novo filtro rápido no seletor de status: `⚠️ Missing V5C`, exibindo apenas as motos sem documento de porte/registro.
   - Suporte à query string `?v5c=missing` com carregamento automático no `DOMContentLoaded`.
 * **Sinalização nos Detalhes do Contrato (`/contratos/<id>`)**:

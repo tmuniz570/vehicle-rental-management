@@ -1,6 +1,6 @@
 let paginaAtual = 1;
 let termoBusca = '';
-let statusFiltro = '';
+let statusFiltro = 'operational';
 let v5cFiltro = '';
 let sortCol = 'placa';
 let sortOrder = 'asc';
@@ -108,8 +108,6 @@ async function carregarMotos() {
             let v5cBadge = '';
             if (v5cCount > 0) {
                 v5cBadge = `<span class="badge" style="background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3); font-size:0.75rem; cursor:pointer;" title="View ${v5cCount} V5C document(s)" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">📄 ${v5cCount} Doc${v5cCount > 1 ? 's' : ''}</span>`;
-            } else if (isSold) {
-                v5cBadge = `<span style="opacity:0.4; font-size:0.75rem; color:var(--text-secondary);">-</span>`;
             } else {
                 v5cBadge = `<span class="badge" style="background: rgba(239,68,68,0.16); color: #fca5a5; border: 1px solid rgba(239,68,68,0.38); font-size:0.75rem; cursor:pointer; font-weight:700;" title="⚠️ Missing V5C Logbook! Click to attach" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">⚠️ No V5C</span>`;
             }
@@ -171,10 +169,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const sf = document.getElementById('statusFilter');
         if (sf) sf.value = 'missing_v5c';
     } else if (initialStatus) {
-        statusFiltro = initialStatus;
+        if (initialStatus.toLowerCase() === 'all' || initialStatus === '') {
+            statusFiltro = 'all';
+            v5cFiltro = '';
+            const sf = document.getElementById('statusFilter');
+            if (sf) sf.value = 'all';
+        } else {
+            statusFiltro = initialStatus;
+            v5cFiltro = '';
+            const sf = document.getElementById('statusFilter');
+            if (sf) sf.value = initialStatus;
+        }
+    } else {
+        // Default: active fleet (operational - excludes Sold and Pound)
+        statusFiltro = 'operational';
         v5cFiltro = '';
         const sf = document.getElementById('statusFilter');
-        if (sf) sf.value = initialStatus;
+        if (sf) sf.value = 'operational';
     }
 
     if (initialSearch) {
@@ -200,6 +211,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (val === 'missing_v5c') {
                 statusFiltro = '';
                 v5cFiltro = 'missing';
+            } else if (val === 'all') {
+                statusFiltro = 'all';
+                v5cFiltro = '';
             } else {
                 statusFiltro = val;
                 v5cFiltro = '';

@@ -791,6 +791,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.onMotoModalUpdated(currentMotoPlaca);
                     }
                 } else {
+                    const numInput = document.getElementById('tracker_numero');
+                    if (numInput) {
+                        numInput.style.borderColor = '#ef4444';
+                        numInput.focus();
+                    }
                     alert(result.erro || result.error || 'Failed to register tracker');
                 }
             } catch(err) {

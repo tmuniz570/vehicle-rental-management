@@ -93,13 +93,33 @@ def run_tests():
         # -------------------------------------------------------------
         # 2. TEST MISSING V5C ALERT IN DASHBOARD & LISTAR MOTOS
         # -------------------------------------------------------------
-        print("\n--- 2. Testing Missing V5C Alert ---")
+        print("\n--- 2. Testing Missing V5C Alert (including Sold Bikes) ---")
+        placa_sold = "SOLD_TEST_V5C_01"
+        Motorcycle.query.filter_by(placa=placa_sold).delete()
+        db.session.commit()
+
+        moto_sold = Motorcycle(
+            placa=placa_sold,
+            modelo="Yamaha Nmax Sold Test",
+            cor="Black",
+            status=MotoStatus.SOLD.value,
+            milhagem_atual=5000
+        )
+        db.session.add(moto_sold)
+        db.session.commit()
+
+        # Re-fetch dashboard
+        dash_res = client.get('/api/dashboard')
+        assert dash_res.status_code == 200
+        dash_data = json.loads(dash_res.data.decode())
+
         motos_sem_v5c_count = dash_data.get('motos_sem_v5c_count', 0)
         motos_sem_v5c_list = dash_data.get('motos_sem_v5c', [])
         
         sem_v5c_plates = [m.get('placa') for m in motos_sem_v5c_list]
         assert placa_pound in sem_v5c_plates, f"Expected {placa_pound} to be in missing V5C list, got {sem_v5c_plates}"
-        print(f"✓ Verified: {placa_pound} is correctly detected as missing V5C logbook (total missing: {motos_sem_v5c_count}).")
+        assert placa_sold in sem_v5c_plates, f"Expected SOLD bike {placa_sold} to be in missing V5C list, got {sem_v5c_plates}"
+        print(f"✓ Verified: Both {placa_pound} (Pound) and {placa_sold} (Sold) are detected in missing V5C alerts (total missing: {motos_sem_v5c_count}).")
 
         # Query /api/motos?v5c=missing
         res_v5c_filter = client.get('/api/motos?v5c=missing')
@@ -107,7 +127,16 @@ def run_tests():
         v5c_filter_data = json.loads(res_v5c_filter.data.decode())
         filter_plates = [item['placa'] for item in v5c_filter_data.get('itens', [])]
         assert placa_pound in filter_plates, f"Expected {placa_pound} in /api/motos?v5c=missing"
-        print(f"✓ Verified: /api/motos?v5c=missing returns {placa_pound}.")
+        assert placa_sold in filter_plates, f"Expected SOLD bike {placa_sold} in /api/motos?v5c=missing"
+        print(f"✓ Verified: /api/motos?v5c=missing returns both {placa_pound} and {placa_sold}.")
+
+        # Query /api/motos?status=missing_v5c
+        res_status_v5c = client.get('/api/motos?status=missing_v5c')
+        assert res_status_v5c.status_code == 200
+        status_v5c_data = json.loads(res_status_v5c.data.decode())
+        status_v5c_plates = [item['placa'] for item in status_v5c_data.get('itens', [])]
+        assert placa_sold in status_v5c_plates, f"Expected SOLD bike {placa_sold} in /api/motos?status=missing_v5c"
+        print(f"✓ Verified: /api/motos?status=missing_v5c returns {placa_sold}.")
 
         # Query /api/motos?status=Pound
         res_pound_filter = client.get('/api/motos?status=Pound')
@@ -188,6 +217,7 @@ def run_tests():
         # Cleanup test data
         db.session.delete(pending_tx)
         Motorcycle.query.filter_by(placa=placa_pound).delete()
+        Motorcycle.query.filter_by(placa=placa_sold).delete()
         db.session.commit()
         print("✓ Cleanup completed.")
 

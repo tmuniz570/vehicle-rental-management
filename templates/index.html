@@ -38,14 +38,19 @@
 <!-- Row 1: Fleet & Contract Status -->
 <div class="dashboard-grid" style="margin-bottom: 1.5rem;">
     <!-- Total Motorbikes -->
-    <a href="/motos" class="stat-card interactive" style="text-decoration: none;">
+    <div class="stat-card interactive" style="text-decoration: none; cursor: pointer;" onclick="window.location.href='/motos'">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title">Total Fleet</span>
             <span style="font-size: 1.25rem;">🛵</span>
         </div>
-        <div class="stat-value" id="total_motos">-</div>
-        <div class="stat-desc">Active fleet (excl. sold)</div>
-    </a>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+            <div class="stat-value" id="total_motos">-</div>
+            <a href="/motos?status=Pound" id="cardPoundBadge" onclick="event.stopPropagation();" class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35); font-size: 0.75rem; padding: 3px 8px; border-radius: 6px; text-decoration: none; display: none; align-items: center; gap: 4px; font-weight: 600;" title="View motorbikes outside operation (Pound)">
+                🏛️ <span id="motos_fora_operacao_val">0</span> out of op
+            </a>
+        </div>
+        <div class="stat-desc" id="total_motos_desc">Active fleet in operation</div>
+    </div>
 
     <!-- Available (General) -->
     <a href="/motos" class="stat-card interactive" style="text-decoration: none;">
@@ -281,6 +286,22 @@
             // 1. Stat cards (apenas se existirem no DOM)
             const elTotalMotos = document.getElementById('total_motos');
             if (elTotalMotos) elTotalMotos.textContent = data.total_motos || 0;
+
+            const poundCount = data.motos_pound || 0;
+            const elForaOpVal = document.getElementById('motos_fora_operacao_val');
+            if (elForaOpVal) elForaOpVal.textContent = poundCount;
+            const cardPoundBadge = document.getElementById('cardPoundBadge');
+            if (cardPoundBadge) {
+                cardPoundBadge.style.display = poundCount > 0 ? 'inline-flex' : 'none';
+            }
+            const elTotalMotosDesc = document.getElementById('total_motos_desc');
+            if (elTotalMotosDesc) {
+                if (poundCount > 0) {
+                    elTotalMotosDesc.innerHTML = `Active in operation • <span style="color: #fbbf24; font-weight: 600;">${poundCount} outside operation</span>`;
+                } else {
+                    elTotalMotosDesc.textContent = `Active fleet in operation (0 outside operation)`;
+                }
+            }
             const elMotosDisp = document.getElementById('motos_disponiveis');
             if (elMotosDisp) elMotosDisp.textContent = data.motos_disponiveis || 0;
             const elMotosAlug = document.getElementById('motos_alugadas');

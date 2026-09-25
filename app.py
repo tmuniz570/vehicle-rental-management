@@ -1582,18 +1582,25 @@ def criar_moto():
 def listar_clientes():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
-    search = request.args.get('search', '', type=str)
+    search = request.args.get('search', '', type=str).strip()
+    client_id = request.args.get('id', None, type=int)
     sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
     query = Client.query
-    if search:
+    if client_id:
+        query = query.filter(Client.id == client_id)
+    elif search:
         search_term = f"%{search}%"
-        query = query.filter(db.or_(
+        search_conds = [
             Client.nome.ilike(search_term),
             Client.telefone.ilike(search_term),
             Client.email.ilike(search_term)
-        ))
+        ]
+        clean_num = search.lstrip('#').strip()
+        if clean_num.isdigit():
+            search_conds.append(Client.id == int(clean_num))
+        query = query.filter(db.or_(*search_conds))
     
     sort_map = {
         'id': Client.id,
@@ -1607,7 +1614,13 @@ def listar_clientes():
     }
     target_col = sort_map.get(sort_by, Client.id)
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
-    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+    order_clauses = []
+    if search:
+        clean_num = search.lstrip('#').strip()
+        if clean_num.isdigit():
+            order_clauses.append(db.case((Client.id == int(clean_num), 0), else_=1))
+    order_clauses.append(order_func)
+    paginated = query.order_by(*order_clauses).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': c.id, 'nome': c.nome, 'telefone': c.telefone, 'email': c.email, 'endereco': c.endereco,
@@ -1713,15 +1726,20 @@ def listar_motos():
     )
 
     if status_filter:
-        if status_filter.lower() == 'sorn':
+        sf_lower = status_filter.lower()
+        if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
+            query = query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound']))
+        elif sf_lower == 'sorn':
             query = query.filter(Motorcycle.tax_sorn == True)
-        elif status_filter.lower() in ['missing_v5c', 'no_v5c', 'sem_v5c']:
-            query = query.filter(~Motorcycle.v5c_arquivos.any(), ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']))
+        elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
+            query = query.filter(~Motorcycle.v5c_arquivos.any())
+        elif sf_lower in ['all', 'todas', 'tudo']:
+            pass
         else:
             query = query.filter(Motorcycle.status.ilike(status_filter))
 
     if v5c_filter in ['missing', 'none', 'sem', '0']:
-        query = query.filter(~Motorcycle.v5c_arquivos.any(), ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']))
+        query = query.filter(~Motorcycle.v5c_arquivos.any())
 
     if search:
         search_clean = search.strip().replace(' ', '')
@@ -1737,7 +1755,7 @@ def listar_motos():
         if search.strip().lower() == 'sorn':
             search_filters.append(Motorcycle.tax_sorn == True)
         elif search.strip().lower() in ['missing_v5c', 'missing v5c', 'no v5c', 'sem v5c']:
-            search_filters.append(db.and_(~Motorcycle.v5c_arquivos.any(), ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])))
+            search_filters.append(~Motorcycle.v5c_arquivos.any())
         query = query.filter(db.or_(*search_filters))
         
     sort_map = {
@@ -1981,6 +1999,22 @@ def adicionar_tracker_moto(placa):
         
     if not numero:
         return jsonify({'error': 'Tracker number / serial is required', 'erro': 'O número/serial do tracker é obrigatório'}), 400
+
+    numero_clean = str(numero).strip()
+    tracker_existente = MotorcycleTracker.query.filter(
+        db.func.lower(MotorcycleTracker.numero) == numero_clean.lower()
+    ).first()
+    if tracker_existente:
+        if tracker_existente.placa == moto.placa:
+            return jsonify({
+                'error': f"Tracker '{numero_clean}' is already registered on this motorbike ({moto.placa}).",
+                'erro': f"Este tracker ({numero_clean}) já está cadastrado nesta moto ({moto.placa})."
+            }), 400
+        else:
+            return jsonify({
+                'error': f"Tracker '{numero_clean}' is already registered on motorbike {tracker_existente.placa}. Remove it from {tracker_existente.placa} first before reassigning.",
+                'erro': f"Este tracker ({numero_clean}) já está cadastrado na moto {tracker_existente.placa}. Remova-o da moto {tracker_existente.placa} primeiro para vinculá-lo a outro veículo."
+            }), 400
         
     tipo_propriedade = request.form.get('tipo_propriedade', 'Company').strip()
     if not tipo_propriedade and request.is_json:
@@ -3807,11 +3841,9 @@ def get_dashboard():
                 })
 
         # Compliance: Motos sem Documento V5C (Logbook)
-        # Monitora a frota da empresa (Available, Rented, Maintenance, Pound), excluindo apenas motos vendidas
+        # Monitora todas as motos da empresa (inclusive vendidas, que necessitam do V5C arquivado para transferência e auditoria)
         motos_sem_v5c_objs = db.session.query(Motorcycle).options(
             selectinload(Motorcycle.v5c_arquivos)
-        ).filter(
-            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])
         ).order_by(Motorcycle.placa.asc()).all()
 
         motos_sem_v5c = []
@@ -3830,6 +3862,7 @@ def get_dashboard():
             'motos_alugadas': motos_alugadas,
             'motos_manutencao': motos_manutencao,
             'motos_pound': motos_pound,
+            'motos_fora_operacao': motos_pound,
             'motos_vendidas': motos_vendidas,
             'motos_sem_v5c_count': motos_sem_v5c_count,
             'motos_sem_v5c': motos_sem_v5c,

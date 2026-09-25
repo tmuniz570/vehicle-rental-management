@@ -105,6 +105,16 @@ async function carregarClientes() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Read URL query parameters (e.g. ?search=12 or ?id=12 or ?q=12)
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialSearch = urlParams.get('search') || urlParams.get('q') || urlParams.get('id');
+    const searchInput = document.getElementById('searchInput');
+
+    if (initialSearch) {
+        termoBusca = initialSearch.trim();
+        if (searchInput) searchInput.value = initialSearch.trim();
+    }
+
     if (typeof enableTableSorting === 'function') {
         enableTableSorting('clientesTable', (field, order) => {
             sortCol = field;
@@ -123,7 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnNext) btnNext.addEventListener('click', () => { paginaAtual++; carregarClientes(); });
 
     // Search logic with debounce
-    const searchInput = document.getElementById('searchInput');
     let timeoutId;
     if (searchInput) {
         searchInput.addEventListener('input', (e) => {
