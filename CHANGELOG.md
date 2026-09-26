@@ -4,6 +4,40 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.11] — 2026-09-26 — *Used Vehicle Purchase Agreement (Buy-in / Trade-in Contracts)*
+
+### 🤝 Novo Tipo de Contrato: Compra de Veículo Usado (`Purchase`)
+* **Fluxo Completo de Aquisição e Troca de Motos**:
+  - Implementado o novo tipo de contrato `Purchase` (`Used Vehicle Purchase Agreement`) para formalizar a compra de motos de clientes ou sua entrada como base de troca (trade-in / part-exchange) ou abatimento de serviços.
+  - O fluxo segue o mesmo padrão operacional da plataforma: o operador seleciona o cliente (vendedor) e a motocicleta cadastrada, escolhendo a opção **🤝 Vehicle Purchase** no formulário de criação (`/contratos/novo`).
+* **Campos e Regras do Formulário de Criação**:
+  - **Elegibilidade Total de Motocicletas**: Toda e qualquer moto do sistema fica disponível no seletor de veículos para contratos de compra, independentemente de status atual (`Available`, `Maintenance`, `Rented` ou `Sold`), permitindo recompra de veículos vendidos ou acerto de trocas.
+  - **Omissão Completa de Seguro**: O campo de certificado de seguro da motocicleta é completamente omitido e desativado no formulário de compra (`Purchase`), já que a moto está entrando no estoque da oficina/loja.
+  - **Categoria do Veículo (`categoria_historico`)**: Histórico de salvado no Reino Unido (`Clear`, `Cat N`, `Cat S`, `Cat C`, `Cat D`, `Cat B`).
+  - **Cor do Veículo (`moto_cor`)**: Captura e atualiza a cor do veículo no cadastro da motocicleta e no contrato impresso.
+  - **Valor de Compra / Trade-in (`valor_compra_veiculo`)**: Montante acordado pago ou creditado ao cliente.
+  - **Método de Pagamento (`metodo_pagamento_compra`)**: `Bank Transfer`, `Cash`, `Trade-in / Exchange`, `Service Credit / Debt Offset` ou `Other`.
+  - **Detalhes do Pagamento / Compensação (`detalhes_pagamento_compra`)**: Descrição detalhada dos dados bancários, abatimento de dívida/serviço ou moto de destino do trade-in.
+  - **Status de Destino na Frota (`status_moto_destino`)**: Escolha se a moto adquirida entra diretamente no pátio como `Available` (disponível para aluguel/venda), `Maintenance` (oficina / preparação mecânica) ou `Pound` (apreendida / fora de operação).
+  - **Milhagem Não Verificada (`milhagem_nao_verificada`)**: Suporte a veículos parados/não funcionais (*non-runners*) cujo odômetro não pode ser lido, permitindo valor 0 ou vazio com ressalva legal.
+* **Isenção de Contas a Receber (Regra A1)**:
+  - Como a loja está pagando ou concedendo crédito na compra da moto (e não cobrando o cliente), o sistema **não gera nenhuma transação a receber** no ledger financeiro (`FinancialTransaction`), mantendo o extrato financeiro limpo e estritamente informativo.
+* **Documento Jurídico Impresso em Página Única A4 (`contrato_compra_print.html`)**:
+  - Layout formal condensado de alta fidelidade calibrado rigorosamente para **preencher harmoniosamente 1 página A4 inteira**, com tipografia legível e confortável (`8.9pt` a `9.5pt` no corpo e cabeçalhos nítidos), eliminando áreas vazias excessivas e sem quebras indesejadas para 2ª página:
+    - **Buyer & Seller Details**: Bloco lado a lado em 2 colunas com dados da compradora `J&F Motorcycles LTD` (109 Windmill Lane, Birmingham, B66 3EW, Fone: 0121 492 0697) e do cliente vendedor.
+    - **Vehicle & Financial Details**: Bloco lado a lado em 2 colunas com dados do veículo (marca, modelo, cor, placa, categoria UK, quilometragem) e termos financeiros (valor, método de pagamento e detalhes de liquidação).
+    - **Seller Declarations & Warranties**: Lista clara e completa das declarações estritas de garantia e titularidade (origem UK, ausência de dívidas/financiamentos pendentes, garantia de quilometragem, ausência de vícios ocultos e indenização total de multas e encargos ULEZ/CAZ prévios).
+    - **Buyer Declaration & Signatures**: Declaração da compradora e bloco lado a lado com a assinatura digital do vendedor e a assinatura fixa autorizada da loja (`signature_fernando.png`), acompanhado de data/hora da venda e rodapé unificado.
+* **Ajuste na Tela de Detalhes (`/contratos/<id>`) para Contratos de Compra**:
+  - **Omissão da Assinatura de Devolução**: O card de assinatura de retorno/término (`#card_sig_devolucao`) é completamente ocultado para contratos de compra (`Purchase`), mantendo apenas a assinatura inicial do contrato de aquisição.
+  - **Omissão do Card de Extrato Financeiro (`#card_financial_statement`)**: Como a compra é liquidada na aquisição e não gera parcelas nem cobranças contínuas, o card de *Financial Statement* é completamente omitido na visualização de contratos de compra.
+* **Assinatura Digital e Conclusão Automática**:
+  - Ao colher a assinatura digital do vendedor, o contrato transiciona automaticamente para o status `Completed` (`Finalizado`), dispensando rotinas de encerramento de aluguel.
+* **Isenção de Compliance askMID e Pré-Entrega**:
+  - Veículos adquiridos não exigem apólice de seguro pessoal do cliente vendedor nem bloqueio de pré-entrega para liberação de pátio.
+* **Testes Automatizados (`tests/test_compra_contratos.py`)**:
+  - Testes cobrindo criação com destinos `Available`, `Maintenance` e `Pound`, validação de página única (1 `.agreement-page`), presença de elementos de UI no detalhe do contrato, assinatura digital e transição de status, aprovados com 100% de sucesso.
+
 ## [1.9.10] — 2026-09-25 — *Signed Contract Legal Immutability & Live Operational Details Screen*
 
 ### ⚖️ Imutabilidade Jurídica do Documento do Contrato Assinado (`/contratos/<id>/imprimir`)

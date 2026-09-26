@@ -504,19 +504,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         // Mileage Tracker
+        const isPurchaseContrato = (data.tipo_contrato === 'Purchase');
         const isVendaContrato = (data.tipo_contrato === 'Sale_Full' || data.tipo_contrato === 'Sale_Installment');
         const labelStartMileage = document.getElementById('label_milhagem_inicial');
         if (labelStartMileage) {
-            labelStartMileage.textContent = isVendaContrato ? 'Sale Mileage:' : 'Start Mileage:';
+            labelStartMileage.textContent = isPurchaseContrato ? 'Purchase Mileage:' : (isVendaContrato ? 'Sale Mileage:' : 'Start Mileage:');
         }
         const elStartMileage = document.getElementById('info_milhagem_inicial');
         if (elStartMileage) {
-            elStartMileage.textContent = (data.milhagem_inicial !== undefined && data.milhagem_inicial !== null) ? `${data.milhagem_inicial.toLocaleString('en-GB')} miles` : '0 miles';
+            if (isPurchaseContrato && data.milhagem_nao_verificada) {
+                elStartMileage.textContent = 'Unverified (Non-runner)';
+            } else {
+                elStartMileage.textContent = (data.milhagem_inicial !== undefined && data.milhagem_inicial !== null) ? `${data.milhagem_inicial.toLocaleString('en-GB')} miles` : '0 miles';
+            }
         }
         const rowEndMileage = document.getElementById('row_milhagem_final');
         const elEndMileage = document.getElementById('info_milhagem_final');
         if (rowEndMileage) {
-            if (isVendaContrato) {
+            if (isVendaContrato || isPurchaseContrato) {
                 rowEndMileage.style.display = 'none';
             } else {
                 rowEndMileage.style.display = 'flex';
@@ -528,7 +533,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rowDistance = document.getElementById('row_milhas_rodadas');
         const elDistance = document.getElementById('info_milhas_rodadas');
         if (rowDistance && elDistance) {
-            if (!isVendaContrato && data.milhas_rodadas !== undefined && data.milhas_rodadas !== null) {
+            if (!isVendaContrato && !isPurchaseContrato && data.milhas_rodadas !== undefined && data.milhas_rodadas !== null) {
                 rowDistance.style.display = 'flex';
                 elDistance.textContent = `${data.milhas_rodadas.toLocaleString('en-GB')} miles driven`;
             } else {
@@ -630,7 +635,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isActiveContract = (stLower === 'active' || stLower === 'ativo');
         const hasCheckoutInsp = (data.vistorias || []).some(v => ['check-out', 'checkout', 'saída', 'saida'].includes((v.tipo || '').toLowerCase()));
         const hasInsuranceDoc = Boolean(data.url_seguro);
-        const isPreReleasePending = isActiveContract && (!hasCheckoutInsp || !hasInsuranceDoc);
+        const isPreReleasePending = !isPurchaseContrato && isActiveContract && (!hasCheckoutInsp || !hasInsuranceDoc);
 
         // Dynamic Pre-Delivery Compliance Alert Banner (Vehicle cannot leave premises without Check-out Inspection and Insurance)
         const preBanner = document.getElementById('prerelease_alert_banner');
@@ -707,8 +712,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (motEval.status === 'expired') expiredList.push(`MOT (expired ${motEval.diffDays}d ago on ${motEval.formattedDate})`);
             else if (motEval.status === 'warning') warningList.push(`MOT (due in ${motEval.diffDays}d on ${motEval.formattedDate})`);
 
-            // Include Insurance status in top banner (only for rentals, sales don't monitor 15-day insurance)
-            if (!isVendaContrato) {
+            // Include Insurance status in top banner (only for rentals, sales and purchases don't monitor 15-day insurance)
+            if (!isVendaContrato && !isPurchaseContrato) {
                 if (data.status_seguro === 'Cancelled') {
                     expiredList.push('Motor Insurance (FLAGGED CANCELLED ON askMID)');
                 } else if (data.checagem_seguro_devida) {
@@ -771,7 +776,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         const verifPorRow = document.getElementById('info_seguro_verif_por_row');
         const infoSeguro = document.getElementById('info_seguro');
 
-        if (isVenda) {
+        if (isPurchaseContrato) {
+            if (titleSeguro) {
+                titleSeguro.innerHTML = '🛡️ Vehicle Acquisition Status';
+            }
+            if (badgeSeguro) {
+                badgeSeguro.className = 'badge';
+                badgeSeguro.innerHTML = '✓ Inventory Inward';
+                badgeSeguro.style.cssText = 'background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3); font-weight:600;';
+            }
+            if (boxSeguro) boxSeguro.style.display = 'none';
+            if (rowBotoesAskmid) rowBotoesAskmid.style.display = 'none';
+            if (btnReportarSeguroCancelado) btnReportarSeguroCancelado.style.display = 'none';
+            if (infoSeguro) infoSeguro.innerHTML = '';
+        } else if (isVenda) {
             // Moto vendida: NÃO monitorar de 15 em 15 dias. Apenas armazenar e exibir o documento entregue na venda.
             if (titleSeguro) {
                 titleSeguro.innerHTML = '🛡️ Motor Insurance Certificate';
@@ -1007,7 +1025,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const elHeaderTipo = document.getElementById('header_tipo_badge');
         const elInfoTipo = document.getElementById('info_tipo_badge');
         
-        if (data.tipo_contrato === 'Sale_Full') {
+        if (data.tipo_contrato === 'Purchase') {
+            if (elHeaderTipo) {
+                elHeaderTipo.className = 'badge';
+                elHeaderTipo.style.cssText = 'background: rgba(6, 182, 212, 0.2); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.4); font-weight: 700; font-size: 0.85rem; padding: 4px 12px; border-radius: 9999px;';
+                elHeaderTipo.textContent = '🤝 Used Vehicle Purchase';
+            }
+            if (elInfoTipo) {
+                elInfoTipo.className = 'badge';
+                elInfoTipo.style.cssText = 'background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.35); font-weight: 700;';
+                elInfoTipo.textContent = 'Vehicle Purchase';
+            }
+        } else if (data.tipo_contrato === 'Sale_Full') {
             if (elHeaderTipo) {
                 elHeaderTipo.className = 'badge';
                 elHeaderTipo.style.cssText = 'background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 700; font-size: 0.85rem; padding: 4px 12px; border-radius: 9999px;';
@@ -1050,12 +1079,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         else statusBadge = `<span class="badge badge-info">${(data.status || '').toUpperCase()}</span>`;
         document.getElementById('info_status').innerHTML = statusBadge;
 
-        // isVenda already declared above
+        // isVenda and isPurchaseContrato already declared above
         const blocoAluguel = document.getElementById('bloco_termos_aluguel');
         const blocoVenda = document.getElementById('bloco_termos_venda');
+        const blocoCompra = document.getElementById('bloco_termos_compra');
 
-        if (isVenda) {
+        if (isPurchaseContrato) {
             if (blocoAluguel) blocoAluguel.style.display = 'none';
+            if (blocoVenda) blocoVenda.style.display = 'none';
+            if (blocoCompra) {
+                blocoCompra.style.display = 'block';
+                const elValor = document.getElementById('info_compra_valor');
+                const elMetodo = document.getElementById('info_compra_metodo');
+                const elDetalhes = document.getElementById('info_compra_detalhes');
+                const elCat = document.getElementById('info_compra_categoria');
+                const elStatus = document.getElementById('info_compra_status_destino');
+
+                if (elValor) elValor.textContent = formatoMoeda.format(data.valor_compra_veiculo || 0);
+                if (elMetodo) elMetodo.textContent = data.metodo_pagamento_compra || '-';
+                if (elDetalhes) elDetalhes.textContent = data.detalhes_pagamento_compra || '-';
+                if (elCat) elCat.textContent = data.categoria_historico || 'Clear';
+                if (elStatus) elStatus.textContent = data.status_moto_destino || 'Available';
+            }
+        } else if (isVenda) {
+            if (blocoAluguel) blocoAluguel.style.display = 'none';
+            if (blocoCompra) blocoCompra.style.display = 'none';
             if (blocoVenda) {
                 blocoVenda.style.display = 'block';
                 const elTotal = document.getElementById('info_venda_total');
@@ -1120,6 +1168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (blocoAluguel) blocoAluguel.style.display = 'block';
             if (blocoVenda) blocoVenda.style.display = 'none';
+            if (blocoCompra) blocoCompra.style.display = 'none';
 
             const valAluguel = data.valor_aluguel_semanal ? formatoMoeda.format(data.valor_aluguel_semanal) : '-';
             const elAluguel = document.getElementById('info_aluguel');
@@ -1163,10 +1212,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // Button Complete Contract (Only for rentals, not sales)
+        // Button Complete Contract (Only for rentals, not sales or purchases)
         const btnFinalizar = document.getElementById('btnFinalizarContrato');
         if (btnFinalizar) {
-            if ((stLower === 'active' || stLower === 'ativo') && !isVenda) {
+            if ((stLower === 'active' || stLower === 'ativo') && !isVenda && !isPurchaseContrato) {
                 btnFinalizar.style.display = 'inline-flex';
                 btnFinalizar.onclick = () => {
                     document.getElementById('ocorrenciaModalTitle').textContent = 'Complete Contract (Check-in Inspection)';
@@ -1286,9 +1335,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 3. Agreement & Signatures Rendering
         const contratoTituloTipo = document.getElementById('contrato_titulo_tipo');
         const labelSigIni = document.getElementById('label_sig_inicial');
-        if (isVenda) {
+        if (isPurchaseContrato) {
+            if (contratoTituloTipo) contratoTituloTipo.textContent = '📄 Used Vehicle Purchase Agreement & Signatures';
+            if (labelSigIni) labelSigIni.textContent = 'Seller Agreement Signature';
+        } else if (isVenda) {
             if (contratoTituloTipo) contratoTituloTipo.textContent = '📄 Vehicle Sale Agreement & Signatures';
             if (labelSigIni) labelSigIni.textContent = '1. Buyer Agreement Signature';
+        } else {
+            if (contratoTituloTipo) contratoTituloTipo.textContent = '📄 Agreement & Signatures';
+            if (labelSigIni) labelSigIni.textContent = '1. Start of Rental Signature';
         }
 
         const badgeSigIni = document.getElementById('badge_sig_inicial');
@@ -1314,8 +1369,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 badgeSigIni.className = 'badge badge-warning';
             }
             if (boxSigIniContent) {
+                const docName = isPurchaseContrato ? 'used vehicle purchase agreement' : (isVenda ? 'vehicle purchase agreement' : 'start of rental');
                 boxSigIniContent.innerHTML = `
-                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Client signature pending for ${isVenda ? 'vehicle purchase agreement' : 'start of rental'}.</span>
+                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Client signature pending for ${docName}.</span>
                 `;
             }
             if (btnAssinarIni) btnAssinarIni.style.display = 'inline-flex';
@@ -1323,7 +1379,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const cardSigDev = document.getElementById('card_sig_devolucao');
         if (cardSigDev) {
-            cardSigDev.style.display = isVenda ? 'none' : 'block';
+            cardSigDev.style.display = (isVenda || isPurchaseContrato) ? 'none' : 'block';
         }
 
         const badgeSigDev = document.getElementById('badge_sig_devolucao');
@@ -1453,6 +1509,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        const cardFinancialStatement = document.getElementById('card_financial_statement');
+        if (cardFinancialStatement) {
+            cardFinancialStatement.style.display = isPurchaseContrato ? 'none' : 'flex';
+        }
+
         const resumoExtrato = document.getElementById('resumoExtrato');
         if (resumoExtrato) {
             let depSummary = '';
@@ -1475,7 +1536,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const btnNext = document.getElementById('btnExtratoNext');
 
             if (!extratoState.transacoes || extratoState.transacoes.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges recorded for this contract.</td></tr>';
+                if (isPurchaseContrato) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);"><span style="color:#22d3ee; font-weight:700;">🤝 Used Vehicle Purchase:</span> Vehicle acquisition payment was settled upon agreement completion as agreed. No ongoing rental or sales charges.</td></tr>';
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges recorded for this contract.</td></tr>';
+                }
                 if (paginationContainer) paginationContainer.style.display = 'none';
                 return;
             }

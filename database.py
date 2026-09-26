@@ -83,10 +83,12 @@ class ContractType(str, Enum):
     RENT = "Rent"
     SALE_FULL = "Sale_Full"
     SALE_INSTALLMENT = "Sale_Installment"
+    PURCHASE = "Purchase"
     # Legacy aliases
     ALUGUEL = "Rent"
     VENDA_VISTA = "Sale_Full"
     VENDA_PARCELADA = "Sale_Installment"
+    COMPRA = "Purchase"
 
 class InspectionType(str, Enum):
     CHECK_OUT = "Check-out"
@@ -206,6 +208,13 @@ class Contract(db.Model):
     saldo_devedor = db.Column(db.Numeric(10, 2), default=0.0, nullable=True) # Outstanding balance
     cronograma_parcelas_json = db.Column(db.Text, nullable=True) # JSON list with installments schedule
     
+    # Specific Vehicle Purchase Fields (Used Vehicle Purchase Agreement)
+    valor_compra_veiculo = db.Column(db.Numeric(10, 2), nullable=True) # Valor pago ou creditado na compra do veículo
+    metodo_pagamento_compra = db.Column(db.String(100), nullable=True) # Cash, Bank Transfer, Trade-in / Exchange, Service Credit / Debt Offset, Other
+    detalhes_pagamento_compra = db.Column(db.Text, nullable=True) # Detalhes da forma de pagamento, troca ou abatimento
+    milhagem_nao_verificada = db.Column(db.Boolean, default=False, nullable=True) # Can be 0 or blank if unverified / non-runner
+    status_moto_destino = db.Column(db.String(20), default=MotoStatus.DISPONIVEL.value, nullable=True) # Available ou Maintenance
+
     # Mileage Tracker (UK Miles)
     milhagem_inicial = db.Column(db.Integer, default=0, nullable=True)
     milhagem_final = db.Column(db.Integer, nullable=True)
@@ -426,6 +435,20 @@ def init_db(app):
                         ('cronograma_parcelas_json', 'TEXT'),
                     ]
                     for col_name, col_type in sale_cols:
+                        if col_name not in cols_c:
+                            conn.execute(db.text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_type}"))
+                            conn.commit()
+
+                    # Vehicle Purchase Columns (Used Vehicle Purchase Agreement)
+                    bool_default = "BOOLEAN DEFAULT FALSE" if db.engine.dialect.name == 'postgresql' else "BOOLEAN DEFAULT 0"
+                    purchase_cols = [
+                        ('valor_compra_veiculo', 'NUMERIC(10, 2)'),
+                        ('metodo_pagamento_compra', 'VARCHAR(100)'),
+                        ('detalhes_pagamento_compra', 'TEXT'),
+                        ('milhagem_nao_verificada', bool_default),
+                        ('status_moto_destino', "VARCHAR(20) DEFAULT 'Available'"),
+                    ]
+                    for col_name, col_type in purchase_cols:
                         if col_name not in cols_c:
                             conn.execute(db.text(f"ALTER TABLE contratos ADD COLUMN {col_name} {col_type}"))
                             conn.commit()

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Used Vehicle Purchase Agreement — Contract #{{ contrato.id }}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 8mm 12mm 8mm 12mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0b0f19;
+            color: #1e293b;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 2rem 1rem;
+            line-height: 1.5;
+        }
+
+        .agreement-container {
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .agreement-page {
+            background: #ffffff;
+            color: #0f172a;
+            border-radius: 12px;
+            padding: 2.5rem 3rem;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
+            position: relative;
+        }
+
+        .header-logo {
+            text-align: center;
+            margin-bottom: 0.85rem;
+        }
+
+        .header-logo img {
+            max-height: 65px;
+            width: auto;
+            object-fit: contain;
+            background: white !important;
+        }
+
+        .agreement-title {
+            text-align: center;
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            margin: 0 0 1.2rem 0;
+            color: #0f172a;
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            margin-top: 1.1rem;
+            margin-bottom: 0.45rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+        }
+
+        .print-two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.35rem;
+        }
+
+        .info-card {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 0.85rem 1.15rem;
+        }
+
+        ul.compact-list {
+            margin: 0.3rem 0 0.65rem 1.35rem;
+            padding: 0;
+        }
+
+        ul.compact-list li {
+            font-size: 0.93rem;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 0.35rem;
+        }
+
+        .info-card ul li {
+            font-size: 0.94rem;
+            color: #334155;
+            line-height: 1.5;
+            margin-bottom: 0.32rem;
+        }
+
+        .data-highlight {
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.4rem;
+            margin-top: 1.1rem;
+        }
+
+        .signature-box {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 0.85rem 1.15rem;
+            text-align: center;
+            background: #f8fafc;
+            min-height: 115px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            position: relative;
+        }
+
+        .signature-img {
+            max-height: 55px;
+            width: auto;
+            max-width: 90%;
+            margin: 0 auto 0.25rem auto;
+            display: block;
+            object-fit: contain;
+            filter: contrast(1.2);
+        }
+
+        .signature-line {
+            border-top: 1px solid #0f172a;
+            margin: 0.65rem 0 0.35rem 0;
+        }
+
+        .signature-label {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .signature-sub {
+            font-size: 0.82rem;
+            color: #64748b;
+        }
+
+        .actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 860px;
+            margin: 0 auto 1.5rem auto;
+        }
+
+        .page-footer-single {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 8.5pt;
+            font-weight: 600;
+            color: #64748b;
+            margin-top: 1.1rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #cbd5e1;
+        }
+
+        /* --- RESPONSIVIDADE SCREEN --- */
+        @media screen and (max-width: 768px) {
+            body {
+                padding: 1rem 0.5rem;
+            }
+            .agreement-page {
+                padding: 1.5rem 1rem;
+            }
+            .print-two-col {
+                grid-template-columns: 1fr !important;
+                gap: 0.75rem !important;
+            }
+            .signature-grid {
+                grid-template-columns: 1fr !important;
+                gap: 1rem !important;
+            }
+        }
+
+        /* --- PADRONIZAÇÃO DE IMPRESSÃO EM 1 PÁGINA A4 COMPLETA E LEGÍVEL --- */
+        @media print {
+            html, body {
+                background: #ffffff !important;
+                color: #000000 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                font-size: 9.5pt !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .actions-bar {
+                display: none !important;
+            }
+            .agreement-container {
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .agreement-page {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+                background: transparent !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+            }
+            .header-logo {
+                margin-bottom: 0.45rem !important;
+            }
+            .header-logo img {
+                max-height: 56px !important;
+            }
+            .agreement-title {
+                font-size: 1.42rem !important;
+                margin-bottom: 0.7rem !important;
+            }
+            .section-title {
+                font-size: 10.2pt !important;
+                margin-top: 0.8rem !important;
+                margin-bottom: 0.3rem !important;
+                padding-bottom: 0.18rem !important;
+            }
+            .info-card {
+                padding: 0.65rem 0.95rem !important;
+                border: 1px solid #94a3b8 !important;
+                background: #f8fafc !important;
+            }
+            .info-card ul li {
+                font-size: 9.4pt !important;
+                line-height: 1.46 !important;
+                margin-bottom: 0.26rem !important;
+            }
+            ul.compact-list {
+                margin: 0.25rem 0 0.55rem 1.25rem !important;
+            }
+            ul.compact-list li {
+                font-size: 9.3pt !important;
+                line-height: 1.46 !important;
+                margin-bottom: 0.28rem !important;
+            }
+            .print-two-col {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 1.15rem !important;
+            }
+            .signature-grid {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 1.35rem !important;
+                margin-top: 0.85rem !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .signature-box {
+                padding: 0.7rem 1rem !important;
+                min-height: 110px !important;
+                border: 1px solid #94a3b8 !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .signature-img {
+                max-height: 52px !important;
+            }
+            .signature-line {
+                margin: 0.55rem 0 0.28rem 0 !important;
+            }
+            .signature-label {
+                font-size: 9pt !important;
+            }
+            .signature-sub {
+                font-size: 8.2pt !important;
+            }
+            .page-footer-single {
+                margin-top: 0.85rem !important;
+                padding-top: 0.45rem !important;
+                font-size: 8.2pt !important;
+                border-top: 1px solid #cbd5e1 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="actions-bar">
+        <a href="/contratos/{{ contrato.id }}" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 0.6rem 1.2rem; border-radius: 8px; font-size: 0.85rem;">
+            &larr; Back to Contract #{{ contrato.id }}
+        </a>
+        <button onclick="window.print()" class="btn-primary" style="display: inline-flex; align-items: center; gap: 8px; padding: 0.6rem 1.4rem; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 0.85rem;">
+            <span>🖨️</span> Print Agreement / Save PDF
+        </button>
+    </div>
+
+    <div class="agreement-container">
+
+        <!-- ================================================================= -->
+        <!-- SINGLE-PAGE USED VEHICLE PURCHASE AGREEMENT                      -->
+        <!-- ================================================================= -->
+        <div class="agreement-page">
+            <div class="header-logo">
+                <img src="/static/images/logo_print.jpg" alt="J&F Motorcycles / FF Motors Logo">
+            </div>
+
+            <h1 class="agreement-title">USED VEHICLE PURCHASE AGREEMENT</h1>
+
+            <!-- 1. PARTIES & PARTICULARS (SIDE-BY-SIDE) -->
+            <div class="print-two-col">
+                <div class="info-card">
+                    <div class="section-title" style="margin-top: 0;">Buyer Details (Purchaser)</div>
+                    <ul class="compact-list" style="list-style: none; margin-left: 0;">
+                        <li><strong>Company Name:</strong> <span class="data-highlight">J&F Motorcycles LTD</span></li>
+                        <li><strong>Address:</strong> <span class="data-highlight">109 Windmill Lane, Birmingham, B66 3EW</span></li>
+                        <li><strong>Phone Number:</strong> <span class="data-highlight">0121 492 0697</span></li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <div class="section-title" style="margin-top: 0;">Seller Details (Vendor)</div>
+                    <ul class="compact-list" style="list-style: none; margin-left: 0;">
+                        <li><strong>Full Name:</strong> <span class="data-highlight">{{ cliente_nome }}</span></li>
+                        <li><strong>Full Address:</strong> <span class="data-highlight">{{ cliente_endereco }}</span></li>
+                        <li><strong>Phone / Email:</strong> <span class="data-highlight">{{ cliente_telefone }}</span> &bull; <span class="data-highlight">{{ cliente_email }}</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 2. VEHICLE & FINANCIAL DETAILS (SIDE-BY-SIDE) -->
+            <div class="print-two-col" style="margin-top: 0.85rem;">
+                <div class="info-card">
+                    <div class="section-title" style="margin-top: 0;">Vehicle Details</div>
+                    <ul class="compact-list" style="list-style: none; margin-left: 0;">
+                        <li><strong>Make & Model:</strong> <span class="data-highlight">{{ moto_modelo }}</span> ({{ moto_cor or 'Standard' }})</li>
+                        <li><strong>Plate / Registration:</strong> <span class="data-highlight" style="font-family: monospace; letter-spacing: 0.5px;">{{ moto_placa }}</span></li>
+                        <li><strong>Category / History:</strong> <span class="data-highlight">{{ categoria_historico }}</span> &bull; <strong>Mileage:</strong> <span class="data-highlight">{{ milhagem_str }}</span></li>
+                    </ul>
+                </div>
+                <div class="info-card">
+                    <div class="section-title" style="margin-top: 0;">Financial & Settlement Details</div>
+                    <ul class="compact-list" style="list-style: none; margin-left: 0;">
+                        <li><strong>Agreed Purchase Value:</strong> <span class="data-highlight" style="font-size: 1rem; color: #0f172a;">£{{ "{:,.2f}".format(valor_compra) }}</span></li>
+                        <li><strong>Payment Method:</strong> <span class="data-highlight">{{ metodo_pagamento }}</span></li>
+                        <li><strong>Settlement Details:</strong> <span class="data-highlight">{{ detalhes_pagamento }}</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 3. SELLER DECLARATIONS & WARRANTIES -->
+            <div class="section-title">I the Seller hereby declare and warrant the following:</div>
+            <ul class="compact-list">
+                <li>I am the absolute legal owner of the vehicle (Registration: <span class="data-highlight">{{ moto_placa }}</span>) and have full right and authority to sell and transfer ownership of the vehicle.</li>
+                <li>I accept full and final payment or credit (agreed value: <span class="data-highlight">£{{ "{:,.2f}".format(valor_compra) }}</span>) from the buyer for this vehicle via the payment method stated above.</li>
+                <li>There is no outstanding amount, debt, liability, finance agreement, logbook loan, or residual encumbrance of any kind for the buyer to inherit.</li>
+                <li>There are no deliberately hidden faults, undisclosed mechanical defects, or unrecorded accident damage on this vehicle.</li>
+                <li>The vehicle originated in the UK and is not an import; I guarantee it is free from third-party claims, police markers, liens, or encumbrances.</li>
+                <li>The mileage (<span class="data-highlight">{{ milhagem_str }}</span>) stated above is true, accurate, and has not been altered (or represents last known MOT/unverified if a non-runner).</li>
+                <li>I agree to fully indemnify, defend, and hold harmless the buyer against any past claims, fines, liabilities, losses, taxes (including ULEZ or Clean Air Zone charges), traffic offenses, or penalties incurred prior to the exact date and time of this sale.</li>
+            </ul>
+
+            <!-- 4. BUYER DECLARATION -->
+            <div class="section-title">I the Buyer hereby declare the following:</div>
+            <ul class="compact-list">
+                <li>Payment or credit to the seller has been issued according to the agreed method stated above.</li>
+                <li>The purchase and acceptance of this vehicle are strictly conditional upon the absolute accuracy of the seller's representations and warranties made herein. If any declaration proves false or misleading, the seller agrees to fully refund the buyer and cover all associated losses.</li>
+            </ul>
+
+            <!-- 5. SIGNATURES & CONFIRMATION OF SALE -->
+            <div class="section-title">Signatures & Confirmation of Sale</div>
+
+            <div class="signature-grid">
+                <!-- Seller's Signature -->
+                <div class="signature-box">
+                    {% if contrato.assinatura_cliente_inicial %}
+                        <img src="{{ contrato.assinatura_cliente_inicial }}" alt="Seller's Signature" class="signature-img">
+                    {% else %}
+                        <div style="height: 52px;"></div>
+                    {% endif %}
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Seller's Signature</div>
+                    <div class="signature-sub">({{ cliente_nome }})</div>
+                </div>
+
+                <!-- Buyer's Signature -->
+                <div class="signature-box">
+                    <img src="/static/images/signature_fernando.png" alt="Buyer's Authorized Signature" class="signature-img">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Buyer's Signature</div>
+                    <div class="signature-sub">(J&F Motorcycles LTD)</div>
+                </div>
+            </div>
+
+            <div class="page-footer-single">
+                <div>
+                    <strong>Date & Time of Sale:</strong> <span class="data-highlight" style="font-family: monospace;">{{ data_hora_documento }}</span>
+                </div>
+                <div>
+                    Agreement #{{ contrato.id }} &bull; Used Vehicle Purchase Agreement
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -221,6 +221,20 @@
                 </div>
             </div>
 
+            <!-- Block for Vehicle Purchase Terms -->
+            <div id="bloco_termos_compra" style="display: none;">
+                <div style="margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; display: block;">Purchase / Trade-in Value</span>
+                    <strong id="info_compra_valor" style="font-size: 1.35rem; color: #22d3ee;">-</strong>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px;">
+                    <div>Payment Method: <strong id="info_compra_metodo" style="color: var(--text-primary);">-</strong></div>
+                    <div>Details: <strong id="info_compra_detalhes" style="color: var(--text-primary);">-</strong></div>
+                    <div>Category: <strong id="info_compra_categoria" style="color: var(--text-primary);">-</strong></div>
+                    <div>Target Fleet Status: <strong id="info_compra_status_destino" style="color: #4ade80;">-</strong></div>
+                </div>
+            </div>
+
             <div id="box_criado_por" style="display:none; margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
                 Staff / Created by: <strong id="info_criado_por" style="color: #c084fc;">-</strong>
             </div>
@@ -372,7 +386,7 @@
 </div>
 
 <!-- Financial Statement (Alone in its own full-width row) -->
-<div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column; width: 100%; margin-bottom: 2rem;">
+<div id="card_financial_statement" class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column; width: 100%; margin-bottom: 2rem;">
     <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
         <div>
             <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Financial Statement</h3>
@@ -915,5 +929,5 @@
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
 <script src="/static/js/moto_modal_shared.js?v=5"></script>
-<script src="/static/js/detalhe_contrato.js?v=27"></script>
+<script src="/static/js/detalhe_contrato.js?v=30"></script>
 {% endblock %}

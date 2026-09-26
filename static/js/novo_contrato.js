@@ -19,27 +19,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const clientes = dataClientes.itens || [];
         const motos = dataMotos.itens || [];
+        window._allMotos = motos;
 
         selectCliente.innerHTML = '<option value="">-- Select Customer --</option>';
         clientes.forEach(c => {
             selectCliente.innerHTML += `<option value="${c.id}">${c.nome} (ID: ${c.id})</option>`;
         });
 
-        selectMoto.innerHTML = '<option value="">-- Select Motorbike --</option>';
-        motos.forEach(m => {
-            const st = (m.status || '').toLowerCase();
-            if (st === 'available' || st === 'disponível') {
-                const milhas = m.milhagem_atual !== undefined ? m.milhagem_atual : 0;
-                selectMoto.innerHTML += `<option value="${m.placa}" data-mileage="${milhas}">${m.placa} - ${m.modelo} (${milhas} mi)</option>`;
+        function populateSelectMotos(currentType) {
+            const currentVal = selectMoto.value;
+            selectMoto.innerHTML = '<option value="">-- Select Motorbike --</option>';
+            motos.forEach(m => {
+                const st = (m.status || '').toLowerCase();
+                let show = false;
+                if (currentType === 'Purchase') {
+                    // For purchase, every single motorcycle in the fleet must be available
+                    show = true;
+                } else {
+                    show = (st === 'available' || st === 'disponível');
+                }
+                if (show) {
+                    const milhas = m.milhagem_atual !== undefined ? m.milhagem_atual : 0;
+                    const cor = m.cor || '';
+                    const statusTag = (currentType === 'Purchase' && st !== 'available' && st !== 'disponível')
+                        ? ` [${(m.status || '').toUpperCase()}]`
+                        : '';
+                    selectMoto.innerHTML += `<option value="${m.placa}" data-mileage="${milhas}" data-cor="${cor}">${m.placa} - ${m.modelo}${statusTag} (${milhas} mi)</option>`;
+                }
+            });
+            if (currentVal) {
+                selectMoto.value = currentVal;
             }
-        });
+        }
+        window.populateSelectMotos = populateSelectMotos;
+        populateSelectMotos(getSelectedContractType());
 
-        // Preencher milhagem inicial ao selecionar a moto
+        // Preencher milhagem inicial e cor ao selecionar a moto
         selectMoto.addEventListener('change', () => {
             const opt = selectMoto.options[selectMoto.selectedIndex];
             const inputMilhagem = document.getElementById('milhagem_inicial');
             if (opt && opt.dataset.mileage && inputMilhagem) {
                 inputMilhagem.value = opt.dataset.mileage;
+            }
+            const inputCor = document.getElementById('moto_cor');
+            if (opt && opt.dataset.cor && inputCor && !inputCor.value) {
+                inputCor.value = opt.dataset.cor;
             }
         });
 
@@ -152,6 +176,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let scheduleItems = []; // [{ numero: 1, valor: 300.00, vencimento: '2026-10-20' }]
 
+    const blocoCompra = document.getElementById('blocoCompra');
+    const inputValorCompra = document.getElementById('valor_compra_veiculo');
+    const inputDetalhesCompra = document.getElementById('detalhes_pagamento_compra');
+    const chkMilhagemNaoVerificada = document.getElementById('milhagem_nao_verificada');
+
+    if (chkMilhagemNaoVerificada) {
+        chkMilhagemNaoVerificada.addEventListener('change', () => {
+            const inputMilhagem = document.getElementById('milhagem_inicial');
+            if (chkMilhagemNaoVerificada.checked) {
+                if (!inputMilhagem.value || inputMilhagem.value === '') {
+                    inputMilhagem.value = '0';
+                }
+                inputMilhagem.removeAttribute('required');
+            } else {
+                if (getSelectedContractType() !== 'Purchase') {
+                    inputMilhagem.setAttribute('required', 'required');
+                }
+            }
+        });
+    }
+
     function getSelectedContractType() {
         const checked = document.querySelector('input[name="tipo_contrato"]:checked');
         return checked ? checked.value : 'Rent';
@@ -160,13 +205,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateContractTypeUI() {
         const type = getSelectedContractType();
 
+        // Atualiza motos elegíveis
+        if (typeof window.populateSelectMotos === 'function') {
+            window.populateSelectMotos(type);
+        }
+
         // Atualiza bordas e estilos dos cards de seleção
         radioTipos.forEach(radio => {
             const card = radio.closest('.contract-type-card');
             if (card) {
                 if (radio.checked) {
-                    card.style.borderColor = 'var(--accent)';
-                    card.style.background = 'rgba(255, 102, 0, 0.08)';
+                    if (type === 'Purchase') {
+                        card.style.borderColor = '#22d3ee';
+                        card.style.background = 'rgba(6, 182, 212, 0.08)';
+                    } else {
+                        card.style.borderColor = 'var(--accent)';
+                        card.style.background = 'rgba(255, 102, 0, 0.08)';
+                    }
                 } else {
                     card.style.borderColor = 'var(--input-border)';
                     card.style.background = 'var(--card-bg)';
@@ -174,11 +229,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
+        const inputMilhagem = document.getElementById('milhagem_inicial');
+
         if (type === 'Rent') {
             if (blocoAluguel) blocoAluguel.style.display = 'block';
             if (blocoVenda) blocoVenda.style.display = 'none';
             if (blocoParcelamento) blocoParcelamento.style.display = 'none';
             if (blocoVendaVista) blocoVendaVista.style.display = 'none';
+            if (blocoCompra) blocoCompra.style.display = 'none';
 
             if (inputDiaPagamento) inputDiaPagamento.required = true;
             if (inputValorAluguel) inputValorAluguel.required = true;
@@ -186,11 +244,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (inputValorVenda) inputValorVenda.required = false;
             if (inputValorEntrada) inputValorEntrada.required = false;
+            if (inputValorCompra) inputValorCompra.required = false;
+            if (inputDetalhesCompra) inputDetalhesCompra.required = false;
+            if (inputMilhagem) inputMilhagem.required = true;
         } else if (type === 'Sale_Full') {
             if (blocoAluguel) blocoAluguel.style.display = 'none';
             if (blocoVenda) blocoVenda.style.display = 'block';
             if (blocoParcelamento) blocoParcelamento.style.display = 'none';
             if (blocoVendaVista) blocoVendaVista.style.display = 'block';
+            if (blocoCompra) blocoCompra.style.display = 'none';
 
             if (inputDiaPagamento) inputDiaPagamento.required = false;
             if (inputValorAluguel) inputValorAluguel.required = false;
@@ -198,12 +260,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (inputValorVenda) inputValorVenda.required = true;
             if (inputValorEntrada) inputValorEntrada.required = false;
+            if (inputValorCompra) inputValorCompra.required = false;
+            if (inputDetalhesCompra) inputDetalhesCompra.required = false;
+            if (inputMilhagem) inputMilhagem.required = true;
             recalculateSaleTotals();
         } else if (type === 'Sale_Installment') {
             if (blocoAluguel) blocoAluguel.style.display = 'none';
             if (blocoVenda) blocoVenda.style.display = 'block';
             if (blocoParcelamento) blocoParcelamento.style.display = 'block';
             if (blocoVendaVista) blocoVendaVista.style.display = 'none';
+            if (blocoCompra) blocoCompra.style.display = 'none';
 
             if (inputDiaPagamento) inputDiaPagamento.required = false;
             if (inputValorAluguel) inputValorAluguel.required = false;
@@ -211,7 +277,58 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (inputValorVenda) inputValorVenda.required = true;
             if (inputValorEntrada) inputValorEntrada.required = true;
+            if (inputValorCompra) inputValorCompra.required = false;
+            if (inputDetalhesCompra) inputDetalhesCompra.required = false;
+            if (inputMilhagem) inputMilhagem.required = true;
             recalculateSaleTotals();
+        } else if (type === 'Purchase') {
+            if (blocoAluguel) blocoAluguel.style.display = 'none';
+            if (blocoVenda) blocoVenda.style.display = 'none';
+            if (blocoParcelamento) blocoParcelamento.style.display = 'none';
+            if (blocoVendaVista) blocoVendaVista.style.display = 'none';
+            if (blocoCompra) blocoCompra.style.display = 'block';
+
+            if (inputDiaPagamento) inputDiaPagamento.required = false;
+            if (inputValorAluguel) inputValorAluguel.required = false;
+            if (inputValorDeposito) inputValorDeposito.required = false;
+
+            if (inputValorVenda) inputValorVenda.required = false;
+            if (inputValorEntrada) inputValorEntrada.required = false;
+
+            if (inputValorCompra) inputValorCompra.required = true;
+            if (inputDetalhesCompra) inputDetalhesCompra.required = true;
+
+            if (chkMilhagemNaoVerificada && chkMilhagemNaoVerificada.checked) {
+                if (inputMilhagem) inputMilhagem.required = false;
+            } else {
+                if (inputMilhagem) inputMilhagem.required = true;
+            }
+        }
+
+        // Toggle Insurance & Documentation UI
+        const blocoSeguro = document.getElementById('blocoSeguro');
+        const seguroInput = document.getElementById('seguro');
+        const tituloDoc = document.getElementById('tituloDocInspecao');
+        const descDoc = document.getElementById('descDocInspecao');
+        const lblFotos = document.getElementById('lblFotosTitulo');
+        const descFotos = document.getElementById('descFotosDica');
+        const lblPlaca = document.getElementById('lblPlaca');
+
+        if (type === 'Purchase') {
+            if (blocoSeguro) blocoSeguro.style.display = 'none';
+            if (seguroInput) seguroInput.value = '';
+            if (tituloDoc) tituloDoc.textContent = 'Intake Inspection & Motorcycle Photos';
+            if (descDoc) descDoc.innerHTML = 'Intake photos can be recorded to document vehicle condition upon purchase or trade-in.';
+            if (lblFotos) lblFotos.textContent = 'Motorbike Intake / Condition Photos';
+            if (descFotos) descFotos.innerHTML = 'Tap <strong>Take Photo</strong> to snap condition photos upon taking the motorbike into inventory.';
+            if (lblPlaca) lblPlaca.textContent = 'Motorbike to Purchase / Trade-in *';
+        } else {
+            if (blocoSeguro) blocoSeguro.style.display = 'block';
+            if (tituloDoc) tituloDoc.textContent = 'Documentation & Initial Check-out Inspection';
+            if (descDoc) descDoc.innerHTML = 'Inspection photos and customer insurance can be attached now or completed later (e.g. while installing accessories). <strong style="color: #fbbf24;">Note: The motorbike cannot leave premises without them.</strong>';
+            if (lblFotos) lblFotos.textContent = 'Motorbike Check-out Photos';
+            if (descFotos) descFotos.innerHTML = 'Tap <strong>Take Photo</strong> repeatedly to snap multiple angles. If bike is still in workshop, photos can be recorded upon completion before release.';
+            if (lblPlaca) lblPlaca.textContent = 'Available Motorbike *';
         }
     }
 
@@ -568,6 +685,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             formData.append('dia_pagamento_semanal', document.getElementById('dia_pagamento_semanal').value);
             formData.append('valor_aluguel_semanal', document.getElementById('valor_aluguel_semanal').value);
             formData.append('valor_deposito', document.getElementById('valor_deposito').value);
+        } else if (contractType === 'Purchase') {
+            formData.append('categoria_historico', document.getElementById('compra_categoria_historico').value);
+            formData.append('moto_cor', document.getElementById('moto_cor')?.value || '');
+            formData.append('valor_compra_veiculo', document.getElementById('valor_compra_veiculo').value || '0');
+            formData.append('metodo_pagamento_compra', document.getElementById('metodo_pagamento_compra').value);
+            formData.append('detalhes_pagamento_compra', document.getElementById('detalhes_pagamento_compra').value || '');
+            formData.append('status_moto_destino', document.getElementById('status_moto_destino').value || 'Available');
+            formData.append('milhagem_nao_verificada', document.getElementById('milhagem_nao_verificada')?.checked ? '1' : '0');
         } else {
             formData.append('categoria_historico', document.getElementById('categoria_historico').value);
             formData.append('valor_venda_veiculo', document.getElementById('valor_venda_veiculo').value);
@@ -613,7 +738,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         const seguroInput = document.getElementById('seguro');
-        if (seguroInput.files.length > 0) {
+        if (contractType !== 'Purchase' && seguroInput && seguroInput.files && seguroInput.files.length > 0) {
             const file = seguroInput.files[0];
             if (file.type.startsWith('image/')) {
                 try {

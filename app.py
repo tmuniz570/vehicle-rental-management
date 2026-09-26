@@ -626,6 +626,33 @@ def imprimir_contrato(id):
     data_assinatura_inicial_uk = contrato.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_inicial else get_local_now().strftime('%d/%m/%Y %H:%M')
     data_assinatura_devolucao_uk = contrato.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if contrato.data_assinatura_devolucao else None
 
+    # Se for Contrato de Compra de Veículo Usado (Used Vehicle Purchase Agreement da J&F Motorcycles LTD)
+    if getattr(contrato, 'tipo_contrato', None) in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+        milhagem_val = contrato.milhagem_inicial if contrato.milhagem_inicial is not None else (moto.milhagem_atual if moto else 0)
+        milhagem_str = "Unverified (0 mi / non-runner)" if (contrato.milhagem_nao_verificada or not milhagem_val) else f"{milhagem_val:,} miles"
+        data_hora_doc = (contrato.data_assinatura_inicial or contrato.data_retirada or get_local_now()).strftime('%d/%m/%Y %H:%M')
+
+        return render_template(
+            'contrato_compra_print.html',
+            contrato=contrato,
+            cliente=cliente,
+            moto=moto,
+            cliente_nome=cliente_nome,
+            cliente_telefone=cliente_telefone,
+            cliente_endereco=cliente_endereco,
+            cliente_email=cliente_email or 'N/A',
+            moto_modelo=moto_modelo,
+            moto_cor=moto_cor,
+            moto_placa=moto_placa,
+            categoria_historico=contrato.categoria_historico or 'Clear',
+            milhagem_str=milhagem_str,
+            valor_compra=float(contrato.valor_compra_veiculo or 0.0),
+            metodo_pagamento=contrato.metodo_pagamento_compra or 'Bank Transfer',
+            detalhes_pagamento=contrato.detalhes_pagamento_compra or '-',
+            data_assinatura_uk=data_assinatura_inicial_uk,
+            data_hora_documento=data_hora_doc
+        )
+
     # Se for Contrato de Venda (Full ou Installment), utiliza o template Vehicle Sale Agreement da J&F Motorcycles LTD
     if getattr(contrato, 'tipo_contrato', None) in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
         is_installment = (contrato.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment'])
@@ -2106,7 +2133,7 @@ def criar_contrato():
     id_cliente = request.form.get('id_cliente') or request.form.get('cliente_id')
     placa = request.form.get('placa') or request.form.get('moto_placa')
     tipo_contrato = request.form.get('tipo_contrato', ContractType.RENT.value)
-    if tipo_contrato not in [ContractType.RENT.value, ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]:
+    if tipo_contrato not in [ContractType.RENT.value, ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, ContractType.PURCHASE.value]:
         tipo_contrato = ContractType.RENT.value
 
     dia_pagamento_semanal = int(request.form.get('dia_pagamento_semanal', 0)) if request.form.get('dia_pagamento_semanal') else 0
@@ -2114,7 +2141,7 @@ def criar_contrato():
     valor_deposito = float(request.form.get('valor_deposito', 0.0)) if request.form.get('valor_deposito') else 0.0
     observacoes = request.form.get('observacoes')
     
-    # Specific Sale Fields
+    # Specific Sale & Purchase Fields
     categoria_historico = request.form.get('categoria_historico', 'Clear')
     valor_venda_veiculo = float(request.form.get('valor_venda_veiculo') or 0.0) if request.form.get('valor_venda_veiculo') else None
     acessorios_extras = (request.form.get('acessorios_extras') or '').strip() or 'None'
@@ -2125,6 +2152,15 @@ def criar_contrato():
     saldo_devedor = float(request.form.get('saldo_devedor') or 0.0)
     cronograma_parcelas_raw = request.form.get('cronograma_parcelas', '[]')
     
+    # Specific Purchase Agreement Fields
+    valor_compra_veiculo = float(request.form.get('valor_compra_veiculo') or 0.0) if request.form.get('valor_compra_veiculo') else None
+    metodo_pagamento_compra = (request.form.get('metodo_pagamento_compra') or '').strip() or None
+    detalhes_pagamento_compra = (request.form.get('detalhes_pagamento_compra') or '').strip() or None
+    milhagem_nao_verificada = request.form.get('milhagem_nao_verificada') in ['1', 'true', 'True', True]
+    status_moto_destino = request.form.get('status_moto_destino') or MotoStatus.AVAILABLE.value
+    if status_moto_destino not in [MotoStatus.AVAILABLE.value, MotoStatus.MANUTENCAO.value, MotoStatus.POUND.value, 'Pound']:
+        status_moto_destino = MotoStatus.AVAILABLE.value
+
     # Calculate or validate valor_total_venda with extras
     if tipo_contrato == ContractType.SALE_FULL.value:
         if not valor_total_venda or valor_total_venda <= 0.0:
@@ -2160,8 +2196,15 @@ def criar_contrato():
         return jsonify({'error': 'Customer not found', 'erro': 'Cliente não encontrado'}), 400
 
     moto = db.session.get(Motorcycle, placa)
-    if not moto or moto.status not in [MotoStatus.AVAILABLE.value, 'Disponível']:
+    if not moto:
+        return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 400
+    if tipo_contrato != ContractType.PURCHASE.value and moto.status not in [MotoStatus.AVAILABLE.value, 'Disponível']:
         return jsonify({'error': 'Motorbike is not available', 'erro': 'Moto não está disponível'}), 400
+
+    # Atualizar cor da moto se informada no formulário de compra/contrato
+    cor_informada = (request.form.get('moto_cor') or '').strip()
+    if cor_informada:
+        moto.cor = cor_informada
         
     # Save inspection photos
     urls_fotos = []
@@ -2187,7 +2230,10 @@ def criar_contrato():
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
 
     # Milhagem Inicial (UK Miles)
-    milhagem_inicial = int(request.form.get('milhagem_inicial') or (moto.milhagem_atual or 0))
+    if milhagem_nao_verificada and tipo_contrato == ContractType.PURCHASE.value:
+        milhagem_inicial = 0
+    else:
+        milhagem_inicial = int(request.form.get('milhagem_inicial') or (moto.milhagem_atual or 0))
     moto.milhagem_atual = milhagem_inicial
 
     # Create Contract with frozen immutable snapshots
@@ -2195,23 +2241,28 @@ def criar_contrato():
         id_cliente=id_cliente,
         placa=placa,
         tipo_contrato=tipo_contrato,
-        dia_pagamento_semanal=dia_pagamento_semanal,
+        dia_pagamento_semanal=dia_pagamento_semanal if tipo_contrato == ContractType.RENT.value else None,
         valor_aluguel_semanal=valor_aluguel_semanal if tipo_contrato == ContractType.RENT.value else 0.0,
         valor_deposito=valor_deposito if tipo_contrato == ContractType.RENT.value else valor_entrada,
         categoria_historico=categoria_historico if tipo_contrato != ContractType.RENT.value else None,
         valor_venda_veiculo=valor_venda_veiculo,
-        acessorios_extras=acessorios_extras if tipo_contrato != ContractType.RENT.value else None,
+        acessorios_extras=acessorios_extras if tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value] else None,
         valor_admin_fee=valor_admin_fee if tipo_contrato == ContractType.SALE_INSTALLMENT.value else 0.0,
         valor_total_venda=valor_total_venda,
         valor_entrada=valor_entrada if tipo_contrato == ContractType.SALE_INSTALLMENT.value else 0.0,
         saldo_devedor=saldo_devedor if tipo_contrato == ContractType.SALE_INSTALLMENT.value else 0.0,
         cronograma_parcelas_json=json.dumps(cronograma_parcelas) if (tipo_contrato == ContractType.SALE_INSTALLMENT.value and cronograma_parcelas) else None,
+        valor_compra_veiculo=valor_compra_veiculo if tipo_contrato == ContractType.PURCHASE.value else None,
+        metodo_pagamento_compra=metodo_pagamento_compra if tipo_contrato == ContractType.PURCHASE.value else None,
+        detalhes_pagamento_compra=detalhes_pagamento_compra if tipo_contrato == ContractType.PURCHASE.value else None,
+        milhagem_nao_verificada=milhagem_nao_verificada if tipo_contrato == ContractType.PURCHASE.value else False,
+        status_moto_destino=status_moto_destino if tipo_contrato == ContractType.PURCHASE.value else None,
         url_seguro=url_seguro,
         status=ContractStatus.ACTIVE.value,
         criado_por_nome=operador_atual,
         milhagem_inicial=milhagem_inicial,
         data_ultima_checagem_seguro=get_local_now().date() if url_seguro else None,
-        status_seguro='Valid' if url_seguro else 'Pending',
+        status_seguro='Valid' if (url_seguro or tipo_contrato == ContractType.PURCHASE.value) else 'Pending',
         seguro_verificado_por=operador_atual if url_seguro else None,
         # Immutable Snapshot of Customer at creation time
         cliente_nome=cliente.nome,
@@ -2226,13 +2277,15 @@ def criar_contrato():
         moto_modelo=moto.modelo,
         moto_cor=moto.cor,
         moto_placa=moto.placa,
-        dia_pagamento_semanal_original=dia_pagamento_semanal
+        dia_pagamento_semanal_original=dia_pagamento_semanal if tipo_contrato == ContractType.RENT.value else None
     )
     db.session.add(novo_contrato)
     
     # Update motorbike status according to contract type
     if tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]:
         moto.status = MotoStatus.SOLD.value
+    elif tipo_contrato == ContractType.PURCHASE.value:
+        moto.status = status_moto_destino
     else:
         moto.status = MotoStatus.RENTED.value
     
@@ -2241,6 +2294,7 @@ def criar_contrato():
     hoje = get_local_now().replace(hour=0, minute=0, second=0, microsecond=0)
     
     # Financial Transactions Provisioning (All transactions start PENDING upon contract creation)
+    # NOTA REGRA A1: Contratos de compra NÃO lançam no financeiro (não é recebível, a loja paga ao vendedor).
     if tipo_contrato == ContractType.RENT.value:
         # 1. Security deposit transaction for rental
         deposito = FinancialTransaction(
@@ -2323,11 +2377,12 @@ def criar_contrato():
             )
             db.session.add(tx_parcela)
     
-    # Create Check-out Inspection with mileage only if photos were provided
+    # Create Inspection with mileage only if photos were provided
     if urls_fotos:
+        tipo_vistoria = InspectionType.CHECK_IN.value if tipo_contrato == ContractType.PURCHASE.value else InspectionType.CHECK_OUT.value
         nova_vistoria = Inspection(
             id_contrato=novo_contrato.id,
-            tipo=InspectionType.CHECK_OUT.value,
+            tipo=tipo_vistoria,
             milhagem=milhagem_inicial,
             observacoes=observacoes,
             url_fotos=url_foto_str,
@@ -2344,6 +2399,8 @@ def criar_contrato():
         detalhes_log = f"Contrato de Aluguel #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Milhagem: {milhagem_inicial} mi, Aluguel: £{valor_aluguel_semanal:.2f}/sem, Depósito: £{valor_deposito:.2f}){insp_obs}{seg_obs}"
     elif tipo_contrato == ContractType.SALE_FULL.value:
         detalhes_log = f"Contrato de Venda à Vista #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Preço: £{valor_total_venda:.2f}, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold).{insp_obs}{seg_obs}"
+    elif tipo_contrato == ContractType.PURCHASE.value:
+        detalhes_log = f"Contrato de Compra de Veículo #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Valor: £{valor_compra_veiculo or 0:.2f}, Método: {metodo_pagamento_compra or 'N/A'}, Categoria: {categoria_historico}). Moto integrada à frota com status {status_moto_destino}."
     else:
         detalhes_log = f"Contrato de Venda Parcelada #{novo_contrato.id} aberto para moto {moto.placa} por {operador_atual} (Total: £{valor_total_venda:.2f}, Entrada: £{valor_entrada:.2f}, Saldo: £{saldo_devedor:.2f}, {len(cronograma_parcelas)} parcelas, Categoria: {categoria_historico}). Moto marcada como Vendida (Sold).{insp_obs}{seg_obs}"
 
@@ -2458,6 +2515,9 @@ def assinar_contrato(id):
             contrato.assinatura_cliente_inicial = url_salva
             contrato.data_assinatura_inicial = agora_london_naive
             registrar_log('CONTRACT_SIGNED_START', 'Contract', contrato.id, f"Contrato #{contrato.id} assinado digitalmente na retirada por {contrato.cliente.nome if contrato.cliente else 'Cliente'} (Operador: {operador})")
+            if contrato.tipo_contrato in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+                contrato.status = ContractStatus.COMPLETED.value
+                registrar_log('CONTRACT_COMPLETED', 'Contract', contrato.id, f"Contrato de compra #{contrato.id} assinado pelo vendedor e concluído com sucesso.")
 
         db.session.commit()
 
@@ -2755,6 +2815,8 @@ def listar_contratos():
             query = query.filter(Contract.tipo_contrato.in_([ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value]))
         elif tipo_filter.lower() in ['rent', 'aluguel']:
             query = query.filter(db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None))
+        elif tipo_filter.lower() in ['purchase', 'compra']:
+            query = query.filter(Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']))
         else:
             query = query.filter(Contract.tipo_contrato == tipo_filter)
         
@@ -2813,10 +2875,11 @@ def listar_contratos():
     
     itens = []
     for c in paginated.items:
+        is_purchase = (getattr(c, 'tipo_contrato', None) in [ContractType.PURCHASE.value, 'Purchase', 'Compra'])
         tem_checkout = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in (c.vistorias or []))
         tem_seguro = bool(c.url_seguro)
         is_active = (c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
-        pendente_liberacao = is_active and (not tem_checkout or not tem_seguro)
+        pendente_liberacao = is_active and not is_purchase and (not tem_checkout or not tem_seguro)
         itens.append({
             'id': c.id, 
             'id_cliente': c.id_cliente, 
@@ -2827,6 +2890,11 @@ def listar_contratos():
             'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
             'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
             'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
+            'valor_compra_veiculo': float(c.valor_compra_veiculo) if c.valor_compra_veiculo is not None else None,
+            'metodo_pagamento_compra': c.metodo_pagamento_compra,
+            'detalhes_pagamento_compra': c.detalhes_pagamento_compra,
+            'milhagem_nao_verificada': bool(c.milhagem_nao_verificada),
+            'status_moto_destino': c.status_moto_destino,
             'data_retirada': c.data_retirada.isoformat() if c.data_retirada else None,
             'dia_pagamento_semanal': c.dia_pagamento_semanal,
             'valor_aluguel_semanal': c.valor_aluguel_semanal,
@@ -2898,12 +2966,14 @@ def detalhe_contrato(id):
     # 15-Day Insurance Compliance (askMID Verification) - apenas para contratos de aluguel (Rent)
     tipo_contrato_val = getattr(c, 'tipo_contrato', 'Rent') or 'Rent'
     is_venda = tipo_contrato_val in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']
+    is_purchase = tipo_contrato_val in [ContractType.PURCHASE.value, 'Purchase', 'Compra']
+    is_pre_release_pending = is_active and not (is_venda or is_purchase) and (not has_checkout_inspection or not has_insurance_doc)
     
     hoje = get_local_now().date()
     ultima_checagem = c.data_ultima_checagem_seguro or (c.data_retirada.date() if c.data_retirada else hoje)
     dias_desde_checagem = (hoje - ultima_checagem).days
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
-    checagem_seguro_devida = (dias_desde_checagem >= 15) if not is_venda else False
+    checagem_seguro_devida = (dias_desde_checagem >= 15) if not (is_venda or is_purchase) else False
     
     # Auto-conclusão para contratos de venda quando todas as transações estiverem quitadas
     if is_venda and c.status in [ContractStatus.ATIVO.value, 'Active', 'Ativo']:
@@ -2950,6 +3020,11 @@ def detalhe_contrato(id):
         'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
         'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
         'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
+        'valor_compra_veiculo': float(c.valor_compra_veiculo) if c.valor_compra_veiculo is not None else None,
+        'metodo_pagamento_compra': c.metodo_pagamento_compra,
+        'detalhes_pagamento_compra': c.detalhes_pagamento_compra,
+        'milhagem_nao_verificada': bool(c.milhagem_nao_verificada),
+        'status_moto_destino': c.status_moto_destino,
         'cronograma_parcelas': cronograma_parsed,
         'id_cliente': c.id_cliente,
         'cliente': current_cliente_nome,
@@ -3911,9 +3986,9 @@ def get_dashboard():
         contratos_seguro_alerta = []
         
         for ca in contratos_ativos_objs:
-            # Não monitorar seguro quinzenal para motos vendidas (Sale_Full / Sale_Installment)
+            # Não monitorar seguro quinzenal para motos vendidas (Sale_Full / Sale_Installment) nem compradas (Purchase)
             tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
-            if tipo_ca in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+            if tipo_ca in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment', ContractType.PURCHASE.value, 'Purchase', 'Compra']:
                 continue
                 
             u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
@@ -3942,8 +4017,12 @@ def get_dashboard():
                 })
         
         # Pre-Delivery Compliance: Motorbikes Pending Check-out Inspection or Insurance Certificate before release
+        # Contratos de compra (Purchase) não requerem liberação para cliente (veículo adquirido pela loja)
         contratos_pendentes_liberacao = []
         for ca in contratos_ativos_objs:
+            tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
+            if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+                continue
             tem_checkout = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in (ca.vistorias or []))
             tem_seguro = bool(ca.url_seguro)
             if not tem_checkout or not tem_seguro:

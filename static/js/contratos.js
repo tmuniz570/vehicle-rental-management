@@ -49,7 +49,12 @@ async function carregarContratos() {
             let dueTerms = '-';
             let amountText = '-';
 
-            if (tipo === 'sale_full') {
+            if (tipo === 'purchase') {
+                tipoBadge = '<span class="badge" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.35); font-weight: 600;">🤝 Purchase</span>';
+                dueTerms = `<span style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(c.metodo_pagamento_compra || 'Paid / Credit')}</span>`;
+                const total = c.valor_compra_veiculo !== null && c.valor_compra_veiculo !== undefined ? c.valor_compra_veiculo : 0;
+                amountText = `<span style="font-weight: 700; color: #22d3ee;">${new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(total)}</span>`;
+            } else if (tipo === 'sale_full') {
                 tipoBadge = '<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Sale: Full</span>';
                 dueTerms = '<span style="color: var(--text-secondary); font-size: 0.85rem;">At Signing</span>';
                 const total = c.valor_total_venda !== null && c.valor_total_venda !== undefined ? c.valor_total_venda : 0;
