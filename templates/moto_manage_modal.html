@@ -4,9 +4,12 @@
         <!-- Modal Header -->
         <div class="modal-header" style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02);">
             <div>
-                <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                     <span class="badge-plate" id="modalDisplayPlaca" style="font-size: 1.1rem; padding: 3px 10px;">-</span>
                     <h3 id="modalDisplayModelo" style="margin: 0; font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">-</h3>
+                    <a href="https://www.check-mot.service.gov.uk/" target="_blank" rel="noopener noreferrer" class="dvla-btn" onclick="copiarPlacaDVLA(event, document.getElementById('edit_placa')?.value)" title="Check MOT & Tax on GOV.UK (copies plate to clipboard)">
+                        DVLA Check ↗
+                    </a>
                 </div>
                 <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Manage vehicle details, V5C registration documents, and GPS trackers.</p>
             </div>
@@ -46,7 +49,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Current Mileage (Miles)</label>
+                        <label>Current Mileage</label>
                         <input type="number" id="edit_milhagem" min="0" step="1" placeholder="e.g. 12500" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
                         <small style="display: block; margin-top: 4px; font-size: 0.75rem; color: var(--text-secondary);">Odometer reading in UK miles.</small>
                     </div>

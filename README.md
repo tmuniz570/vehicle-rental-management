@@ -34,11 +34,15 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Realized Cashflow Tracking:** Weekly Revenue card tracks expected rent alongside actual payments collected in the current week (`Collected this week: £X,XXX.XX (Today: £XXX.XX)`).
 * **Live KPI Counters:** Real-time visibility into total fleet, available bikes, active rentals, motorcycles in maintenance, registered customers, and expected weekly revenue.
 * **Out-of-Operation Visibility:** Total Fleet card shows active bikes in operation alongside an interactive out-of-operation badge (`🏛️ [N] OUT OF OP`) with 1-click navigation to `/motos?status=Pound`.
-* **Interactive Fleet Allocation Bar:** Visual percentage breakdown of available, rented, workshop-held, and impounded (`Pound`) motorbikes with 1-click filtered drilldown.
+* **Interactive Fleet & Business Model Distribution Bar:** Visual breakdown distinguishing Weekly Rentals (`Rentals`), Financed / Rent-to-Buy deals (`Financed`), Ready inventory (`Available`), Workshop (`Maintenance`), Impounded (`Pound`), and Outright Sold (`Sold`), complete with real-time operational fleet utilization rate badge (`⚡ X% Active Deals on Road`) and interactive clickable dark-glass status pills.
+* **Sticky Desktop Sidebar:** Persistent desktop sidebar (`position: sticky; top: 0; height: 100vh;`) remaining continuously visible while scrolling long dashboard and ledger screens, featuring smooth independent scroll and floating tooltips in collapsed mode.
 * **Instant Overdue Alerts:** Immediate notification of late payments and actionable shortcuts.
 * **Missing V5C Logbook Alarm:** Real-time dashboard alert listing all fleet vehicles without an attached V5C logbook document with 1-click links to upload documents.
 
 ### 🛵 2. Fleet & Vehicle Lifecycle
+* **Zero-Scroll Horizontal Layout (1280px):** Optimized fleet table columns (`Plate`, `Road Tax`, `MOT`, `V5C & GPS`, `Status`) and compact `+ Deal` action button, fitting all 9 table columns horizontally across standard 1280px laptop screens without horizontal scrolling.
+* **DVLA Check Quick Actions:** 1-tap DVLA vehicle check integration (`DVLA Check ↗`) in motorbike editing modals and the Add Bike page (`/motos/nova`), automatically copying the registration plate to clipboard with feedback and opening the official UK vehicle enquiry portal (`vehicleenquiry.service.gov.uk`).
+* **Universal Search Sold Bike Drilldown:** Direct deep-link from dashboard quick lookup to fleet table (`status=all`) and automatic fallback ensuring sold or impounded motorbikes appear immediately in search results.
 * **Default Active Fleet View:** Fleet table (`/motos`) defaults to `⚡ Active Fleet (In Operation)` excluding sold and impounded vehicles, with an explicit `All Statuses` dropdown option for full historical audit.
 * **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`, `Pound`, `Sold`).
 * **Pound Status & MOT/Tax Exemption:** Dedicated status (`Pound`) for motorbikes outside operation (e.g., impounded by police or held in external compounds). Motorbikes in this status are strictly exempt from MOT and Road Tax alerts on the executive dashboard and display `Exempt (Pound)` in fleet tables.

@@ -28,14 +28,19 @@
         
         <div class="form-row">
             <div class="form-group half">
-                <label for="placa">Registration Plate (Reg No.) *</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                    <label for="placa" style="margin-bottom: 0;">Registration Plate *</label>
+                    <a href="https://www.check-mot.service.gov.uk/" target="_blank" rel="noopener noreferrer" class="dvla-btn" onclick="copiarPlacaDVLA(event, document.getElementById('placa')?.value)" title="Check MOT & Tax on GOV.UK (copies plate to clipboard)">
+                        DVLA Check ↗
+                    </a>
+                </div>
                 <input type="text" id="placa" name="placa" placeholder="BP21XYZ" required autocapitalize="characters" style="text-transform: uppercase;" autocomplete="off" spellcheck="false" maxlength="10">
                 <small style="display: block; margin-top: 4px; font-size: 0.78rem; color: var(--text-secondary);">
                     Without spaces (e.g. <strong>BP21XYZ</strong>).
                 </small>
             </div>
             <div class="form-group half">
-                <label for="milhagem_atual">Current Mileage (Miles)</label>
+                <label for="milhagem_atual">Current Mileage</label>
                 <input type="number" id="milhagem_atual" name="milhagem_atual" placeholder="e.g. 12500" min="0" step="1" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
                 <small style="display: block; margin-top: 4px; font-size: 0.78rem; color: var(--text-secondary);">
                     Odometer reading in UK miles.

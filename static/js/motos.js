@@ -32,16 +32,23 @@ window.copiarPlacaDVLA = function(event, placa) {
     if (event) {
         event.stopPropagation();
     }
+    if (!placa) {
+        placa = document.getElementById('edit_placa')?.value || document.getElementById('placa')?.value || '';
+    }
+    if (!placa) return;
+    placa = placa.trim().toUpperCase();
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(placa).then(() => {
-            const btn = event ? event.currentTarget : null;
+            const btn = event ? (event.currentTarget || event.target) : null;
             if (btn) {
                 const origText = btn.innerHTML;
                 btn.innerHTML = '✓ Copied!';
                 btn.style.color = '#4ade80';
+                btn.style.borderColor = '#4ade80';
                 setTimeout(() => {
                     btn.innerHTML = origText;
                     btn.style.color = '';
+                    btn.style.borderColor = '';
                 }, 2000);
             }
         }).catch(() => {});
@@ -110,7 +117,15 @@ async function carregarMotos() {
         }
 
         if (motos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 2.5rem 1rem; color: var(--text-secondary);">No motorbikes found matching criteria.</td></tr>';
+            const hasFilter = statusFiltro && statusFiltro !== 'all';
+            const clearFilterAction = hasFilter ? `
+                <div style="margin-top: 12px;">
+                    <button type="button" class="btn-secondary" onclick="document.getElementById('statusFilter').value='all'; document.getElementById('statusFilter').dispatchEvent(new Event('change'));" style="padding: 6px 14px; font-size: 0.82rem; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        🔍 Search All Fleet (incl. Sold & Pound)
+                    </button>
+                </div>
+            ` : '';
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 2.5rem 1rem; color: var(--text-secondary);"><div style="margin-bottom: 4px;">No motorbikes found matching criteria.</div>${clearFilterAction}</td></tr>`;
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
@@ -241,18 +256,18 @@ async function carregarMotos() {
                 ? `<span class="badge" style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-size:0.75rem; cursor:pointer;" title="View ${trackersCount} GPS tracker(s)" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabTrackers', motosCache['${escapeHtml(m.placa)}'])">📡 ${trackersCount} GPS</span>`
                 : `<span style="opacity:0.4; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; text-decoration: underline;" title="Register tracker" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabTrackers', motosCache['${escapeHtml(m.placa)}'])">+ Tracker</span>`;
 
-            // Actions Column: "+ Rent" for Available bikes and "Manage"
+            // Actions Column: compact "+ Deal" for Available bikes and "Manage"
             let actionsHtml = '';
             if (st === 'available' || st === 'disponível') {
                 actionsHtml = `
-                    <div style="display:inline-flex; gap:6px; align-items:center;">
-                        <a href="/contratos/novo?moto_placa=${encodeURIComponent(m.placa)}" class="btn-primary" style="padding:6px 10px; font-size:0.78rem; text-decoration:none; display:inline-flex; align-items:center; gap:3px; border-radius:6px; background:var(--accent); color:#fff; font-weight:700; white-space:nowrap;" title="Create new agreement with ${escapeHtml(m.placa)}">+ Rent</a>
-                        <button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.15); padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.78rem;">Manage</button>
+                    <div style="display:inline-flex; gap:3px; align-items:center;">
+                        <a href="/contratos/novo?moto_placa=${encodeURIComponent(m.placa)}" class="btn-primary" style="padding:3px 7px; font-size:0.72rem; text-decoration:none; display:inline-flex; align-items:center; gap:2px; border-radius:5px; background:var(--accent); color:#fff; font-weight:700; white-space:nowrap;" title="Create new agreement (Rental, Sale, Finance) for ${escapeHtml(m.placa)}">+ Deal</a>
+                        <button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.15); padding:3px 7px; border-radius:5px; cursor:pointer; font-weight:600; font-size:0.72rem;">Manage</button>
                     </div>
                 `;
             } else {
                 actionsHtml = `
-                    <button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:7px 14px; min-width:64px; min-height:34px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.82rem;">Manage</button>
+                    <button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:3px 10px; min-height:26px; border-radius:5px; cursor:pointer; font-weight:600; font-size:0.75rem;">Manage</button>
                 `;
             }
 
@@ -272,7 +287,7 @@ async function carregarMotos() {
                 <td data-sort="${isPound ? 'POUND' : (m.tax_sorn ? 'SORN' : (m.vencimento_tax || ''))}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${isPound ? 'POUND' : (m.vencimento_mot || '')}" class="nowrap">${motBadge}</td>
                 <td class="nowrap">
-                    <div style="display: inline-flex; gap: 6px; align-items: center; min-height: 36px;">
+                    <div style="display: inline-flex; gap: 4px; align-items: center; min-height: 28px;">
                         ${v5cBadge}
                         ${trackerBadge}
                     </div>
@@ -326,6 +341,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const sf = document.getElementById('statusFilter');
             if (sf) sf.value = initialStatus;
         }
+    } else if (initialSearch) {
+        // When searching for a specific motorbike or plate, search across all statuses (including Sold and Pound)
+        statusFiltro = 'all';
+        v5cFiltro = '';
+        const sf = document.getElementById('statusFilter');
+        if (sf) sf.value = 'all';
     } else {
         // Default: active fleet (operational - excludes Sold and Pound)
         statusFiltro = 'operational';

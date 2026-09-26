@@ -1,3 +1,29 @@
+// Quick DVLA check helper
+window.copiarPlacaDVLA = window.copiarPlacaDVLA || function(event, placa) {
+    if (event) event.stopPropagation();
+    if (!placa) {
+        placa = document.getElementById('placa')?.value || '';
+    }
+    if (!placa) return;
+    placa = placa.trim().toUpperCase();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(placa).then(() => {
+            const btn = event ? (event.currentTarget || event.target) : null;
+            if (btn) {
+                const origText = btn.innerHTML;
+                btn.innerHTML = '✓ Copied!';
+                btn.style.color = '#4ade80';
+                btn.style.borderColor = '#4ade80';
+                setTimeout(() => {
+                    btn.innerHTML = origText;
+                    btn.style.color = '';
+                    btn.style.borderColor = '';
+                }, 2000);
+            }
+        }).catch(() => {});
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('motoForm');
     const submitBtn = document.getElementById('submitBtn');

@@ -4,6 +4,40 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.14] — 2026-09-27 — *Universal Search Sold Bike Drilldown, Fleet Horizontal Zero-Scroll Optimization & DVLA Quick Actions*
+
+### 📌 Menu Lateral Fixo / Sticky na Rolagem Vertical (`static/css/styles.css`)
+* **Sidebar Sempre Visível Durante a Rolagem da Página (Desktop)**:
+  - **Posicionamento Sticky**: O menu lateral (`.sidebar`) agora acompanha a rolagem da página verticalmente (`position: sticky; top: 0; height: 100vh; height: 100dvh;`), permanecendo sempre fixo e acessível em páginas longas como o Dashboard ou a listagem financeira.
+  - **Scroll Suave Independente**: Adicionado `overflow-y: auto` com barra de rolagem ultrafina e estilizada caso o usuário utilize telas de baixa resolução vertical, garantindo que todos os links e botões de perfil/logout permaneçam alcançáveis.
+  - **Ajuste de Container Flex**: Configurado `overflow-x: clip` no layout principal (`.app-layout`) e removido aprisionamento de rolagem no `.main-content`, permitindo que o viewport do navegador gerencie a rolagem fluida mantendo a barra lateral fixa no topo.
+  - **Compatibilidade com Modo Recolhido (Collapsed)**: Mantido `overflow: visible` quando a sidebar está recolhida (`.sidebar.collapsed`), preservando os tooltips flutuantes no hover à direita dos ícones.
+
+### 📊 Gráfico de Distribuição da Frota & Modelo de Negócios (`templates/index.html` & `app.py`)
+* **Diferenciação Completa do Modelo de Negócios (Locação vs Venda/Financiamento vs Inventário)**:
+  - **Separação de Deals Ativos**: A fatia anterior genérica de `Rented` foi aprimorada para distinguir claramente **Rentals** (aluguel semanal, em tom laranja `var(--accent)`) e **Financed** (vendas parceladas / rent-to-buy com parcelas ativas, em tom violeta `#a855f7`).
+  - **Visão Integral dos Ativos**: A barra agora contempla todo o portfólio de 33 veículos com segmentos para `Rentals`, `Financed`, `Available`, `Maintenance`, `Pound` e `Sold` (motos vendidas à vista/quitadas).
+  - **Indicador de Utilização Operacional (Utilization Rate)**: Adicionado badge inteligente no cabeçalho: `⚡ 73% Active Deals on Road (19/26)`, calculando a porcentagem exata de motos em contrato ativo sobre a frota operacional em circulação.
+  - **Pills de Legenda Interativas Estilo SaaS**: Substituídos os textos simples por botões/pills modernos em *dark glass*, com pontos de status iluminados (*glow*), contagem e porcentagem calculada dinamicamente, permitindo filtrar contratos ou frotas diretamente com 1 clique.
+  - **Barra de Progresso de 18px**: Altura expandida de 12px para 18px com espaçamento interno, cantos arredondados e efeito de brilho e elevação no hover.
+
+### 🔍 Busca Universal & Navegação da Frota (`/motos` & `templates/index.html`)
+* **Exibição Automática de Motos Vendidas e em Pátio (`Sold` / `Pound`) via Busca**:
+  - **Correção de Drilldown**: Ao clicar em uma moto vendida ou apreendida nos resultados do buscador geral do Dashboard, o link agora envia explicitamente `status=all` (`/motos?search=<PLACA>&status=all`).
+  - **Tratamento Inteligente no Fleet**: Caso a página `/motos` seja acessada com o parâmetro `search` sem especificação de status, o filtro padrão de frota ativa (`operational`) cede lugar automaticamente para `All Statuses (Incl. Sold & Pound)` (`statusFiltro = 'all'`), garantindo que motos vendidas (`Sold`) e apreendidas (`Pound`) sejam localizadas e exibidas imediatamente na tabela.
+  - **Ação Proativa de Busca em Estado Vazio**: Quando uma busca na tabela da frota não encontra resultados sob o filtro ativo, é exibido o botão de atalho `🔍 Search All Fleet (incl. Sold & Pound)`, permitindo ao operador expandir a pesquisa para a frota completa com 1 clique.
+
+### 📐 Otimização Horizontal da Tabela de Frotas (Zero Barra de Rolagem)
+* **Ajuste de Cabeçalhos e Densidade Visual em 1280px**:
+  - Títulos de colunas compactados de forma limpa e compreensível (`Plate`, `Road Tax`, `MOT`, `V5C & GPS`, `Status`).
+  - Renomeado o botão de ação rápida de `+ Rent` para `+ Deal` com padding otimizado, refletindo com precisão as operações do negócio (venda, financiamento e aluguel).
+  - Espaçamentos horizontais refinados (`padding: 0.55rem 0.35rem`), garantindo que todas as 9 colunas da tabela de frotas caibam 100% visíveis em telas de 1280px (MacBook Air / laptops de 13") sem acionar barra de rolagem horizontal.
+
+### 🛡️ Integração de Consulta DVLA e Limpeza de Formulários
+* **Botões DVLA Check nos Modais e Telas de Cadastro**:
+  - Adicionado botão `DVLA Check ↗` estilizado e responsivo no modal de edição/gerenciamento de motos (`#motoManageModal`) e na tela de inclusão de novos veículos (`/motos/nova`). O botão copia a placa automaticamente para a área de transferência com feedback visual e abre o portal oficial do governo britânico (`vehicleenquiry.service.gov.uk`).
+  - Limpeza dos rótulos dos campos nos formulários, removendo textos redundantes (`(Reg No.)` em *Registration Plate* e `(Miles)` em *Current Mileage*).
+
 ## [1.9.13] — 2026-09-26 — *Dashboard Operational Hub: Quick Lookup, Due Today Collections, Interactive Distribution & Cashflow*
 
 ### ⚡ Dashboard Operacional (`/` & `templates/index.html`)
@@ -50,11 +84,17 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
 * **KPI Summary Cards com Filtro Interativo por Clique**:
   - Barra de 6 mini-cards no topo da tela do Fleet: **Active Fleet** (⚡), **Available** (🟢), **Rented** (🔑), **Maintenance** (🔧), **Missing V5C** (⚠️) e **Compliance Alerts** (🛡️).
   - Clicar em qualquer card filtra instantaneamente a tabela com feedback visual ativo (highlight e badge sincronizado).
-* **Atalho Rápido "+ Rent" para Motos Disponíveis**:
-  - Na coluna de ações, motos com status `Available` contam com botão direto `+ Rent` que abre o formulário de novo contrato (`/contratos/novo?moto_placa=...`) já com a moto selecionada e odômetro preenchido automaticamente.
-* **Layout Compacto e Consulta Rápida DVLA Oficial**:
-  - Para evitar expansão horizontal desnecessária da tabela, o botão `DVLA ↗` foi empilhado verticalmente logo abaixo da placa, e o cabeçalho de odômetro simplificado para `Mileage` (sem parênteses redundantes).
-  - O botão `DVLA ↗` copia a matrícula para a área de transferência com feedback (`✓ Copied!`) e abre a consulta oficial de MOT/Tax do governo britânico (`check-mot.service.gov.uk`).
+* **Atalho Multimodal Compacto "+ Deal" para Motos Disponíveis**:
+  - Na coluna de ações, motos com status `Available` contam com botão direto e enxuto `+ Deal` (substituindo `+ Rent`/`+ Agreement`) que abre o formulário de novo contrato (`/contratos/novo?moto_placa=...`) com suporte a todas as modalidades operacionais da plataforma: **Aluguel (`Rent`)**, **Venda Parcelada/Financiamento (`Sale_Installment`)**, **Venda à Vista (`Sale_Full`)** ou **Compra/Trade-in (`Purchase`)**.
+* **Eliminação da Barra de Rolagem Horizontal no Fleet (Títulos Compactos & Padding Otimizado)**:
+  - Preservadas todas as 9 colunas originais separadas, aplicando abreviações inteligentes nos cabeçalhos: `Reg Plate` ➔ `Plate`, `Road Tax Expiry` ➔ `Road Tax`, `MOT Expiry` ➔ `MOT`, `V5C & Trackers` ➔ `V5C & GPS`, e `Status & Agreement` ➔ `Status`.
+  - Tabela ajustada para padding refinado (`padding: 0.55rem 0.35rem`), garantindo que 100% da tabela — incluindo as ações `+ Deal` e `Manage` — caiba perfeitamente na horizontal sem gerar barra de rolagem em resoluções padrão (1280px e 1366px).
+* **Consulta Rápida DVLA Oficial na Tabela, Modal de Edição e Cadastro de Moto**:
+  - O botão `DVLA Check ↗` copia a matrícula para a área de transferência com feedback visual instantâneo (`✓ Copied!`) e abre a consulta oficial de MOT/Tax do governo britânico (`check-mot.service.gov.uk`).
+  - Disponível de forma integrada:
+    1. **Na Tabela da Frota**: empilhado verticalmente logo abaixo da placa.
+    2. **No Modal de Gestão/Edição da Moto (`#motoManageModal`)**: ao lado do badge da placa no cabeçalho.
+    3. **Na Tela de Cadastro de Nova Moto (`/motos/nova`)**: ao lado do label do campo de matrícula (`Registration Plate`).
 * **Relatório Oficial da Frota em PDF (`/motos/relatorio-pdf` & `templates/relatorio_fleet.html`)**:
   - Botão `🖨️ PDF Report` no topo da tela da frota gerando relatório imprimível e exportável em PDF (A4) com os dados essenciais e úteis da tabela filtrada atual (placa, modelo e cor, milhagem, status, vencimentos de MOT e Tax / SORN, contrato e condutor ativo). Substitui planilhas CSV volumosas por um documento limpo e executivo.
 

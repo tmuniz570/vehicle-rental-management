@@ -256,7 +256,7 @@ body {
     display: flex;
     min-height: 100vh;
     width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     position: relative;
 }
 
@@ -290,8 +290,27 @@ body {
     transition: transform 0.3s ease, width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     z-index: 50;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
     overflow-x: hidden;
-    position: relative;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
 }
 
 .sidebar-brand {
@@ -509,6 +528,7 @@ body {
 .sidebar.collapsed {
     width: 74px;
     padding: 1.25rem 0.5rem;
+    overflow: visible;
 }
 
 .sidebar.collapsed .sidebar-brand {
@@ -691,7 +711,6 @@ html.sidebar-collapsed-preload .sidebar .sidebar-nav a {
     min-width: 0;
     max-width: 100%;
     padding: 2rem 2rem;
-    overflow-y: auto;
     overflow-x: auto;
 }
 
@@ -865,24 +884,66 @@ html.sidebar-collapsed-preload .sidebar .sidebar-nav a {
 
 .fleet-bar-track {
     display: flex;
-    height: 12px;
+    height: 18px;
     border-radius: 999px;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.06);
-    margin: 0.75rem 0;
+    background: rgba(255, 255, 255, 0.05);
+    margin: 0.85rem 0 1rem 0;
+    padding: 2px;
+    gap: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .fleet-bar-segment {
     height: 100%;
     transition: width 0.4s ease;
+    border-radius: 999px;
+    cursor: pointer;
+    position: relative;
+}
+
+.fleet-bar-segment:hover {
+    filter: brightness(1.2);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
 .fleet-bar-legend {
     display: flex;
     flex-wrap: wrap;
-    gap: 1.25rem;
-    font-size: 0.85rem;
-    color: var(--text-secondary);
+    gap: 0.6rem;
+    font-size: 0.82rem;
+}
+
+.fleet-legend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.fleet-legend-pill:hover {
+    background: rgba(255, 255, 255, 0.09);
+    transform: translateY(-1px);
+    border-color: var(--pill-color, var(--border-color));
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.fleet-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--pill-color, var(--accent));
+    box-shadow: 0 0 8px var(--pill-color, var(--accent));
+    flex-shrink: 0;
 }
 
 .fleet-bar-legend-item {
@@ -1795,6 +1856,36 @@ th.sortable-th.sorted-desc .sort-indicator {
 
 .btn-copy:active {
     transform: translateY(0);
+}
+
+/* Official DVLA / GOV.UK Check Button */
+.dvla-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.18s ease;
+    cursor: pointer;
+    line-height: 1.2;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.dvla-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(255, 102, 0, 0.12);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(255, 102, 0, 0.2);
 }
 
 

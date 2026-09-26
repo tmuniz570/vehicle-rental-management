@@ -4309,6 +4309,27 @@ def get_dashboard():
         contratos_ativos = len(contratos_ativos_objs)
         receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_objs)
         
+        # Breakdown of agreements by business model (Rental vs Financed/Rent-to-Buy vs Outright Sold)
+        motos_rental = 0
+        motos_financed = 0
+        motos_sold_outright = 0
+
+        sold_motos_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).all()
+        for m in sold_motos_objs:
+            c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
+            if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
+                motos_financed += 1
+            else:
+                motos_sold_outright += 1
+
+        rented_motos_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).all()
+        for m in rented_motos_objs:
+            c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
+            if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
+                motos_financed += 1
+            else:
+                motos_rental += 1
+
         total_clientes = Client.query.count()
         
         # Performance: Direct SQL sum for pending revenue
@@ -4594,6 +4615,9 @@ def get_dashboard():
             'total_motos': total_motos,
             'motos_disponiveis': motos_disponiveis,
             'motos_alugadas': motos_alugadas,
+            'motos_rental': motos_rental,
+            'motos_financed': motos_financed,
+            'motos_sold_outright': motos_sold_outright,
             'motos_manutencao': motos_manutencao,
             'motos_pound': motos_pound,
             'motos_fora_operacao': motos_pound,

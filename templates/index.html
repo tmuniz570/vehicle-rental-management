@@ -626,36 +626,51 @@
 {% endif %}
 
 {% if current_user.is_authenticated and current_user.pode_alugueis() %}
-<!-- Fleet Allocation Bar -->
+<!-- Fleet & Asset Distribution Bar -->
 <div class="fleet-bar-card">
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-            <span>📊</span> Fleet Distribution
-        </h4>
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                <span>📊</span> Fleet Distribution
+            </h4>
+            <span class="badge" id="fleetUtilizationBadge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.35); font-size: 0.75rem; padding: 2px 8px; border-radius: 6px; font-weight: 600;" title="Active agreements out of operational fleet">
+                ⚡ 0% on Road
+            </span>
+        </div>
         <span id="fleetPercentSummary" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; line-height: 1.4;">-</span>
     </div>
     <div class="fleet-bar-track">
-        <div id="barRented" class="fleet-bar-segment" style="background: var(--accent); width: 0%; cursor: pointer;" title="Filter Rented motorbikes" onclick="window.location.href='/contratos?status=Active&tipo=Rent'"></div>
+        <div id="barRental" class="fleet-bar-segment" style="background: var(--accent); width: 0%; cursor: pointer;" title="Filter Weekly Rentals" onclick="window.location.href='/contratos?status=Active&tipo=Rent'"></div>
+        <div id="barFinanced" class="fleet-bar-segment" style="background: #a855f7; width: 0%; cursor: pointer;" title="Filter Financed / Rent-to-Buy Agreements" onclick="window.location.href='/contratos?status=Active&tipo=Sale_Installment'"></div>
         <div id="barAvailable" class="fleet-bar-segment" style="background: var(--success); width: 0%; cursor: pointer;" title="Filter Available motorbikes" onclick="window.location.href='/motos?status=Available'"></div>
         <div id="barMaintenance" class="fleet-bar-segment" style="background: #f59e0b; width: 0%; cursor: pointer;" title="Filter In Maintenance motorbikes" onclick="window.location.href='/motos?status=Maintenance'"></div>
         <div id="barPound" class="fleet-bar-segment" style="background: #ef4444; width: 0%; display: none; cursor: pointer;" title="Filter Pound motorbikes" onclick="window.location.href='/motos?status=Pound'"></div>
+        <div id="barSold" class="fleet-bar-segment" style="background: #64748b; width: 0%; display: none; cursor: pointer;" title="Filter Sold motorbikes" onclick="window.location.href='/motos?status=Sold'"></div>
     </div>
     <div class="fleet-bar-legend">
-        <a href="/contratos?status=Active&tipo=Rent" class="fleet-bar-legend-item" style="text-decoration: none; color: inherit; cursor: pointer;" title="Filter Rented">
-            <span class="fleet-bar-dot" style="background: var(--accent);"></span>
-            <span>Rented: <strong id="legendRented" style="color: var(--text-primary);">0</strong></span>
+        <a href="/contratos?status=Active&tipo=Rent" class="fleet-legend-pill" style="--pill-color: var(--accent);" title="Active Weekly Rentals">
+            <span class="fleet-legend-dot"></span>
+            <span>Rentals: <strong id="legendRental" style="color: var(--text-primary);">0</strong> <small id="pctRental" style="color: var(--text-secondary); font-size: 0.72rem;"></small></span>
         </a>
-        <a href="/motos?status=Available" class="fleet-bar-legend-item" style="text-decoration: none; color: inherit; cursor: pointer;" title="Filter Available">
-            <span class="fleet-bar-dot" style="background: var(--success);"></span>
-            <span>Available: <strong id="legendAvailable" style="color: var(--text-primary);">0</strong></span>
+        <a href="/contratos?status=Active&tipo=Sale_Installment" class="fleet-legend-pill" style="--pill-color: #a855f7;" title="Active Financed / Rent-to-Buy Agreements">
+            <span class="fleet-legend-dot"></span>
+            <span>Financed: <strong id="legendFinanced" style="color: var(--text-primary);">0</strong> <small id="pctFinanced" style="color: var(--text-secondary); font-size: 0.72rem;"></small></span>
         </a>
-        <a href="/motos?status=Maintenance" class="fleet-bar-legend-item" style="text-decoration: none; color: inherit; cursor: pointer;" title="Filter In Maintenance">
-            <span class="fleet-bar-dot" style="background: #f59e0b;"></span>
-            <span>In Maintenance: <strong id="legendMaintenance" style="color: var(--text-primary);">0</strong></span>
+        <a href="/motos?status=Available" class="fleet-legend-pill" style="--pill-color: var(--success);" title="Available in Fleet">
+            <span class="fleet-legend-dot"></span>
+            <span>Available: <strong id="legendAvailable" style="color: var(--text-primary);">0</strong> <small id="pctAvailable" style="color: var(--text-secondary); font-size: 0.72rem;"></small></span>
         </a>
-        <a href="/motos?status=Pound" class="fleet-bar-legend-item" id="legendItemPound" style="display: none; text-decoration: none; color: inherit; cursor: pointer;" title="Filter Pound">
-            <span class="fleet-bar-dot" style="background: #ef4444;"></span>
-            <span>Pound: <strong id="legendPound" style="color: var(--text-primary);">0</strong></span>
+        <a href="/motos?status=Maintenance" class="fleet-legend-pill" style="--pill-color: #f59e0b;" title="In Workshop / Maintenance">
+            <span class="fleet-legend-dot"></span>
+            <span>Maintenance: <strong id="legendMaintenance" style="color: var(--text-primary);">0</strong> <small id="pctMaintenance" style="color: var(--text-secondary); font-size: 0.72rem;"></small></span>
+        </a>
+        <a href="/motos?status=Pound" class="fleet-legend-pill" id="legendItemPound" style="--pill-color: #ef4444; display: none;" title="Outside Operation / Pound">
+            <span class="fleet-legend-dot"></span>
+            <span>Pound: <strong id="legendPound" style="color: var(--text-primary);">0</strong> <small id="pctPound" style="color: var(--text-secondary); font-size: 0.72rem;"></small></span>
+        </a>
+        <a href="/motos?status=Sold" class="fleet-legend-pill" id="legendItemSold" style="--pill-color: #64748b; display: none;" title="Outright Sold Assets">
+            <span class="fleet-legend-dot"></span>
+            <span>Sold: <strong id="legendSold" style="color: var(--text-primary);">0</strong> <small id="pctSold" style="color: var(--text-secondary); font-size: 0.72rem;"></small></span>
         </a>
     </div>
 </div>
@@ -957,44 +972,106 @@
             }
 
             // 2. Fleet Allocation Bar
-            const elBarRented = document.getElementById('barRented');
-            if (elBarRented) {
-                const total = data.total_motos || 0;
-                const alugadas = data.motos_alugadas || 0;
+            // 2. Fleet & Asset Allocation Bar
+            const elBarRental = document.getElementById('barRental') || document.getElementById('barRented');
+            if (elBarRental) {
+                const totalOp = data.total_motos || 0; // Operational active fleet
+                const rental = (data.motos_rental !== undefined) ? data.motos_rental : (data.motos_alugadas || 0);
+                const financed = data.motos_financed || 0;
                 const disponiveis = data.motos_disponiveis || 0;
                 const manutencao = data.motos_manutencao || 0;
                 const pound = data.motos_pound || 0;
+                const sold = (data.motos_sold_outright !== undefined) ? data.motos_sold_outright : (data.motos_vendidas || 0);
+                
+                const totalAll = rental + financed + disponiveis + manutencao + pound + sold;
+                const activeDeals = rental + financed;
 
-                const elLegRented = document.getElementById('legendRented');
-                if (elLegRented) elLegRented.textContent = alugadas;
+                // Update Legend Counts & Percentages
+                const elLegRental = document.getElementById('legendRental') || document.getElementById('legendRented');
+                if (elLegRental) elLegRental.textContent = rental;
+                const elPctRental = document.getElementById('pctRental');
+                if (elPctRental && totalAll > 0) elPctRental.textContent = `(${Math.round((rental / totalAll) * 100)}%)`;
+
+                const elLegFinanced = document.getElementById('legendFinanced');
+                if (elLegFinanced) elLegFinanced.textContent = financed;
+                const elPctFinanced = document.getElementById('pctFinanced');
+                if (elPctFinanced && totalAll > 0) elPctFinanced.textContent = `(${Math.round((financed / totalAll) * 100)}%)`;
+
                 const elLegAvail = document.getElementById('legendAvailable');
                 if (elLegAvail) elLegAvail.textContent = disponiveis;
+                const elPctAvail = document.getElementById('pctAvailable');
+                if (elPctAvail && totalAll > 0) elPctAvail.textContent = `(${Math.round((disponiveis / totalAll) * 100)}%)`;
+
                 const elLegManut = document.getElementById('legendMaintenance');
                 if (elLegManut) elLegManut.textContent = manutencao;
+                const elPctManut = document.getElementById('pctMaintenance');
+                if (elPctManut && totalAll > 0) elPctManut.textContent = `(${Math.round((manutencao / totalAll) * 100)}%)`;
+
                 const elLegPound = document.getElementById('legendPound');
                 if (elLegPound) elLegPound.textContent = pound;
+                const elPctPound = document.getElementById('pctPound');
+                if (elPctPound && totalAll > 0) elPctPound.textContent = `(${Math.round((pound / totalAll) * 100)}%)`;
                 const legItemPound = document.getElementById('legendItemPound');
                 if (legItemPound) legItemPound.style.display = pound > 0 ? 'inline-flex' : 'none';
 
+                const elLegSold = document.getElementById('legendSold');
+                if (elLegSold) elLegSold.textContent = sold;
+                const elPctSold = document.getElementById('pctSold');
+                if (elPctSold && totalAll > 0) elPctSold.textContent = `(${Math.round((sold / totalAll) * 100)}%)`;
+                const legItemSold = document.getElementById('legendItemSold');
+                if (legItemSold) legItemSold.style.display = sold > 0 ? 'inline-flex' : 'none';
+
+                // Bar segments
+                const elBarFinanced = document.getElementById('barFinanced');
                 const elBarAvail = document.getElementById('barAvailable');
                 const elBarManut = document.getElementById('barMaintenance');
+                const elBarPound = document.getElementById('barPound');
+                const elBarSold = document.getElementById('barSold');
                 const elFleetSum = document.getElementById('fleetPercentSummary');
+                const elUtilBadge = document.getElementById('fleetUtilizationBadge');
 
-                if (total > 0) {
-                    const pRented = ((alugadas / total) * 100).toFixed(0);
-                    const pAvail = ((disponiveis / total) * 100).toFixed(0);
-                    const pManut = ((manutencao / total) * 100).toFixed(0);
+                if (totalAll > 0) {
+                    const pRental = ((rental / totalAll) * 100).toFixed(1);
+                    const pFinanced = ((financed / totalAll) * 100).toFixed(1);
+                    const pAvail = ((disponiveis / totalAll) * 100).toFixed(1);
+                    const pManut = ((manutencao / totalAll) * 100).toFixed(1);
+                    const pPound = ((pound / totalAll) * 100).toFixed(1);
+                    const pSold = ((sold / totalAll) * 100).toFixed(1);
 
-                    elBarRented.style.width = `${pRented}%`;
+                    elBarRental.style.width = `${pRental}%`;
+                    if (elBarFinanced) elBarFinanced.style.width = `${pFinanced}%`;
                     if (elBarAvail) elBarAvail.style.width = `${pAvail}%`;
                     if (elBarManut) elBarManut.style.width = `${pManut}%`;
-                    let summaryText = `${pRented}% Rented • ${pAvail}% Available • ${pManut}% Maintenance`;
-                    if (pound > 0) {
-                        summaryText += ` • ${pound} in Pound (off-road)`;
+                    if (elBarPound) {
+                        elBarPound.style.width = `${pPound}%`;
+                        elBarPound.style.display = pound > 0 ? 'block' : 'none';
                     }
+                    if (elBarSold) {
+                        elBarSold.style.width = `${pSold}%`;
+                        elBarSold.style.display = sold > 0 ? 'block' : 'none';
+                    }
+
+                    // Utilization calculation (Active Deals / Operational Fleet)
+                    const utilRate = totalOp > 0 ? Math.round((activeDeals / totalOp) * 100) : 0;
+                    if (elUtilBadge) {
+                        elUtilBadge.textContent = `⚡ ${utilRate}% Active Deals on Road (${activeDeals}/${totalOp})`;
+                        if (utilRate >= 70) {
+                            elUtilBadge.style.color = '#4ade80';
+                            elUtilBadge.style.borderColor = 'rgba(34, 197, 94, 0.35)';
+                            elUtilBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                        } else {
+                            elUtilBadge.style.color = '#fbbf24';
+                            elUtilBadge.style.borderColor = 'rgba(245, 158, 11, 0.35)';
+                            elUtilBadge.style.background = 'rgba(245, 158, 11, 0.15)';
+                        }
+                    }
+
+                    let summaryText = `${rental} Rentals • ${financed} Financed • ${disponiveis} Available • ${manutencao} Workshop`;
+                    if (pound > 0) summaryText += ` • ${pound} Pound`;
+                    if (sold > 0) summaryText += ` • ${sold} Sold`;
                     if (elFleetSum) elFleetSum.textContent = summaryText;
                 } else {
-                    if (elFleetSum) elFleetSum.textContent = pound > 0 ? `${pound} bike(s) in Pound` : 'No motorbikes in fleet';
+                    if (elFleetSum) elFleetSum.textContent = 'No motorbikes in fleet';
                 }
             }
 
@@ -1383,7 +1460,7 @@
                 const displayMotos = motosSemV5C.slice(0, 10);
                 displayMotos.forEach(m => {
                     itemsV5CHtml += `
-                        <a href="/motos?search=${encodeURIComponent(m.placa)}" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(0,0,0,0.3); border:1px solid rgba(239,68,68,0.35); padding:4px 8px; border-radius:6px; font-size:0.78rem; transition:all 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='rgba(239,68,68,0.35)'">
+                        <a href="/motos?search=${encodeURIComponent(m.placa)}&status=all" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(0,0,0,0.3); border:1px solid rgba(239,68,68,0.35); padding:4px 8px; border-radius:6px; font-size:0.78rem; transition:all 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='rgba(239,68,68,0.35)'">
                             <strong style="font-family:monospace; color:var(--text-primary);">${escapeHtml(m.placa)}</strong>
                             <span style="color:var(--text-secondary); font-size:0.72rem;">${escapeHtml(m.modelo || 'Moto')}</span>
                             <span class="badge" style="background:rgba(239,68,68,0.25); color:#f87171; font-size:0.68rem; padding:1px 5px;">No V5C</span>
@@ -1603,7 +1680,7 @@
                             else if (m.status === 'Pound') statusColor = '#ef4444';
                             else if (m.status === 'Sold') statusColor = '#94a3b8';
 
-                            const motoFleetUrl = `/motos?search=${encodeURIComponent(m.placa)}`;
+                            const motoFleetUrl = `/motos?search=${encodeURIComponent(m.placa)}&status=all`;
                             const agreementId = m.contract_id || m.contrato_ativo_id;
 
                             outHtml += `
