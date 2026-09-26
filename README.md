@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.10--Signed%20Contract%20Immutability%20%26%20Live%20Details-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.13--Dashboard%20Hub%20%26%20Fleet%20PDF-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -28,9 +28,13 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 ## ✨ Key Features
 
 ### 📊 1. Executive Dashboard & Fleet Allocation
+* **Universal Quick Lookup Bar:** Omni-search bar in the dashboard header (`/api/busca-rapida`) with instant lookup across plates, bike models, customers, and agreements, keyboard shortcuts (`Ctrl+K` / `/`), vector SVG iconography, and responsive two-line cards.
+* **iPhone Action Grid:** Mobile-optimized 2-column action cluster ensuring all 5 key buttons (`+ New Contract`, `Add Bike`, `New Inspection`, `Add Customer`, `Overdue Report`) are visible on iPhone portrait mode without horizontal scrolling or rotation.
+* **Proactive "Payments Due Today":** Real-time list of all charges due on the current date based on pending financial ledger transactions across Rent, Sale Installments, Deposits, and PCNs, with one-tap customized WhatsApp reminders.
+* **Realized Cashflow Tracking:** Weekly Revenue card tracks expected rent alongside actual payments collected in the current week (`Collected this week: £X,XXX.XX (Today: £XXX.XX)`).
 * **Live KPI Counters:** Real-time visibility into total fleet, available bikes, active rentals, motorcycles in maintenance, registered customers, and expected weekly revenue.
 * **Out-of-Operation Visibility:** Total Fleet card shows active bikes in operation alongside an interactive out-of-operation badge (`🏛️ [N] OUT OF OP`) with 1-click navigation to `/motos?status=Pound`.
-* **Interactive Fleet Allocation Bar:** Visual percentage breakdown of available, rented, workshop-held, and impounded (`Pound`) motorbikes.
+* **Interactive Fleet Allocation Bar:** Visual percentage breakdown of available, rented, workshop-held, and impounded (`Pound`) motorbikes with 1-click filtered drilldown.
 * **Instant Overdue Alerts:** Immediate notification of late payments and actionable shortcuts.
 * **Missing V5C Logbook Alarm:** Real-time dashboard alert listing all fleet vehicles without an attached V5C logbook document with 1-click links to upload documents.
 
@@ -39,6 +43,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **UK Registration Plate Standardization:** Dedicated plate badges (e.g., `XX10YYY`) with space-free input sanitization and status management (`Available`, `Rented`, `Maintenance`, `Pound`, `Sold`).
 * **Pound Status & MOT/Tax Exemption:** Dedicated status (`Pound`) for motorbikes outside operation (e.g., impounded by police or held in external compounds). Motorbikes in this status are strictly exempt from MOT and Road Tax alerts on the executive dashboard and display `Exempt (Pound)` in fleet tables.
 * **UK MOT & Road Tax (VED) Compliance:** Annual MOT test and DVLA Road Tax expiry date tracking with proactive warning badges (🟢 Valid, 🟡 Expiring within 30 days, 🔴 Expired).
+* **Actionable Agreement Links & Hirer Previews:** Rented and sold bikes in the fleet table directly display clickable agreement links (`Rented #ID ↗`, `Sold #ID ↗`) alongside current driver names and one-tap WhatsApp contact shortcuts.
+* **Printable & Filtered PDF Fleet Report (`/motos/relatorio-pdf`):** Generates an executive A4 printable PDF report of the active or filtered fleet with key operational columns (Plate, Model, Colour, Status, Driver, Phone, Mileage, Tracker, V5C, MOT & Tax expiry), adhering dynamically to user table filters (status, search query, warnings).
 * **DVLA SORN (Statutory Off Road Notification) Support:** Native toggle for vehicles officially declared off-road (SORN) with DVLA. Automatically disables Road Tax expiry dates, displays a distinctive `🛡️ SORN` badge in the fleet list, supports quick search (`search=sorn`), and excludes off-road bikes from false-positive Road Tax dashboard alerts.
 * **Missing V5C Tracking & Alerts:** Fleet vehicles without V5C registration logbooks feature an eye-catching `⚠️ No V5C` badge in the fleet table, quick filtering (`/motos?v5c=missing`), and an amber alert badge on contract cards.
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.

@@ -331,7 +331,24 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (paramStatus.toLowerCase() === 'all') {
             statusFiltro = '';
             filterStatusEl.value = '';
+        } else if (paramStatus.toLowerCase() === 'pendentes' || paramStatus.toLowerCase() === 'pending') {
+            statusFiltro = 'pendentes';
+            filterStatusEl.value = 'pendentes';
         }
+    }
+
+    const paramTipo = urlParams.get('tipo');
+    const filterTipoEl = document.getElementById('filterTipo');
+    if (paramTipo && filterTipoEl) {
+        tipoFiltro = paramTipo;
+        filterTipoEl.value = paramTipo;
+    }
+
+    const paramSearch = urlParams.get('search') || urlParams.get('q');
+    const searchInputEl = document.getElementById('searchInput');
+    if (paramSearch && searchInputEl) {
+        termoBusca = paramSearch;
+        searchInputEl.value = paramSearch;
     }
 
     carregarFinanceiro();

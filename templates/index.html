@@ -3,38 +3,511 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- Top Header & Quick Actions -->
-<div class="page-header" style="flex-wrap: wrap; gap: 1rem; align-items: flex-start;">
-    <div>
-        <h1 style="margin: 0; font-weight: 700; letter-spacing: -0.02em;">Overview</h1>
-        <p style="color: var(--text-secondary); margin: 0.35rem 0 0 0; font-size: 0.95rem;">
-            {% if current_user.is_authenticated and current_user.pode_alugueis() %}
-            Real-time control of fleet status, contracts, maintenance, and revenue.
-            {% else %}
-            Painel operacional e visão geral dos seus módulos habilitados.
-            {% endif %}
-        </p>
-    </div>
-    
-    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+<style>
+/* Dashboard Top Section & Action Hub */
+.dash-top-hub {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.75rem;
+}
+
+.dash-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.dash-title-wrap {
+    min-width: 220px;
+    flex: 1 1 auto;
+}
+
+.dash-main-title {
+    margin: 0;
+    font-size: 1.85rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+}
+
+.dash-main-subtitle {
+    color: var(--text-secondary);
+    margin: 0.35rem 0 0 0;
+    font-size: 0.92rem;
+    line-height: 1.4;
+}
+
+/* Quick Lookup Command Bar: Aligned to the right of Overview */
+.dash-command-bar {
+    position: relative;
+    width: 100%;
+    max-width: 460px;
+    min-width: 280px;
+    flex: 1 0 auto;
+}
+
+.dash-search-field-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.dash-search-icon-left {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: var(--text-secondary);
+    pointer-events: none;
+    z-index: 2;
+    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dash-search-field-wrap:focus-within .dash-search-icon-left {
+    color: var(--accent);
+}
+
+.dash-search-field {
+    width: 100%;
+    height: 44px;
+    padding: 0 2.5rem 0 2.75rem;
+    border-radius: 12px;
+    background: rgba(13, 16, 23, 0.85);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.dash-search-field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(255, 102, 0, 0.22);
+    background: rgba(18, 22, 33, 0.95);
+}
+
+.dash-search-clear {
+    position: absolute;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px;
+    line-height: 1;
+    display: none;
+    z-index: 2;
+}
+
+.dash-search-clear:hover {
+    color: var(--text-primary);
+}
+
+.dash-search-popover {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 640px;
+    max-width: min(640px, calc(100vw - 32px));
+    z-index: 1000;
+    background: rgba(21, 25, 36, 0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.75);
+    max-height: 460px;
+    overflow-y: auto;
+    padding: 0.65rem;
+    box-sizing: border-box;
+}
+
+/* Quick Action Buttons Group */
+.dash-actions-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+}
+
+.dash-quick-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0.58rem 1rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 10px;
+    white-space: nowrap;
+    width: auto !important;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box;
+    user-select: none;
+}
+
+.dash-quick-btn.primary {
+    background: var(--accent-gradient);
+    color: #ffffff !important;
+    border: none;
+    box-shadow: 0 3px 12px rgba(255, 102, 0, 0.28);
+}
+
+.dash-quick-btn.primary:hover {
+    background: linear-gradient(135deg, #FF7711 0%, #FF5500 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(255, 102, 0, 0.42);
+}
+
+.dash-quick-btn.secondary {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.dash-quick-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+}
+
+.dash-quick-btn.danger-soft {
+    background: rgba(239, 68, 68, 0.08);
+    color: #f87171 !important;
+    border: 1px solid rgba(239, 68, 68, 0.28);
+}
+
+.dash-quick-btn.danger-soft:hover {
+    background: rgba(239, 68, 68, 0.16);
+    border-color: rgba(239, 68, 68, 0.45);
+    transform: translateY(-1px);
+}
+
+/* Search Dropdown Result Cards */
+.search-section-title {
+    padding: 6px 8px 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.search-result-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: background 0.15s, border-color 0.15s;
+    gap: 12px;
+    box-sizing: border-box;
+}
+
+.search-result-card:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.search-card-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    min-width: 0;
+    flex: 1;
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+}
+
+.search-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+}
+
+.search-card-header strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+.search-card-details {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+    width: 100%;
+}
+
+.search-card-details span {
+    white-space: nowrap;
+}
+
+.search-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Dedicated Search Action Buttons (Replaces solid orange .btn-action) */
+.dash-search-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 5px 11px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 8px;
+    text-decoration: none;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #f1f5f9 !important;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.dash-search-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.35);
+    color: #ffffff !important;
+    transform: translateY(-1px);
+}
+
+.dash-search-btn.accent {
+    background: rgba(255, 102, 0, 0.16);
+    border-color: rgba(255, 102, 0, 0.4);
+    color: #ff9d5c !important;
+}
+
+.dash-search-btn.accent:hover {
+    background: var(--accent-gradient);
+    border-color: transparent;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(255, 102, 0, 0.35);
+}
+
+.dash-search-btn.green {
+    background: rgba(34, 197, 94, 0.14);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #4ade80 !important;
+}
+
+.dash-search-btn.green:hover {
+    background: rgba(34, 197, 94, 0.28);
+    border-color: rgba(34, 197, 94, 0.6);
+    color: #ffffff !important;
+}
+
+/* Mobile & iPhone Responsive Layout (≤ 768px) */
+@media (max-width: 768px) {
+    .dash-top-hub {
+        gap: 0.85rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .dash-header-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .dash-main-title {
+        font-size: 1.45rem;
+    }
+
+    .dash-main-subtitle {
+        font-size: 0.82rem;
+    }
+
+    .dash-command-bar {
+        max-width: 100%;
+        min-width: 100%;
+    }
+
+    .dash-search-field {
+        height: 44px;
+        /* font-size 16px prevents iOS Safari from auto-zooming page on focus */
+        font-size: 16px !important;
+        border-radius: 10px;
+    }
+
+    /* All 5 action buttons visible on iPhone portrait without scrolling: 2-column grid */
+    .dash-actions-cluster {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        width: 100%;
+    }
+
+    .dash-quick-btn {
+        width: 100% !important;
+        padding: 0.65rem 0.5rem;
+        font-size: 0.82rem;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .dash-quick-btn.primary {
+        grid-column: span 2;
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* Search Results on iPhone: Card-based responsive layout */
+    .dash-search-popover {
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0 !important;
+        right: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        max-height: 60vh !important;
+        padding: 0.5rem;
+    }
+
+    .search-result-card {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 9px 10px;
+        gap: 6px;
+    }
+
+    .search-card-main {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .search-card-header {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .search-card-details {
+        white-space: normal;
+        word-break: break-word;
+        font-size: 0.78rem;
+    }
+
+    .search-card-actions {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 6px;
+        margin-top: 2px;
+    }
+
+    .dash-search-btn {
+        flex: 1;
+        text-align: center;
+        justify-content: center;
+        padding: 7px 10px !important;
+        font-size: 0.8rem !important;
+    }
+}
+</style>
+
+<!-- Top Header & Action Hub -->
+<div class="dash-top-hub">
+    <div class="dash-header-bar">
+        <div class="dash-title-wrap">
+            <h1 class="dash-main-title">Overview</h1>
+            <p class="dash-main-subtitle">
+                {% if current_user.is_authenticated and current_user.pode_alugueis() %}
+                Real-time control of fleet status, contracts, maintenance, and revenue.
+                {% else %}
+                Painel operacional e visão geral dos seus módulos habilitados.
+                {% endif %}
+            </p>
+        </div>
+        
         {% if current_user.is_authenticated and current_user.pode_alugueis() %}
-        <a href="/contratos/novo" class="btn-primary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-            <span>+</span> New Contract
-        </a>
-        <a href="/vistorias/nova" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-            <span>🔍</span> New Inspection
-        </a>
-        <a href="/clientes/novo" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-            <span>👤</span> Add Customer
-        </a>
-        <a href="/relatorios/vencidos" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; text-decoration: none; color: #f87171; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 6px;">
-            <span>⚠️</span> Overdue Report
-        </a>
+        <!-- Universal Quick Lookup Bar (aligned to the right of Overview) -->
+        <div class="dash-command-bar">
+            <div class="dash-search-field-wrap">
+                <svg class="dash-search-icon-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="dashQuickSearch" 
+                       placeholder="Quick lookup: plate, model, customer, contract #..." 
+                       autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                       class="dash-search-field">
+                <button id="dashQuickSearchClear" type="button" onclick="clearQuickSearch()" class="dash-search-clear" title="Clear search">✕</button>
+            </div>
+            <!-- Search Results Dropdown -->
+            <div id="dashSearchResults" class="dash-search-popover"></div>
+        </div>
         {% endif %}
     </div>
+
+    {% if current_user.is_authenticated and current_user.pode_alugueis() %}
+    <!-- Quick Action Buttons Group (Desktop Inline / iPhone 2-Col Grid) -->
+    <div class="dash-actions-cluster">
+        <a href="/contratos/novo" class="dash-quick-btn primary" title="Create new rental or sale contract">
+            <span style="font-size: 1.1rem; line-height: 1;">+</span>
+            <span>New Contract</span>
+        </a>
+        <a href="/motos/nova" class="dash-quick-btn secondary" title="Register new motorbike">
+            <span>🛵</span>
+            <span>Add Bike</span>
+        </a>
+        <a href="/vistorias/nova" class="dash-quick-btn secondary" title="New inspection check">
+            <span>🔍</span>
+            <span>New Inspection</span>
+        </a>
+        <a href="/clientes/novo" class="dash-quick-btn secondary" title="Register new customer">
+            <span>👤</span>
+            <span>Add Customer</span>
+        </a>
+        <a href="/relatorios/vencidos" class="dash-quick-btn danger-soft" title="Overdue payments report">
+            <span>⚠️</span>
+            <span>Overdue Report</span>
+        </a>
+    </div>
+    {% endif %}
 </div>
 
 {% if current_user.is_authenticated and current_user.pode_alugueis() %}
+
 <!-- Row 1: Fleet & Contract Status -->
 <div class="dashboard-grid" style="margin-bottom: 1.5rem;">
     <!-- Total Motorbikes -->
@@ -53,7 +526,7 @@
     </div>
 
     <!-- Available (General) -->
-    <a href="/motos" class="stat-card interactive" style="text-decoration: none;">
+    <a href="/motos?status=Available" class="stat-card interactive" style="text-decoration: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title">Available</span>
             <span style="font-size: 1.25rem;">✅</span>
@@ -63,7 +536,7 @@
     </a>
 
     <!-- Rented (On Road) -->
-    <a href="/contratos" class="stat-card interactive" style="text-decoration: none;">
+    <a href="/contratos?status=Active&tipo=Rent" class="stat-card interactive" style="text-decoration: none;" title="View active rental contracts">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title">Rented (Active)</span>
             <span style="font-size: 1.25rem;">🚀</span>
@@ -73,7 +546,7 @@
     </a>
 
     <!-- In Maintenance (Motos em Manutenção) -->
-    <a href="#maintenanceSection" class="stat-card interactive" id="cardManutencao" style="text-decoration: none;">
+    <a href="/motos?status=Maintenance" class="stat-card interactive" id="cardManutencao" style="text-decoration: none;" title="View motorbikes in maintenance">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title" style="color: #f59e0b;">In Maintenance</span>
             <span style="font-size: 1.25rem;">🔧</span>
@@ -86,7 +559,7 @@
 <!-- Row 2: Financial & Arrears -->
 <div class="dashboard-grid" style="margin-bottom: 1.75rem;">
     <!-- TAX & MOT Warnings -->
-    <a href="/motos" class="stat-card interactive" id="cardTaxMotWarnings" style="text-decoration: none;">
+    <a href="/motos?status=warnings" class="stat-card interactive" id="cardTaxMotWarnings" style="text-decoration: none;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title" id="tax_mot_title">TAX & MOT Warnings</span>
             <span style="font-size: 1.25rem;" id="tax_mot_icon">🛡️</span>
@@ -96,13 +569,16 @@
     </a>
 
     <!-- Expected Weekly Revenue -->
-    <a href="/financeiro" class="stat-card interactive" style="text-decoration: none;">
+    <a href="/financeiro?tipo=Rent&status=pendentes" class="stat-card interactive" style="text-decoration: none;" title="View rental charges in financial management">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title">Weekly Revenue</span>
             <span style="font-size: 1.25rem;">💷</span>
         </div>
         <div class="stat-value" style="color: var(--accent);" id="receita_semanal">-</div>
-        <div class="stat-desc">Expected rent each week</div>
+        <div class="stat-desc" id="receita_semanal_desc" style="display: flex; flex-direction: column; gap: 2px;">
+            <span>Expected rent each week</span>
+            <span id="collectedCashflowSummary" style="color: var(--success); font-weight: 600; font-size: 0.78rem;">Collected this week: £0.00</span>
+        </div>
     </a>
 
     <!-- Overdue Receivables -->
@@ -116,13 +592,13 @@
     </a>
 
     <!-- Deposit Holds -->
-    <a href="/contratos?status=Deposit_Hold" class="stat-card interactive" style="text-decoration: none;">
+    <a href="/contratos?status=Deposit_Hold" class="stat-card interactive" style="text-decoration: none;" title="Bikes in return quarantine and total rental deposits held">
         <div style="display: flex; justify-content: space-between; align-items: center;">
             <span class="stat-title">Deposit Holds</span>
             <span style="font-size: 1.25rem;">🔒</span>
         </div>
         <div class="stat-value" style="color: var(--warning);" id="quarentenas_count">-</div>
-        <div class="stat-desc" id="quarentenas_valor">Total Held: £0.00</div>
+        <div class="stat-desc" id="quarentenas_valor">Total Held in Fleet: £0.00</div>
     </a>
 </div>
 {% endif %}
@@ -159,28 +635,28 @@
         <span id="fleetPercentSummary" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 500; line-height: 1.4;">-</span>
     </div>
     <div class="fleet-bar-track">
-        <div id="barRented" class="fleet-bar-segment" style="background: var(--accent); width: 0%;" title="Rented"></div>
-        <div id="barAvailable" class="fleet-bar-segment" style="background: var(--success); width: 0%;" title="Available"></div>
-        <div id="barMaintenance" class="fleet-bar-segment" style="background: #f59e0b; width: 0%;" title="Maintenance"></div>
-        <div id="barPound" class="fleet-bar-segment" style="background: #ef4444; width: 0%; display: none;" title="Pound"></div>
+        <div id="barRented" class="fleet-bar-segment" style="background: var(--accent); width: 0%; cursor: pointer;" title="Filter Rented motorbikes" onclick="window.location.href='/contratos?status=Active&tipo=Rent'"></div>
+        <div id="barAvailable" class="fleet-bar-segment" style="background: var(--success); width: 0%; cursor: pointer;" title="Filter Available motorbikes" onclick="window.location.href='/motos?status=Available'"></div>
+        <div id="barMaintenance" class="fleet-bar-segment" style="background: #f59e0b; width: 0%; cursor: pointer;" title="Filter In Maintenance motorbikes" onclick="window.location.href='/motos?status=Maintenance'"></div>
+        <div id="barPound" class="fleet-bar-segment" style="background: #ef4444; width: 0%; display: none; cursor: pointer;" title="Filter Pound motorbikes" onclick="window.location.href='/motos?status=Pound'"></div>
     </div>
     <div class="fleet-bar-legend">
-        <div class="fleet-bar-legend-item">
+        <a href="/contratos?status=Active&tipo=Rent" class="fleet-bar-legend-item" style="text-decoration: none; color: inherit; cursor: pointer;" title="Filter Rented">
             <span class="fleet-bar-dot" style="background: var(--accent);"></span>
             <span>Rented: <strong id="legendRented" style="color: var(--text-primary);">0</strong></span>
-        </div>
-        <div class="fleet-bar-legend-item">
+        </a>
+        <a href="/motos?status=Available" class="fleet-bar-legend-item" style="text-decoration: none; color: inherit; cursor: pointer;" title="Filter Available">
             <span class="fleet-bar-dot" style="background: var(--success);"></span>
             <span>Available: <strong id="legendAvailable" style="color: var(--text-primary);">0</strong></span>
-        </div>
-        <div class="fleet-bar-legend-item">
+        </a>
+        <a href="/motos?status=Maintenance" class="fleet-bar-legend-item" style="text-decoration: none; color: inherit; cursor: pointer;" title="Filter In Maintenance">
             <span class="fleet-bar-dot" style="background: #f59e0b;"></span>
             <span>In Maintenance: <strong id="legendMaintenance" style="color: var(--text-primary);">0</strong></span>
-        </div>
-        <div class="fleet-bar-legend-item" id="legendItemPound" style="display: none;">
+        </a>
+        <a href="/motos?status=Pound" class="fleet-bar-legend-item" id="legendItemPound" style="display: none; text-decoration: none; color: inherit; cursor: pointer;" title="Filter Pound">
             <span class="fleet-bar-dot" style="background: #ef4444;"></span>
             <span>Pound: <strong id="legendPound" style="color: var(--text-primary);">0</strong></span>
-        </div>
+        </a>
     </div>
 </div>
 
@@ -240,6 +716,28 @@
     <!-- Right Column: Alerts & Operational Status -->
     <div style="display: flex; flex-direction: column; gap: 1.5rem;">
         
+        <!-- CARD: Payments Due Today (Rent & Sales Installments) -->
+        <div class="stat-card" id="cardDueTodaySection">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                    <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
+                        <span>📅</span> Payments Due Today
+                    </h3>
+                    <p style="margin: 4px 0 0 0; font-size: 0.85rem; color: var(--text-secondary);" id="dueTodaySubtitle">
+                        Pending charges (rent, installments, and deposits) scheduled for collection today.
+                    </p>
+                </div>
+                <span class="badge" id="dueTodayBadge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; display: none;">
+                    0 due
+                </span>
+            </div>
+            <div id="dueTodayContainer">
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+                    Checking payment cycles...
+                </div>
+            </div>
+        </div>
+
         <!-- CARD: Important Notices & Alerts -->
         <div class="stat-card">
             <h3 style="margin: 0 0 1rem 0; font-size: 1.15rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text-primary);">
@@ -273,6 +771,16 @@
 {% block scripts %}
 <script>
     const formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarDashboard();
@@ -354,6 +862,13 @@
             
             const elReceitaSemanal = document.getElementById('receita_semanal');
             if (elReceitaSemanal) elReceitaSemanal.textContent = formatoMoeda.format(data.receita_semanal || 0);
+
+            const elCashflowSummary = document.getElementById('collectedCashflowSummary');
+            if (elCashflowSummary) {
+                const colWeek = data.collected_this_week || 0;
+                const colToday = data.collected_today || 0;
+                elCashflowSummary.innerHTML = `Collected this week: <strong>${formatoMoeda.format(colWeek)}</strong> <span style="color: var(--text-secondary); font-size: 0.72rem;">(Today: ${formatoMoeda.format(colToday)})</span>`;
+            }
             
             const elReceitaVencida = document.getElementById('receita_vencida');
             if (elReceitaVencida) elReceitaVencida.textContent = formatoMoeda.format(data.receita_vencida || 0);
@@ -366,7 +881,15 @@
             const elQuarCount = document.getElementById('quarentenas_count');
             if (elQuarCount) elQuarCount.textContent = data.quarentenas_count || 0;
             const elQuarValor = document.getElementById('quarentenas_valor');
-            if (elQuarValor) elQuarValor.textContent = `Total Held: ${formatoMoeda.format(data.quarentenas_valor || 0)}`;
+            if (elQuarValor) {
+                const totalRetido = data.total_depositos_retidos !== undefined ? data.total_depositos_retidos : (data.quarentenas_valor || 0);
+                const valorHold = data.quarentenas_valor || 0;
+                if ((data.quarentenas_count || 0) > 0 && valorHold > 0) {
+                    elQuarValor.innerHTML = `Total Held in Fleet: <strong>${formatoMoeda.format(totalRetido)}</strong> <span style="font-size: 0.72rem; color: #fbbf24;">(${formatoMoeda.format(valorHold)} on hold)</span>`;
+                } else {
+                    elQuarValor.innerHTML = `Total Held in Fleet: <strong>${formatoMoeda.format(totalRetido)}</strong>`;
+                }
+            }
 
             // 1.1 Claims Alerts (Se usuário tiver permissão, data.claims_alerts virá preenchido)
             const sectionClaims = document.getElementById('sectionClaimsDashboard');
@@ -485,7 +1008,12 @@
                 renderRecentInspections(data.recent_inspections || []);
             }
 
-            // 5. Load Notices & Alerts (apenas se o container existir)
+            // 5. Render Rent Due Today (apenas se existir no DOM)
+            if (document.getElementById('dueTodayContainer')) {
+                renderDueToday(data.due_today);
+            }
+
+            // 6. Load Notices & Alerts (apenas se o container existir)
             if (document.getElementById('alertasContainer')) {
                 await carregarAlertas(data);
             }
@@ -742,7 +1270,7 @@
                     <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
                         ${dashData.tax_mot_warnings} motorbike(s) require compliance renewal (${dashData.tax_warnings} Tax alerts, ${dashData.mot_warnings} MOT alerts).
                     </p>
-                    <a href="/motos" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
+                    <a href="/motos?status=warnings" style="color: var(--accent); text-decoration: none; font-size: 0.85rem; font-weight: 600; margin-top: 8px; display: inline-block;">
                         View Motorbike Fleet &rarr;
                     </a>
                 </div>`;
@@ -756,7 +1284,10 @@
                     itemsCancHtml += `
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
                             <span>🚨 Contract #${ca.id} (<strong style="font-family:monospace; color:var(--text-primary);">${ca.placa}</strong> - ${ca.cliente}) • <span style="color:#f87171; font-weight:700;">CANCELLED on askMID</span></span>
-                            <a href="/contratos/${ca.id}" style="color:var(--accent); text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Open Contract &rarr;</a>
+                            <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+                                <a href="https://www.askmid.com/" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 2px 7px; font-size: 0.72rem; color: #f87171; border-color: rgba(239,68,68,0.4); text-decoration: none;">askMID ↗</a>
+                                <a href="/contratos/${ca.id}" style="color:var(--accent); text-decoration:none; font-weight:600; white-space:nowrap;">Open Contract &rarr;</a>
+                            </div>
                         </div>
                     `;
                 });
@@ -784,7 +1315,10 @@
                     itemsDueHtml += `
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
                             <span>🔍 Contract #${ca.id} (<strong style="font-family:monospace; color:var(--text-primary);">${ca.placa}</strong> - ${ca.cliente}) • <span style="color:#fbbf24;">Last checked ${ca.dias}d ago</span></span>
-                            <a href="/contratos/${ca.id}" style="color:var(--accent); text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Open Contract &rarr;</a>
+                            <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+                                <a href="https://www.askmid.com/" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 2px 7px; font-size: 0.72rem; color: #fbbf24; border-color: rgba(245,158,11,0.4); text-decoration: none;">askMID ↗</a>
+                                <a href="/contratos/${ca.id}" style="color:var(--accent); text-decoration:none; font-weight:600; white-space:nowrap;">Open Contract &rarr;</a>
+                            </div>
                         </div>
                     `;
                 });
@@ -900,6 +1434,349 @@
         } catch (e) {
             console.error('Error loading alerts:', e);
             container.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.85rem;">Could not load notices.</p>';
+        }
+    }
+
+    function renderDueToday(dueData) {
+        const container = document.getElementById('dueTodayContainer');
+        const badge = document.getElementById('dueTodayBadge');
+        if (!container) return;
+
+        const items = (dueData && dueData.items) ? dueData.items : ((dueData && dueData.itens) ? dueData.itens : []);
+        const totalCount = (dueData && dueData.total_count !== undefined) ? dueData.total_count : ((dueData && dueData.count) ? dueData.count : 0);
+        const totalAmount = (dueData && dueData.total_amount !== undefined) ? dueData.total_amount : ((dueData && dueData.total) ? dueData.total : 0);
+
+        if (badge) {
+            if (totalCount > 0) {
+                badge.textContent = `${totalCount} due (${formatoMoeda.format(totalAmount)})`;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (!items || items.length === 0) {
+            container.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px; padding: 1rem; border-radius: 8px; background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2);">
+                    <span style="font-size: 1.25rem;">🎉</span>
+                    <div>
+                        <strong style="color: var(--success); font-size: 0.9rem; display: block;">No payments due today!</strong>
+                        <span style="color: var(--text-secondary); font-size: 0.8rem;">All scheduled charges for today have been collected or settled.</span>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '<div style="display: flex; flex-direction: column; gap: 0.65rem;">';
+        items.forEach(item => {
+            const phoneClean = (item.cliente_telefone || '').replace(/\D/g, '');
+            const valorNum = Number(item.valor || item.valor_semanal || 0);
+
+            // Determine charge type label and style
+            let typeLabel = 'Rent';
+            let typeBadgeStyle = 'background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.35);';
+            let chargeDescription = 'weekly rent';
+
+            const rawTipo = (item.tipo || '').toLowerCase();
+            if (rawTipo === 'sale_installment' || rawTipo.includes('installment') || rawTipo === 'venda_parcela') {
+                typeLabel = 'Sale Installment';
+                typeBadgeStyle = 'background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.35);';
+                chargeDescription = 'vehicle installment';
+            } else if (rawTipo === 'sale_deposit' || rawTipo === 'venda_entrada') {
+                typeLabel = 'Sale Down Payment';
+                typeBadgeStyle = 'background: rgba(217, 119, 6, 0.15); color: #fbbf24; border: 1px solid rgba(217, 119, 6, 0.35);';
+                chargeDescription = 'down payment';
+            } else if (rawTipo === 'sale_full' || rawTipo === 'venda_vista') {
+                typeLabel = 'Sale Full Payment';
+                typeBadgeStyle = 'background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35);';
+                chargeDescription = 'vehicle purchase payment';
+            } else if (rawTipo === 'deposit' || rawTipo === 'deposito') {
+                typeLabel = 'Rental Deposit';
+                typeBadgeStyle = 'background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.35);';
+                chargeDescription = 'deposit payment';
+            } else if (rawTipo === 'fine' || rawTipo === 'multa') {
+                typeLabel = 'Fine / PCN';
+                typeBadgeStyle = 'background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35);';
+                chargeDescription = 'traffic fine / penalty charge';
+            } else if (rawTipo === 'damage' || rawTipo === 'dano') {
+                typeLabel = 'Damage Charge';
+                typeBadgeStyle = 'background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);';
+                chargeDescription = 'repair / damage cost';
+            } else if (item.tipo && item.tipo !== 'Rent') {
+                typeLabel = item.tipo;
+                chargeDescription = `${item.tipo} payment`;
+            }
+
+            const plateOrRef = (item.placa && item.placa !== '-') ? item.placa : (item.contrato_id ? `Agreement #${item.contrato_id}` : 'General Charge');
+            const whatsappMsg = encodeURIComponent(
+                `Hello ${item.cliente_nome}, this is FF Motors. A friendly reminder that your ${chargeDescription} of £${valorNum.toFixed(2)} for motorbike ${plateOrRef} is due today. If you have already made this payment, please disregard this message. Thank you!`
+            );
+            const waLink = phoneClean ? `https://wa.me/${phoneClean}?text=${whatsappMsg}` : '#';
+
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.9rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; gap: 0.5rem; flex-wrap: wrap;">
+                    <div style="min-width: 0; flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
+                            <span class="badge" style="background: rgba(255,102,0,0.12); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-family: monospace; font-size: 0.85rem; font-weight: 700; padding: 2px 6px;">
+                                ${escapeHtml(plateOrRef)}
+                            </span>
+                            <strong style="color: var(--text-primary); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${escapeHtml(item.cliente_nome)}
+                            </strong>
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <span class="badge" style="${typeBadgeStyle} font-size: 0.7rem; padding: 1px 6px; font-weight: 600;">${escapeHtml(typeLabel)}</span>
+                            <span>Due: <strong style="color: var(--accent);">${formatoMoeda.format(valorNum)}</strong></span>
+                            ${item.cliente_telefone ? `<span>📞 ${escapeHtml(item.cliente_telefone)}</span>` : ''}
+                            ${item.nota ? `<span style="color: var(--text-secondary); font-size: 0.75rem; font-style: italic;">(${escapeHtml(item.nota)})</span>` : ''}
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        ${phoneClean ? `
+                            <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 5px 9px; font-size: 0.78rem; color: #22c55e; border-color: rgba(34, 197, 94, 0.35); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Send WhatsApp payment reminder">
+                                💬 Remind
+                            </a>
+                        ` : ''}
+                        ${item.contrato_id ? `
+                            <a href="/contratos/${item.contrato_id}" class="btn-action" style="padding: 5px 9px; font-size: 0.78rem; text-decoration: none;" title="Open Agreement">
+                                Agreement ↗
+                            </a>
+                        ` : `
+                            <a href="/financeiro?search=${encodeURIComponent(item.placa && item.placa !== '-' ? item.placa : item.cliente_nome)}" class="btn-action" style="padding: 5px 9px; font-size: 0.78rem; text-decoration: none;" title="Open Financial Ledger">
+                                Ledger ↗
+                            </a>
+                        `}
+                    </div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    }
+
+    // Universal Quick Lookup Search
+    let searchDebounceTimeout = null;
+    const searchInput = document.getElementById('dashQuickSearch');
+    const resultsBox = document.getElementById('dashSearchResults');
+    const clearBtn = document.getElementById('dashQuickSearchClear');
+
+    if (searchInput && resultsBox) {
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+
+            if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
+            if (!query || query.length < 2) {
+                resultsBox.style.display = 'none';
+                resultsBox.innerHTML = '';
+                return;
+            }
+
+            searchDebounceTimeout = setTimeout(async () => {
+                try {
+                    resultsBox.innerHTML = '<div style="padding: 0.75rem; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">Searching...</div>';
+                    resultsBox.style.display = 'block';
+
+                    const res = await fetch(`/api/busca-rapida?q=${encodeURIComponent(query)}`);
+                    const data = await res.json();
+
+                    const motos = data.motos || [];
+                    const clientes = data.clientes || [];
+                    const contratos = data.contratos || [];
+
+                    if (motos.length === 0 && clientes.length === 0 && contratos.length === 0) {
+                        resultsBox.innerHTML = '<div style="padding: 0.85rem; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No motorbikes, customers, or contracts found.</div>';
+                        return;
+                    }
+
+                    let outHtml = '';
+
+                    // 1. Motorbikes Section
+                    if (motos.length > 0) {
+                        outHtml += `<div class="search-section-title" style="color: var(--accent);">🛵 Motorbikes (${motos.length})</div>`;
+                        motos.forEach(m => {
+                            let statusColor = 'var(--text-secondary)';
+                            if (m.status === 'Available') statusColor = 'var(--success)';
+                            else if (m.status === 'Rented') statusColor = 'var(--accent)';
+                            else if (m.status === 'Maintenance') statusColor = '#f59e0b';
+                            else if (m.status === 'Pound') statusColor = '#ef4444';
+                            else if (m.status === 'Sold') statusColor = '#94a3b8';
+
+                            const motoFleetUrl = `/motos?search=${encodeURIComponent(m.placa)}`;
+                            const agreementId = m.contract_id || m.contrato_ativo_id;
+
+                            outHtml += `
+                                <div class="search-result-card">
+                                    <a href="${motoFleetUrl}" class="search-card-main">
+                                        <div class="search-card-header">
+                                            <span class="badge" style="font-family: monospace; font-weight: 700; font-size: 0.85rem; padding: 2px 6px; background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-color);">
+                                                ${escapeHtml(m.placa)}
+                                            </span>
+                                            <strong style="font-size: 0.88rem; color: var(--text-primary);">
+                                                ${escapeHtml(m.modelo)}
+                                            </strong>
+                                            <small style="color: var(--text-secondary);">(${escapeHtml(m.cor || 'Bike')})</small>
+                                            <span style="font-size: 0.75rem; font-weight: 600; color: ${statusColor}; margin-left: auto;">● ${escapeHtml(m.status)}</span>
+                                        </div>
+                                        <div class="search-card-details">
+                                            ${(m.hirer_name || m.cliente_atual) ? `<span>👤 Driver: <strong style="color: var(--text-primary);">${escapeHtml(m.hirer_name || m.cliente_atual)}</strong></span>` : `<span style="color: var(--text-secondary);">No active driver</span>`}
+                                            ${m.milhagem ? `<span style="margin-left: 8px;">• ${Number(m.milhagem).toLocaleString()} miles</span>` : ''}
+                                        </div>
+                                    </a>
+                                    <div class="search-card-actions">
+                                        ${agreementId ? `
+                                            <a href="/contratos/${agreementId}" class="dash-search-btn accent" title="Open Contract #${agreementId}">
+                                                Agreement #${agreementId} ↗
+                                            </a>
+                                        ` : ''}
+                                        <a href="${motoFleetUrl}" class="dash-search-btn" title="View Motorbike in Fleet">
+                                            Fleet ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    // 2. Customers Section
+                    if (clientes.length > 0) {
+                        if (motos.length > 0) outHtml += `<div style="height: 1px; background: var(--border-color); margin: 6px 0;"></div>`;
+                        outHtml += `<div class="search-section-title" style="color: #60a5fa;">👤 Customers (${clientes.length})</div>`;
+                        clientes.forEach(c => {
+                            const clientUrl = `/clientes?search=${encodeURIComponent(c.nome)}`;
+                            const agreementId = c.contract_id || c.contrato_ativo_id;
+
+                            let typeBadge = '';
+                            if (c.contract_type) {
+                                let typeName = c.contract_type;
+                                if (typeName === 'Sale_Installment') typeName = 'Financed';
+                                else if (typeName === 'Sale_Full') typeName = 'Sale';
+                                else if (typeName === 'Rent') typeName = 'Rental';
+                                typeBadge = `<span class="badge" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(59,130,246,0.14); color: #60a5fa; border: 1px solid rgba(59,130,246,0.28); flex-shrink: 0; font-weight: 600;">${escapeHtml(typeName)}</span>`;
+                            }
+
+                            outHtml += `
+                                <div class="search-result-card">
+                                    <a href="${clientUrl}" class="search-card-main">
+                                        <div class="search-card-header">
+                                            <span style="font-size: 0.95rem; flex-shrink: 0;">👤</span>
+                                            <strong style="font-size: 0.88rem; color: var(--text-primary);">
+                                                ${escapeHtml(c.nome)}
+                                            </strong>
+                                            ${typeBadge}
+                                        </div>
+                                        <div class="search-card-details">
+                                            ${c.moto_placa ? `<span style="color: var(--accent); font-weight: 600; flex-shrink: 0;">🛵 ${escapeHtml(c.moto_placa)}</span>` : ''}
+                                            ${c.telefone ? `<span>📞 ${escapeHtml(c.telefone)}</span>` : ''}
+                                            ${c.email ? `<span style="margin-left: 6px;">✉️ ${escapeHtml(c.email)}</span>` : ''}
+                                            ${(!c.telefone && !c.email && !c.moto_placa) ? `<span>No active contract or contact info</span>` : ''}
+                                        </div>
+                                    </a>
+                                    <div class="search-card-actions">
+                                        ${agreementId ? `
+                                            <a href="/contratos/${agreementId}" class="dash-search-btn green" title="Open Agreement #${agreementId}">
+                                                Agreement #${agreementId} ↗
+                                            </a>
+                                        ` : ''}
+                                        <a href="${clientUrl}" class="dash-search-btn" title="View Customer Profile">
+                                            Customer ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    // 3. Contracts Section
+                    if (contratos.length > 0) {
+                        if (motos.length > 0 || clientes.length > 0) outHtml += `<div style="height: 1px; background: var(--border-color); margin: 6px 0;"></div>`;
+                        outHtml += `<div class="search-section-title" style="color: #c084fc;">📄 Agreements & Contracts (${contratos.length})</div>`;
+                        contratos.forEach(ct => {
+                            const contractUrl = `/contratos/${ct.id}`;
+                            let typeBadgeClr = 'background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3);';
+                            if (ct.tipo === 'Sale_Installment' || ct.tipo === 'Sale_Full') {
+                                typeBadgeClr = 'background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);';
+                            } else if (ct.tipo === 'Purchase') {
+                                typeBadgeClr = 'background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3);';
+                            }
+
+                            outHtml += `
+                                <div class="search-result-card">
+                                    <a href="${contractUrl}" class="search-card-main">
+                                        <div class="search-card-header">
+                                            <span class="badge" style="font-family: monospace; font-weight: 700; font-size: 0.85rem; padding: 2px 6px; background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-color);">
+                                                #${ct.id}
+                                            </span>
+                                            <span class="badge" style="${typeBadgeClr} font-size: 0.72rem; padding: 1px 6px;">
+                                                ${escapeHtml(ct.tipo)}
+                                            </span>
+                                            <span style="font-family: monospace; font-weight: 600; font-size: 0.82rem; color: var(--text-primary);">
+                                                ${escapeHtml(ct.placa)}
+                                            </span>
+                                            <span class="badge" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(255,255,255,0.05); color: var(--text-secondary); margin-left: auto;">
+                                                ${escapeHtml(ct.status)}
+                                            </span>
+                                        </div>
+                                        <div class="search-card-details">
+                                            <span>👤 Customer: <strong style="color: var(--text-primary);">${escapeHtml(ct.cliente)}</strong></span>
+                                            ${ct.valor ? `<span style="margin-left: 8px;">• ${formatoMoeda.format(Number(ct.valor))}</span>` : ''}
+                                        </div>
+                                    </a>
+                                    <div class="search-card-actions">
+                                        <a href="${contractUrl}" class="dash-search-btn accent" title="Open Contract #${ct.id}">
+                                            Open ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    resultsBox.innerHTML = outHtml;
+                } catch (err) {
+                    console.error('Quick lookup error:', err);
+                    resultsBox.innerHTML = '<div style="padding: 0.75rem; text-align: center; color: #f87171; font-size: 0.85rem;">Error searching records.</div>';
+                }
+            }, 220);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !resultsBox.contains(e.target)) {
+                resultsBox.style.display = 'none';
+            }
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                resultsBox.style.display = 'none';
+                searchInput.blur();
+            }
+        });
+
+        // Global keyboard shortcut: Ctrl+K, Cmd+K, or '/' (when not typing) to focus search
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            } else if (e.key === '/' && document.activeElement !== searchInput && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            }
+        });
+    }
+
+    function clearQuickSearch() {
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (resultsBox) {
+            resultsBox.style.display = 'none';
+            resultsBox.innerHTML = '';
         }
     }
 </script>

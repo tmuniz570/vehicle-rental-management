@@ -10,7 +10,7 @@ from functools import wraps
 from dotenv import load_dotenv
 from flask import (
     Flask, render_template, request, jsonify, send_file, redirect, url_for, 
-    send_from_directory, flash, session
+    send_from_directory, flash, session, Response
 )
 from flask_login import (
     LoginManager, login_user, logout_user, login_required, current_user
@@ -583,6 +583,108 @@ def relatorio_vencidos():
         
     agora = agora_london.strftime('%d/%m/%Y %H:%M:%S')
     return render_template('relatorio_vencidos.html', dados=dados, total=total, agora=agora)
+
+@app.route('/motos/relatorio-pdf')
+@alugueis_required
+def relatorio_fleet_pdf():
+    search = request.args.get('search', '', type=str)
+    status_filter = request.args.get('status', '', type=str).strip()
+    v5c_filter = request.args.get('v5c', '', type=str).strip().lower()
+
+    query = Motorcycle.query.options(
+        selectinload(Motorcycle.v5c_arquivos),
+        selectinload(Motorcycle.trackers),
+        selectinload(Motorcycle.contratos).selectinload(Contract.cliente)
+    )
+
+    hoje_date = datetime.now(pytz.timezone('Europe/London')).date()
+
+    filter_desc = "All Fleet"
+    if status_filter:
+        sf_lower = status_filter.lower()
+        if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
+            query = query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound']))
+            filter_desc = "Active Fleet (In Operation)"
+        elif sf_lower == 'sorn':
+            query = query.filter(Motorcycle.tax_sorn == True)
+            filter_desc = "SORN (Statutory Off Road Notification)"
+        elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
+            query = query.filter(~Motorcycle.v5c_arquivos.any())
+            filter_desc = "Missing V5C Logbook"
+        elif sf_lower in ['warnings', 'tax_mot_warnings', 'alert', 'alerts']:
+            trinta_dias = hoje_date + timedelta(days=30)
+            query = query.filter(
+                ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
+                db.or_(
+                    db.and_(
+                        ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                        Motorcycle.tax_sorn == False,
+                        Motorcycle.vencimento_tax <= trinta_dias
+                    ),
+                    Motorcycle.vencimento_mot <= trinta_dias
+                )
+            )
+            filter_desc = "Compliance Alerts (TAX/MOT <= 30 days)"
+        elif sf_lower in ['all', 'todas', 'tudo']:
+            filter_desc = "All Statuses (Including Sold & Pound)"
+        else:
+            query = query.filter(Motorcycle.status.ilike(status_filter))
+            filter_desc = f"Status: {status_filter}"
+
+    if v5c_filter in ['missing', 'none', 'sem', '0']:
+        query = query.filter(~Motorcycle.v5c_arquivos.any())
+        filter_desc += " [Missing V5C]"
+
+    if search:
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
+        search_filters = [
+            Motorcycle.placa.ilike(search_plate_term),
+            Motorcycle.placa.ilike(search_term),
+            Motorcycle.modelo.ilike(search_term),
+            Motorcycle.cor.ilike(search_term),
+            Motorcycle.status.ilike(search_term)
+        ]
+        if search.strip().lower() == 'sorn':
+            search_filters.append(Motorcycle.tax_sorn == True)
+        elif search.strip().lower() in ['missing_v5c', 'missing v5c', 'no v5c', 'sem v5c']:
+            search_filters.append(~Motorcycle.v5c_arquivos.any())
+        query = query.filter(db.or_(*search_filters))
+        filter_desc += f' (Search: "{search}")'
+
+    motos = query.order_by(Motorcycle.placa.asc()).all()
+
+    dados = []
+    for m in motos:
+        contratos_sorted = sorted(m.contratos, key=lambda x: x.id, reverse=True) if m.contratos else []
+        active_c = next((c for c in contratos_sorted if c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
+        last_c = contratos_sorted[0] if contratos_sorted else None
+
+        active_str = '-'
+        if active_c:
+            hirer_nome = (active_c.cliente.nome if active_c.cliente else active_c.cliente_nome) or 'N/A'
+            active_str = f"#{active_c.id} • {hirer_nome}"
+        elif last_c:
+            client_nome = (last_c.cliente.nome if last_c.cliente else last_c.cliente_nome) or ''
+            active_str = f"Last: #{last_c.id}" + (f" ({client_nome})" if client_nome else "")
+
+        tax_str = 'SORN' if getattr(m, 'tax_sorn', False) else (m.vencimento_tax.strftime('%d/%m/%Y') if m.vencimento_tax else '-')
+        mot_str = m.vencimento_mot.strftime('%d/%m/%Y') if m.vencimento_mot else '-'
+
+        dados.append({
+            'placa': m.placa,
+            'modelo_cor': f"{m.modelo} ({m.cor})" if m.cor else m.modelo,
+            'milhagem': f"{int(m.milhagem_atual or 0):,} mi",
+            'status': m.status,
+            'tax': tax_str,
+            'mot': mot_str,
+            'contrato_hirer': active_str
+        })
+
+    agora_london = get_london_now()
+    agora = agora_london.strftime('%d/%m/%Y %H:%M')
+    return render_template('relatorio_fleet.html', dados=dados, total=len(dados), filter_desc=filter_desc, agora=agora)
 
 @app.route('/contratos/<int:id>')
 @alugueis_required
@@ -1753,8 +1855,11 @@ def listar_motos():
     
     query = Motorcycle.query.options(
         selectinload(Motorcycle.v5c_arquivos),
-        selectinload(Motorcycle.trackers)
+        selectinload(Motorcycle.trackers),
+        selectinload(Motorcycle.contratos).selectinload(Contract.cliente)
     )
+
+    hoje_date = datetime.now(pytz.timezone('Europe/London')).date()
 
     if status_filter:
         sf_lower = status_filter.lower()
@@ -1764,6 +1869,19 @@ def listar_motos():
             query = query.filter(Motorcycle.tax_sorn == True)
         elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
             query = query.filter(~Motorcycle.v5c_arquivos.any())
+        elif sf_lower in ['warnings', 'tax_mot_warnings', 'alert', 'alerts']:
+            trinta_dias = hoje_date + timedelta(days=30)
+            query = query.filter(
+                ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
+                db.or_(
+                    db.and_(
+                        ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                        Motorcycle.tax_sorn == False,
+                        Motorcycle.vencimento_tax <= trinta_dias
+                    ),
+                    Motorcycle.vencimento_mot <= trinta_dias
+                )
+            )
         elif sf_lower in ['all', 'todas', 'tudo']:
             pass
         else:
@@ -1808,31 +1926,224 @@ def listar_motos():
     target_col = sort_map.get(sort_by, Motorcycle.placa)
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
     paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+
+    def _resumir_contrato(c):
+        if not c:
+            return None
+        c_nome = (c.cliente.nome if c.cliente else c.cliente_nome) or 'N/A'
+        c_tel = (c.cliente.telefone if c.cliente else c.cliente_telefone) or ''
+        return {
+            'id': c.id,
+            'tipo': c.tipo_contrato,
+            'status': c.status,
+            'cliente_id': c.id_cliente,
+            'cliente_nome': c_nome,
+            'cliente_telefone': c_tel
+        }
     
-    itens = [{
-        'placa': m.placa,
-        'modelo': m.modelo,
-        'cor': m.cor,
-        'status': m.status,
-        'milhagem_atual': int(m.milhagem_atual or 0),
-        'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
-        'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None,
-        'tax_sorn': bool(getattr(m, 'tax_sorn', False)),
-        'v5c_count': len(m.v5c_arquivos) if m.v5c_arquivos else 0,
-        'trackers_count': len(m.trackers) if m.trackers else 0,
-        'trackers_summary': [{
-            'id': tr.id,
-            'numero': tr.numero,
-            'tipo_propriedade': tr.tipo_propriedade
-        } for tr in (m.trackers or [])]
-    } for m in paginated.items]
+    itens = []
+    for m in paginated.items:
+        contratos_sorted = sorted(m.contratos, key=lambda x: x.id, reverse=True) if m.contratos else []
+        active_c = next((c for c in contratos_sorted if c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
+        last_c = contratos_sorted[0] if contratos_sorted else None
+
+        itens.append({
+            'placa': m.placa,
+            'modelo': m.modelo,
+            'cor': m.cor,
+            'status': m.status,
+            'milhagem_atual': int(m.milhagem_atual or 0),
+            'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
+            'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None,
+            'tax_sorn': bool(getattr(m, 'tax_sorn', False)),
+            'v5c_count': len(m.v5c_arquivos) if m.v5c_arquivos else 0,
+            'trackers_count': len(m.trackers) if m.trackers else 0,
+            'trackers_summary': [{
+                'id': tr.id,
+                'numero': tr.numero,
+                'tipo_propriedade': tr.tipo_propriedade
+            } for tr in (m.trackers or [])],
+            'active_contract': _resumir_contrato(active_c),
+            'last_contract': _resumir_contrato(last_c)
+        })
+
+    # KPIs rápidos para o topo da tela
+    todas_motos_kpi = Motorcycle.query.options(selectinload(Motorcycle.v5c_arquivos)).all()
+    kpi_total = len(todas_motos_kpi)
+    kpi_operational = 0
+    kpi_available = 0
+    kpi_rented = 0
+    kpi_maintenance = 0
+    kpi_pound = 0
+    kpi_sold = 0
+    kpi_missing_v5c = 0
+    kpi_tax_mot_warnings = 0
+
+    for mk in todas_motos_kpi:
+        st = (mk.status or '').lower()
+        is_p = (st == 'pound')
+        is_s = (st in ['sold', 'vendida'])
+        
+        if not is_p and not is_s:
+            kpi_operational += 1
+
+        if st in ['available', 'disponível']:
+            kpi_available += 1
+        elif st in ['rented', 'alugada']:
+            kpi_rented += 1
+        elif st in ['maintenance', 'manutenção']:
+            kpi_maintenance += 1
+        elif is_p:
+            kpi_pound += 1
+        elif is_s:
+            kpi_sold += 1
+
+        if not mk.v5c_arquivos:
+            kpi_missing_v5c += 1
+
+        if not is_p:
+            is_sorn = bool(getattr(mk, 'tax_sorn', False))
+            has_w = False
+            if not is_s and not is_sorn and mk.vencimento_tax:
+                diff_t = (mk.vencimento_tax - hoje_date).days
+                if diff_t <= 30:
+                    has_w = True
+            if mk.vencimento_mot:
+                diff_m = (mk.vencimento_mot - hoje_date).days
+                if diff_m <= 30:
+                    has_w = True
+            if has_w:
+                kpi_tax_mot_warnings += 1
     
     return jsonify({
         'itens': itens,
         'total': paginated.total,
         'paginas': paginated.pages,
-        'pagina_atual': paginated.page
+        'pagina_atual': paginated.page,
+        'kpis': {
+            'total': kpi_total,
+            'operational': kpi_operational,
+            'available': kpi_available,
+            'rented': kpi_rented,
+            'maintenance': kpi_maintenance,
+            'pound': kpi_pound,
+            'sold': kpi_sold,
+            'missing_v5c': kpi_missing_v5c,
+            'tax_mot_warnings': kpi_tax_mot_warnings
+        }
     })
+
+@app.route('/api/motos/export', methods=['GET'])
+@alugueis_required
+def export_motos_csv():
+    import io
+    import csv
+    search = request.args.get('search', '', type=str)
+    status_filter = request.args.get('status', '', type=str).strip()
+    v5c_filter = request.args.get('v5c', '', type=str).strip().lower()
+
+    query = Motorcycle.query.options(
+        selectinload(Motorcycle.v5c_arquivos),
+        selectinload(Motorcycle.trackers),
+        selectinload(Motorcycle.contratos).selectinload(Contract.cliente)
+    )
+
+    hoje_date = datetime.now(pytz.timezone('Europe/London')).date()
+
+    if status_filter:
+        sf_lower = status_filter.lower()
+        if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
+            query = query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound']))
+        elif sf_lower == 'sorn':
+            query = query.filter(Motorcycle.tax_sorn == True)
+        elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
+            query = query.filter(~Motorcycle.v5c_arquivos.any())
+        elif sf_lower in ['warnings', 'tax_mot_warnings', 'alert', 'alerts']:
+            trinta_dias = hoje_date + timedelta(days=30)
+            query = query.filter(
+                ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
+                db.or_(
+                    db.and_(
+                        ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                        Motorcycle.tax_sorn == False,
+                        Motorcycle.vencimento_tax <= trinta_dias
+                    ),
+                    Motorcycle.vencimento_mot <= trinta_dias
+                )
+            )
+        elif sf_lower in ['all', 'todas', 'tudo']:
+            pass
+        else:
+            query = query.filter(Motorcycle.status.ilike(status_filter))
+
+    if v5c_filter in ['missing', 'none', 'sem', '0']:
+        query = query.filter(~Motorcycle.v5c_arquivos.any())
+
+    if search:
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
+        search_filters = [
+            Motorcycle.placa.ilike(search_plate_term),
+            Motorcycle.placa.ilike(search_term),
+            Motorcycle.modelo.ilike(search_term),
+            Motorcycle.cor.ilike(search_term),
+            Motorcycle.status.ilike(search_term)
+        ]
+        if search.strip().lower() == 'sorn':
+            search_filters.append(Motorcycle.tax_sorn == True)
+        elif search.strip().lower() in ['missing_v5c', 'missing v5c', 'no v5c', 'sem v5c']:
+            search_filters.append(~Motorcycle.v5c_arquivos.any())
+        query = query.filter(db.or_(*search_filters))
+
+    motos = query.order_by(Motorcycle.placa.asc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'Reg Plate', 'Model', 'Colour', 'Status', 'Mileage (Miles)',
+        'Road Tax Expiry', 'SORN', 'MOT Expiry', 'V5C Documents Count',
+        'GPS Trackers Count', 'Active Contract ID', 'Active Hirer Name',
+        'Active Hirer Phone', 'Last Contract ID', 'Last Contract Type', 'Last Client Name'
+    ])
+
+    for m in motos:
+        contratos_sorted = sorted(m.contratos, key=lambda x: x.id, reverse=True) if m.contratos else []
+        active_c = next((c for c in contratos_sorted if c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
+        last_c = contratos_sorted[0] if contratos_sorted else None
+
+        active_id = active_c.id if active_c else ''
+        active_nome = ((active_c.cliente.nome if active_c.cliente else active_c.cliente_nome) or '') if active_c else ''
+        active_phone = ((active_c.cliente.telefone if active_c.cliente else active_c.cliente_telefone) or '') if active_c else ''
+
+        last_id = last_c.id if last_c else ''
+        last_tipo = last_c.tipo_contrato if last_c else ''
+        last_nome = ((last_c.cliente.nome if last_c.cliente else last_c.cliente_nome) or '') if last_c else ''
+
+        writer.writerow([
+            m.placa,
+            m.modelo,
+            m.cor or '',
+            m.status,
+            int(m.milhagem_atual or 0),
+            m.vencimento_tax.strftime('%d/%m/%Y') if m.vencimento_tax else '',
+            'YES' if getattr(m, 'tax_sorn', False) else 'NO',
+            m.vencimento_mot.strftime('%d/%m/%Y') if m.vencimento_mot else '',
+            len(m.v5c_arquivos) if m.v5c_arquivos else 0,
+            len(m.trackers) if m.trackers else 0,
+            active_id,
+            active_nome,
+            active_phone,
+            last_id,
+            last_tipo,
+            last_nome
+        ])
+
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv; charset=utf-8',
+        headers={'Content-Disposition': f'attachment; filename=fleet_export_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'}
+    )
 
 @app.route('/api/motos/<placa>', methods=['PUT'])
 @alugueis_required
@@ -3801,6 +4112,156 @@ def excluir_transacao(id):
     registrar_log('TRANSACTION_DELETE', 'Transaction', id, f"Transação #{id} excluída por {operador_atual}")
     return jsonify({'message': 'Transaction deleted successfully', 'mensagem': 'Transação excluída com sucesso'}), 200
 
+@app.route('/api/busca-rapida', methods=['GET'])
+@login_required
+def busca_rapida():
+    termo = request.args.get('q', '', type=str).strip()
+    termo_limpo = termo.replace(' ', '').replace('#', '')
+    if not termo or (len(termo) < 2 and not termo_limpo.isdigit()):
+        return jsonify({'motos': [], 'clientes': [], 'contratos': []})
+
+    like_termo = f"%{termo}%"
+    like_limpo = f"%{termo_limpo}%"
+
+    # 1. Search Motorbikes (plates, model, color)
+    exact_moto = Motorcycle.query.options(
+        selectinload(Motorcycle.contratos).selectinload(Contract.cliente)
+    ).filter(Motorcycle.placa.ilike(termo_limpo)).first()
+
+    motos_query = Motorcycle.query.options(
+        selectinload(Motorcycle.contratos).selectinload(Contract.cliente)
+    ).filter(
+        db.or_(
+            Motorcycle.placa.ilike(like_limpo),
+            Motorcycle.placa.ilike(like_termo),
+            Motorcycle.modelo.ilike(like_termo),
+            Motorcycle.cor.ilike(like_termo)
+        )
+    ).limit(8).all()
+
+    motos_res = []
+    seen_plates = set()
+
+    all_motos = ([exact_moto] if exact_moto else []) + [m for m in motos_query if not exact_moto or m.placa != exact_moto.placa]
+    for m in all_motos:
+        if m.placa in seen_plates:
+            continue
+        contratos_sorted = sorted(m.contratos, key=lambda x: x.id, reverse=True) if m.contratos else []
+        active_c = next((c for c in contratos_sorted if c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
+        hirer_name = None
+        contract_id = None
+        contract_type = None
+        if active_c:
+            hirer_name = (active_c.cliente.nome if active_c.cliente else active_c.cliente_nome) or 'N/A'
+            contract_id = active_c.id
+            contract_type = getattr(active_c, 'tipo_contrato', 'Rent') or 'Rent'
+
+        motos_res.append({
+            'placa': m.placa,
+            'modelo': m.modelo,
+            'cor': m.cor or '',
+            'status': m.status,
+            'contract_id': contract_id,
+            'contrato_ativo_id': contract_id,
+            'contract_type': contract_type,
+            'hirer_name': hirer_name,
+            'cliente_atual': hirer_name,
+            'milhagem': int(m.milhagem_atual or 0)
+        })
+        seen_plates.add(m.placa)
+        if len(motos_res) >= 6:
+            break
+
+    # 2. Search Clients (name, phone, email)
+    clientes_query = Client.query.options(
+        selectinload(Client.contratos).selectinload(Contract.moto)
+    ).filter(
+        db.or_(
+            Client.nome.ilike(like_termo),
+            Client.telefone.ilike(like_termo),
+            Client.email.ilike(like_termo)
+        )
+    ).limit(6).all()
+
+    clientes_res = []
+    for c in clientes_query:
+        contratos_sorted = sorted(c.contratos, key=lambda x: x.id, reverse=True) if c.contratos else []
+        active_c = next((ct for ct in contratos_sorted if ct.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
+        c_id = active_c.id if active_c else None
+        placa = active_c.placa if active_c else None
+        c_tipo = getattr(active_c, 'tipo_contrato', 'Rent') if active_c else None
+
+        clientes_res.append({
+            'id': c.id,
+            'nome': c.nome,
+            'telefone': c.telefone or '',
+            'email': c.email or '',
+            'contract_id': c_id,
+            'contrato_ativo_id': c_id,
+            'moto_placa': placa,
+            'contract_type': c_tipo
+        })
+
+    # 3. Search Contracts (ID, plate, client name, type)
+    exact_contract = None
+    if termo_limpo.isdigit():
+        exact_contract = Contract.query.options(joinedload(Contract.cliente)).filter(Contract.id == int(termo_limpo)).first()
+
+    contratos_filters = [
+        Contract.placa.ilike(like_limpo),
+        Contract.placa.ilike(like_termo)
+    ]
+    if termo_limpo.isdigit():
+        contratos_filters.append(Contract.id == int(termo_limpo))
+    
+    contratos_query = Contract.query.options(
+        joinedload(Contract.cliente)
+    ).join(Client, Contract.id_cliente == Client.id).filter(
+        db.or_(
+            *contratos_filters,
+            Client.nome.ilike(like_termo),
+            Contract.status.ilike(like_termo),
+            Contract.tipo_contrato.ilike(like_termo)
+        )
+    ).order_by(Contract.id.desc()).limit(8).all()
+
+    contratos_res = []
+    seen_contract_ids = set()
+
+    if exact_contract:
+        cli_nome = (exact_contract.cliente.nome if exact_contract.cliente else exact_contract.cliente_nome) or 'N/A'
+        contratos_res.append({
+            'id': exact_contract.id,
+            'tipo': exact_contract.tipo_contrato or 'Rent',
+            'placa': exact_contract.placa,
+            'cliente': cli_nome,
+            'status': exact_contract.status,
+            'valor': float(exact_contract.valor_aluguel_semanal or 0.0) if exact_contract.tipo_contrato in [None, 'Rent', ContractType.RENT.value] else float(exact_contract.valor_total_venda or exact_contract.valor_compra_veiculo or 0.0)
+        })
+        seen_contract_ids.add(exact_contract.id)
+
+    for ct in contratos_query:
+        if ct.id in seen_contract_ids:
+            continue
+        cli_nome = (ct.cliente.nome if ct.cliente else ct.cliente_nome) or 'N/A'
+        contratos_res.append({
+            'id': ct.id,
+            'tipo': ct.tipo_contrato or 'Rent',
+            'placa': ct.placa,
+            'cliente': cli_nome,
+            'status': ct.status,
+            'valor': float(ct.valor_aluguel_semanal or 0.0) if ct.tipo_contrato in [None, 'Rent', ContractType.RENT.value] else float(ct.valor_total_venda or ct.valor_compra_veiculo or 0.0)
+        })
+        seen_contract_ids.add(ct.id)
+        if len(contratos_res) >= 6:
+            break
+
+    return jsonify({
+        'motos': motos_res,
+        'clientes': clientes_res,
+        'contratos': contratos_res
+    })
+
 @app.route('/api/dashboard', methods=['GET'])
 def get_dashboard():
     resp_data = {}
@@ -3859,7 +4320,24 @@ def get_dashboard():
         ).scalar() or 0.0)
         
         # Performance: Direct SQL sum and count for overdue charges using London Time
-        inicio_hoje = get_london_now().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        agora_london = get_london_now()
+        inicio_hoje = agora_london.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        inicio_semana = inicio_hoje - timedelta(days=agora_london.weekday())
+
+        collected_today = float(db.session.query(
+            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+        ).filter(
+            FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+            FinancialTransaction.data_pagamento >= inicio_hoje
+        ).scalar() or 0.0)
+
+        collected_this_week = float(db.session.query(
+            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+        ).filter(
+            FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+            FinancialTransaction.data_pagamento >= inicio_semana
+        ).scalar() or 0.0)
+
         vencidas_q = db.session.query(
             db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
             db.func.count(FinancialTransaction.id)
@@ -3871,21 +4349,37 @@ def get_dashboard():
         total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
         
         # Performance: Pre-fetch transactions to prevent N+1 queries during deposit accounting
-        contratos_quarentena = db.session.query(Contract).options(joinedload(Contract.transacoes)).filter(
-            Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])
+        contratos_com_deposito = db.session.query(Contract).options(joinedload(Contract.transacoes)).filter(
+            Contract.status.in_([
+                ContractStatus.ACTIVE.value, 'Active', 'Ativo',
+                ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'
+            ]),
+            (Contract.tipo_contrato.is_(None) | Contract.tipo_contrato.in_([ContractType.RENT.value, 'Rent', 'Aluguel']))
         ).all()
-        quarentenas_count = len(contratos_quarentena)
+        quarentenas_count = 0
         quarentenas_valor = 0.0
-        for cq in contratos_quarentena:
+        depositos_ativos_valor = 0.0
+        total_depositos_retidos = 0.0
+
+        for c in contratos_com_deposito:
+            is_hold = c.status in [ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']
+            if is_hold:
+                quarentenas_count += 1
+            
             dep_pago = 0.0
             deducoes = 0.0
-            for t in cq.transacoes:
+            for t in c.transacoes:
                 if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
                     if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
                         dep_pago += float(t.valor)
                     elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
                         deducoes += float(t.valor)
-            quarentenas_valor += max(0.0, dep_pago - deducoes)
+            saldo = max(0.0, dep_pago - deducoes)
+            total_depositos_retidos += saldo
+            if is_hold:
+                quarentenas_valor += saldo
+            else:
+                depositos_ativos_valor += saldo
                     
         # Últimas vistorias (eager-loaded)
         recent_inspections = []
@@ -4057,6 +4551,45 @@ def get_dashboard():
                 })
         motos_sem_v5c_count = len(motos_sem_v5c)
 
+        # Proactive Collections: Actual pending charges due today (Rent, Sales Installments, Deposits, Fines, etc.)
+        fim_hoje = inicio_hoje + timedelta(days=1)
+        transacoes_hoje_objs = db.session.query(FinancialTransaction).options(
+            joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
+        ).filter(
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+            FinancialTransaction.data_vencimento >= inicio_hoje,
+            FinancialTransaction.data_vencimento < fim_hoje
+        ).order_by(FinancialTransaction.data_vencimento.asc()).all()
+
+        due_today_list = []
+        for t in transacoes_hoje_objs:
+            c = t.contrato
+            cli = c.cliente if c else None
+            cli_nome = cli.nome if cli else (c.cliente_nome if c else 'N/A')
+            cli_tel = cli.telefone if cli else (c.cliente_telefone if c else '')
+            placa = c.placa if c else '-'
+            c_id = c.id if c else None
+            due_today_list.append({
+                'transacao_id': t.id,
+                'contrato_id': c_id,
+                'placa': placa,
+                'cliente_nome': cli_nome,
+                'cliente_telefone': cli_tel,
+                'valor': float(t.valor),
+                'valor_semanal': float(t.valor),
+                'tipo': t.tipo,
+                'nota': t.nota or ''
+            })
+
+        due_today = {
+            'count': len(due_today_list),
+            'total_count': len(due_today_list),
+            'total': round(sum(d['valor'] for d in due_today_list), 2),
+            'total_amount': round(sum(d['valor'] for d in due_today_list), 2),
+            'itens': due_today_list,
+            'items': due_today_list
+        }
+
         resp_data.update({
             'total_motos': total_motos,
             'motos_disponiveis': motos_disponiveis,
@@ -4084,8 +4617,13 @@ def get_dashboard():
             'receita_semanal': receita_semanal,
             'receita_vencida': receita_vencida,
             'total_vencidos': total_vencidos,
+            'collected_today': collected_today,
+            'collected_this_week': collected_this_week,
+            'due_today': due_today,
             'quarentenas_count': quarentenas_count,
             'quarentenas_valor': quarentenas_valor,
+            'depositos_ativos_valor': depositos_ativos_valor,
+            'total_depositos_retidos': total_depositos_retidos,
             'recent_inspections': recent_inspections,
             'recent_contracts': recent_contracts
         })

@@ -54,6 +54,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.populateSelectMotos = populateSelectMotos;
         populateSelectMotos(getSelectedContractType());
 
+        // Auto-select motorbike from URL query parameters (e.g. from Fleet "+ Rent" button)
+        const urlParams = new URLSearchParams(window.location.search);
+        const preSelectedPlaca = urlParams.get('moto_placa') || urlParams.get('placa');
+        if (preSelectedPlaca && selectMoto) {
+            selectMoto.value = preSelectedPlaca;
+            selectMoto.dispatchEvent(new Event('change'));
+        }
+
         // Preencher milhagem inicial e cor ao selecionar a moto
         selectMoto.addEventListener('change', () => {
             const opt = selectMoto.options[selectMoto.selectedIndex];

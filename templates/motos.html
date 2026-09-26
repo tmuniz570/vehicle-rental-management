@@ -3,9 +3,53 @@
 {% block title %}Fleet{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Motorbike Fleet</h1>
-    <a href="/motos/nova" class="btn-primary" style="width: auto; display: inline-flex;">+ Add Motorbike</a>
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 1.85rem;">Motorbike Fleet</h1>
+        <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Fleet status, compliance, active agreements and documentation</p>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <button id="btnExportPdf" class="btn-secondary" style="display: inline-flex; align-items: center; gap: 6px; padding: 0.75rem 1.25rem; border-radius: 10px; background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15); font-weight: 600; cursor: pointer; transition: all 0.2s;" title="Print or save filtered fleet list as PDF">
+            🖨️ PDF Report
+        </button>
+        <a href="/motos/nova" class="btn-primary" style="width: auto; display: inline-flex; align-items: center; gap: 6px;">
+            + Add Motorbike
+        </a>
+    </div>
+</div>
+
+<!-- Fleet KPI Summary Cards (Click to Filter) -->
+<div class="fleet-kpis-grid" id="fleetKpisGrid">
+    <div class="kpi-card active" data-filter="operational" id="kpiCard_operational" title="Click to filter Active Fleet in operation">
+        <div class="kpi-title"><span>Active Fleet</span> <span>⚡</span></div>
+        <div class="kpi-value" id="kpiVal_operational">-</div>
+        <div class="kpi-sub">In operation</div>
+    </div>
+    <div class="kpi-card" data-filter="Available" id="kpiCard_Available" title="Click to filter Available motorbikes">
+        <div class="kpi-title"><span>Available</span> <span>🟢</span></div>
+        <div class="kpi-value" style="color: #4ade80;" id="kpiVal_available">-</div>
+        <div class="kpi-sub">Ready to rent/sell</div>
+    </div>
+    <div class="kpi-card" data-filter="Rented" id="kpiCard_Rented" title="Click to filter Rented motorbikes">
+        <div class="kpi-title"><span>Rented</span> <span>🔑</span></div>
+        <div class="kpi-value" style="color: #38bdf8;" id="kpiVal_rented">-</div>
+        <div class="kpi-sub">Active agreements</div>
+    </div>
+    <div class="kpi-card" data-filter="Maintenance" id="kpiCard_Maintenance" title="Click to filter Bikes in maintenance/workshop">
+        <div class="kpi-title"><span>Maintenance</span> <span>🔧</span></div>
+        <div class="kpi-value" style="color: #f59e0b;" id="kpiVal_maintenance">-</div>
+        <div class="kpi-sub">In workshop</div>
+    </div>
+    <div class="kpi-card" data-filter="missing_v5c" id="kpiCard_missing_v5c" title="Click to filter Bikes missing V5C logbook">
+        <div class="kpi-title"><span>Missing V5C</span> <span>⚠️</span></div>
+        <div class="kpi-value" style="color: #f87171;" id="kpiVal_missing_v5c">-</div>
+        <div class="kpi-sub">Logbook required</div>
+    </div>
+    <div class="kpi-card" data-filter="warnings" id="kpiCard_warnings" title="Click to filter TAX & MOT expiry warnings (&le;30d)">
+        <div class="kpi-title"><span>Compliance Alerts</span> <span>🛡️</span></div>
+        <div class="kpi-value" style="color: #fbbf24;" id="kpiVal_tax_mot_warnings">-</div>
+        <div class="kpi-sub">TAX / MOT &le;30d</div>
+    </div>
 </div>
 
 <div style="margin-bottom: 1.5rem; display: flex; gap: 10px; flex-wrap: wrap;">
@@ -19,6 +63,7 @@
         <option value="Pound">🏛️ Pound (Outside Operation)</option>
         <option value="Sold">Sold</option>
         <option value="missing_v5c">⚠️ Missing V5C</option>
+        <option value="warnings">🛡️ TAX & MOT Alerts (&le;30d)</option>
         <option value="sorn">🛡️ SORN</option>
     </select>
 </div>
@@ -30,11 +75,11 @@
                 <th data-sort-field="placa">Reg Plate</th>
                 <th data-sort-field="modelo">Model</th>
                 <th data-sort-field="cor">Colour</th>
-                <th data-sort-field="milhagem_atual">Mileage (Miles)</th>
+                <th data-sort-field="milhagem_atual">Mileage</th>
                 <th data-sort-field="vencimento_tax">Road Tax Expiry</th>
                 <th data-sort-field="vencimento_mot">MOT Expiry</th>
                 <th>V5C & Trackers</th>
-                <th data-sort-field="status">Status</th>
+                <th data-sort-field="status">Status & Agreement</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -53,6 +98,75 @@
 {% include 'moto_manage_modal.html' %}
 
 <style>
+    .fleet-kpis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+        background: var(--card-bg, rgba(30, 41, 59, 0.7));
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+        border-radius: 12px;
+        padding: 0.9rem 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        user-select: none;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .kpi-card.active {
+        border-color: var(--accent, #f97316);
+        background: rgba(249, 115, 22, 0.08);
+        box-shadow: 0 0 0 1px var(--accent, #f97316);
+    }
+    .kpi-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary, #94a3b8);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .kpi-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary, #f8fafc);
+        line-height: 1.2;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: var(--text-secondary, #94a3b8);
+    }
+    .dvla-btn {
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        color: #94a3b8;
+        font-size: 0.7rem;
+        font-weight: 600;
+        padding: 3px 6px;
+        border-radius: 4px;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        transition: all 0.15s ease;
+        cursor: pointer;
+        user-select: none;
+    }
+    .dvla-btn:hover {
+        background: rgba(56, 189, 248, 0.18);
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.4);
+    }
     #motosTable th, #motosTable td {
         padding: 0.75rem 0.65rem;
         font-size: 0.88rem;
@@ -74,5 +188,5 @@
 
 {% block scripts %}
 <script src="/static/js/moto_modal_shared.js?v=5"></script>
-<script src="/static/js/motos.js?v=11"></script>
+<script src="/static/js/motos.js?v=13"></script>
 {% endblock %}

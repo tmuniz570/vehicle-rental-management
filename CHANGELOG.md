@@ -4,6 +4,60 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.13] — 2026-09-26 — *Dashboard Operational Hub: Quick Lookup, Due Today Collections, Interactive Distribution & Cashflow*
+
+### ⚡ Dashboard Operacional (`/` & `templates/index.html`)
+* **Barra de Acesso Rápido Universal & Layout Responsivo Mobile (iPhone)**:
+  - **Alinhamento no Cabeçalho**: A barra de busca rápida foi realocada para a mesma linha do título `Overview`, ocupando o lado direito do cabeçalho no Desktop e eliminando uma linha inteira de espaço vertical.
+  - **Refinamento dos Cartões de Clientes (Customer Cards)**: Corrigida anomalia visual onde badges de tipo de contrato (`Financed`, `Rental`, `Purchase`) quebravam linha e flutuavam isoladas. Agora os badges ficam inline e contíguos ao nome do cliente na primeira linha; a placa da moto (`🛵`) é exibida na linha de detalhes ao lado de telefone e email; e os botões de ação foram encurtados de `Agreement #ID (PLATE) ↗` para `Agreement #ID ↗` em estilo *dark glass* de alto contraste.
+  - **Resolução de Sobreposições no Desktop**: Expandido popover para 640px de largura e estruturado em duas linhas verticais sem quebra desordenada (`flex-wrap: nowrap`), eliminando colisão de texto e emojis de motorista sobre modelos de veículos.
+  - **Grid Compacto de Botões no iPhone**: No modo retrato do celular, os 5 botões de ação são exibidos em grid de 2 colunas (`+ New Contract` ocupando toda a largura na primeira linha, seguido de pares balanceados: `Add Bike` / `New Inspection`, `Add Customer` / `Overdue Report`), permitindo visualizar **todos os botões simultaneamente sem precisar girar o celular para a horizontal ou fazer scroll**.
+  - **Resultados de Busca Legíveis no Celular**: O dropdown de resultados adota formato de cartões responsivos no iPhone (`search-result-card`), separando cabeçalho com placa/status, linha de detalhes e botões de ação touch em linhas dedicadas para evitar sobreposição e truncamento de texto.
+  - **Ícone Vetorial de Lupa (SVG com Efeito Focus)**: Substituído o caractere emoji `🔎` por um ícone SVG vetorial ultra-nítido posicionado com `z-index: 2` (eliminando problema de sobreposição pelo plano de fundo do input) e com transição dinâmica de cor para o laranja corporativo (`var(--accent)`) quando o usuário foca na busca.
+  - **Prevenção de Zoom no iOS**: Altura mínima de 44px e tamanho de fonte de 16px configurados para evitar que o Safari do iPhone aplique zoom involuntário ao tocar no campo de busca.
+* **Seção Proativa "Payments Due Today" Baseada em Lançamentos Financeiros Pendentes**:
+  - **Correção da Regra de Negócio**: Listagem agora baseia-se estritamente em **lançamentos reais de cobrança pendentes (`FinancialTransaction`) com vencimento no dia de hoje**, eliminando a geração sintética anterior que se baseava apenas no dia da semana cadastrado no contrato de aluguel.
+  - Abrange todas as modalidades de cobrança com vencimento na data: **aluguel semanal (`Rent`)**, **parcelas de venda (`Sale_Installment`)**, entradas (`Sale_Deposit`), quitações integrais (`Sale_Full`), depósitos caução (`Deposit`), multas/PCNs e taxas de avaria.
+  - Exibe badges contextuais de tipo (`Rent`, `Sale Installment`, `Sale Down Payment`, `Sale Full Payment`, `Rental Deposit`, `Fine / PCN`, `Damage Charge`) e notas operacionais.
+  - Botão direto `💬 Remind` com mensagem amigável e profissional pré-formatada em inglês britânico adaptada dinamicamente ao tipo de encargo (*weekly rent*, *vehicle installment*, *down payment*, etc.) e com a ressalva de cortesia:
+    > *"If you have already made this payment, please disregard this message. Thank you!"*
+  - Links contextuais inteligentes: direciona para o contrato (`Agreement ↗`) quando vinculado ou para o livro contábil (`Ledger ↗`) com busca pré-filtrada.
+* **Métricas de Fluxo de Caixa Realizado (Realized Cashflow)**:
+  - Adicionado no card de *Weekly Revenue* o acompanhamento de caixa efetivamente recebido: `Collected this week: £X,XXX.XX (Today: £XXX.XX)`, calculado a partir das transações pagas no horário de Londres.
+  - Card de *Weekly Revenue* direciona com filtro para transações pendentes de aluguel (`/financeiro?tipo=Rent&status=pendentes`).
+* **Barra de Distribuição da Frota Interativa (Interactive Fleet Distribution)**:
+  - Segmentos da barra colorida (`Rented`, `Available`, `In Maintenance`, `Pound`) e itens da legenda agora são interativos (cursor pointer com feedback visual e clique filtrando instantaneamente a lista de motos ou contratos correspondentes).
+  - Segmento e legenda de `Rented` direcionam estritamente para contratos de aluguel ativos (`/contratos?status=Active&tipo=Rent`).
+* **Navegação Direta e Filtros Corrigidos nos Stat Cards**:
+  - `Available` ➔ `/motos?status=Available`.
+  - `Rented (Active)` ➔ `/contratos?status=Active&tipo=Rent` (evita misturar contratos de venda).
+  - `In Maintenance` ➔ `/motos?status=Maintenance` (direciona para a frota com filtro de oficina).
+  - `Weekly Revenue` ➔ `/financeiro?tipo=Rent&status=pendentes` (com suporte a carregamento com filtro `tipo` em `static/js/financeiro.js`).
+  - `TAX & MOT Warnings` ➔ `/motos?status=warnings`.
+  - Adicionado botão de atalho `+ Add Bike` (`/motos/nova`) no grupo de ações rápidas do cabeçalho.
+* **Alertas com Ações Imediatas (Actionable Notices)**:
+  - Alertas de verificação de 15 dias de seguro no askMID contam com botão direto `askMID ↗` abrindo o portal oficial do governo britânico (`askmid.com`).
+  - Alerta de Tax & MOT direciona diretamente para os avisos filtrados da frota.
+  - Alertas de falta de documento V5C permitem acesso direto ao filtro de veículos sem logbook.
+
+## [1.9.12] — 2026-09-26 — *Fleet Operational Hub: Interactive Agreement Links, Hirer Previews, Compact Layout & PDF Report*
+
+### 🏍️ Central Operacional do Fleet (`/motos`)
+* **Vinculação Interativa de Contratos no Status da Moto**:
+  - Para motos alugadas (`Rented`), o badge transiciona para um link direto para o contrato ativo (`Rented #ID ↗`) acompanhado do nome do condutor atual (`👤 Hirer Name`) e atalho direto para WhatsApp (`💬`).
+  - Para motos vendidas (`Sold`), o badge vira link direto para o contrato de venda (`Sold #ID ↗`) com indicação do comprador.
+  - Para motos disponíveis (`Available`) ou em oficina (`Maintenance`), exibe o status operacional com indicação sutil de histórico do último contrato concluído (`Last: #ID ↗`).
+* **KPI Summary Cards com Filtro Interativo por Clique**:
+  - Barra de 6 mini-cards no topo da tela do Fleet: **Active Fleet** (⚡), **Available** (🟢), **Rented** (🔑), **Maintenance** (🔧), **Missing V5C** (⚠️) e **Compliance Alerts** (🛡️).
+  - Clicar em qualquer card filtra instantaneamente a tabela com feedback visual ativo (highlight e badge sincronizado).
+* **Atalho Rápido "+ Rent" para Motos Disponíveis**:
+  - Na coluna de ações, motos com status `Available` contam com botão direto `+ Rent` que abre o formulário de novo contrato (`/contratos/novo?moto_placa=...`) já com a moto selecionada e odômetro preenchido automaticamente.
+* **Layout Compacto e Consulta Rápida DVLA Oficial**:
+  - Para evitar expansão horizontal desnecessária da tabela, o botão `DVLA ↗` foi empilhado verticalmente logo abaixo da placa, e o cabeçalho de odômetro simplificado para `Mileage` (sem parênteses redundantes).
+  - O botão `DVLA ↗` copia a matrícula para a área de transferência com feedback (`✓ Copied!`) e abre a consulta oficial de MOT/Tax do governo britânico (`check-mot.service.gov.uk`).
+* **Relatório Oficial da Frota em PDF (`/motos/relatorio-pdf` & `templates/relatorio_fleet.html`)**:
+  - Botão `🖨️ PDF Report` no topo da tela da frota gerando relatório imprimível e exportável em PDF (A4) com os dados essenciais e úteis da tabela filtrada atual (placa, modelo e cor, milhagem, status, vencimentos de MOT e Tax / SORN, contrato e condutor ativo). Substitui planilhas CSV volumosas por um documento limpo e executivo.
+
 ## [1.9.11] — 2026-09-26 — *Used Vehicle Purchase Agreement (Buy-in / Trade-in Contracts)*
 
 ### 🤝 Novo Tipo de Contrato: Compra de Veículo Usado (`Purchase`)
@@ -35,6 +89,9 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
   - Ao colher a assinatura digital do vendedor, o contrato transiciona automaticamente para o status `Completed` (`Finalizado`), dispensando rotinas de encerramento de aluguel.
 * **Isenção de Compliance askMID e Pré-Entrega**:
   - Veículos adquiridos não exigem apólice de seguro pessoal do cliente vendedor nem bloqueio de pré-entrega para liberação de pátio.
+* **Card de Depósitos no Dashboard (`/api/dashboard` & `index.html`)**:
+  - **Total de Depósitos Retidos na Frota**: O endpoint `/api/dashboard` foi otimizado para calcular o montante total de depósitos caução sob custódia da empresa (`total_depositos_retidos`), consolidando tanto as motos ativas em circulação (`depositos_ativos_valor`) quanto as motos em processo de devolução (`quarentenas_valor`).
+  - **Exibição Inteligente no Card `Deposit Holds`**: Mantém a contagem de contratos em quarentena/hold em destaque numérico e adiciona no texto descritivo o valor monetário total retido na frota (`Total Held in Fleet: £X,XXX.XX`), com detalhamento contextual quando houver valores sob análise de devolução (`(£XXX.XX on hold)`).
 * **Testes Automatizados (`tests/test_compra_contratos.py`)**:
   - Testes cobrindo criação com destinos `Available`, `Maintenance` e `Pound`, validação de página única (1 `.agreement-page`), presença de elementos de UI no detalhe do contrato, assinatura digital e transição de status, aprovados com 100% de sucesso.
 

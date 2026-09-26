@@ -27,10 +27,61 @@ function formatExpiryBadge(dateStr) {
     }
 }
 
+// Quick DVLA check helper: copies plate to clipboard and provides subtle visual feedback
+window.copiarPlacaDVLA = function(event, placa) {
+    if (event) {
+        event.stopPropagation();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(placa).then(() => {
+            const btn = event ? event.currentTarget : null;
+            if (btn) {
+                const origText = btn.innerHTML;
+                btn.innerHTML = '✓ Copied!';
+                btn.style.color = '#4ade80';
+                setTimeout(() => {
+                    btn.innerHTML = origText;
+                    btn.style.color = '';
+                }, 2000);
+            }
+        }).catch(() => {});
+    }
+};
+
 // Hook called when V5C or Trackers are updated inside the shared modal
 window.onMotoModalUpdated = function() {
     carregarMotos();
 };
+
+function atualizarKpiCards(kpis) {
+    if (!kpis) return;
+    const elOp = document.getElementById('kpiVal_operational');
+    const elAv = document.getElementById('kpiVal_available');
+    const elRe = document.getElementById('kpiVal_rented');
+    const elMa = document.getElementById('kpiVal_maintenance');
+    const elV5 = document.getElementById('kpiVal_missing_v5c');
+    const elWa = document.getElementById('kpiVal_tax_mot_warnings');
+
+    if (elOp) elOp.textContent = kpis.operational !== undefined ? kpis.operational : '-';
+    if (elAv) elAv.textContent = kpis.available !== undefined ? kpis.available : '-';
+    if (elRe) elRe.textContent = kpis.rented !== undefined ? kpis.rented : '-';
+    if (elMa) elMa.textContent = kpis.maintenance !== undefined ? kpis.maintenance : '-';
+    if (elV5) elV5.textContent = kpis.missing_v5c !== undefined ? kpis.missing_v5c : '-';
+    if (elWa) elWa.textContent = kpis.tax_mot_warnings !== undefined ? kpis.tax_mot_warnings : '-';
+
+    sincronizarKpiCardAtivo();
+}
+
+function sincronizarKpiCardAtivo() {
+    const currentFilter = v5cFiltro === 'missing' ? 'missing_v5c' : (statusFiltro || 'operational');
+    document.querySelectorAll('.kpi-card').forEach(card => {
+        if (card.dataset.filter === currentFilter) {
+            card.classList.add('active');
+        } else {
+            card.classList.remove('active');
+        }
+    });
+}
 
 // Load Motorbikes Table
 async function carregarMotos() {
@@ -53,8 +104,13 @@ async function carregarMotos() {
         const data = await res.json();
         const motos = data.itens || [];
         
+        // Update Fleet KPIs strip
+        if (data.kpis) {
+            atualizarKpiCards(data.kpis);
+        }
+
         if (motos.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 2rem; color: var(--text-secondary);">No motorbikes found matching criteria.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding: 2.5rem 1rem; color: var(--text-secondary);">No motorbikes found matching criteria.</td></tr>';
             if(paginationInfo) paginationInfo.textContent = '';
             return;
         }
@@ -67,23 +123,92 @@ async function carregarMotos() {
         motos.forEach(m => {
             const tr = document.createElement('tr');
             
-            let statusBadge = '';
             const st = (m.status || '').toLowerCase();
             const isPound = (st === 'pound');
             const isSold = (st === 'sold' || st === 'vendida');
 
-            if (st === 'available' || st === 'disponível') {
-                statusBadge = '<span class="badge badge-success">Available</span>';
-            } else if (st === 'maintenance' || st === 'manutenção') {
-                statusBadge = '<span class="badge badge-warning">Maintenance</span>';
-            } else if (st === 'rented' || st === 'alugada') {
-                statusBadge = '<span class="badge badge-info">Rented</span>';
-            } else if (isPound) {
-                statusBadge = '<span class="badge" style="background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid rgba(239,68,68,0.4); font-weight:700;" title="Out of operation (Impounded / Off-road)">🏛️ Pound</span>';
+            // 1. Status Column with interactive Contract link and Hirer info
+            let statusHtml = '';
+            if (st === 'rented' || st === 'alugada') {
+                if (m.active_contract) {
+                    const c = m.active_contract;
+                    let waBtn = '';
+                    if (c.cliente_telefone) {
+                        let phoneClean = c.cliente_telefone.replace(/\D/g, '');
+                        if (phoneClean.startsWith('0') && phoneClean.length === 11) {
+                            phoneClean = '44' + phoneClean.slice(1);
+                        }
+                        waBtn = `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>`;
+                    }
+                    statusHtml = `
+                        <div>
+                            <a href="/contratos/${c.id}" class="badge badge-info" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;" title="View Active Contract #${c.id}">
+                                Rented #${c.id} ↗
+                            </a>
+                            <div style="font-size:0.75rem; margin-top:4px; display:flex; align-items:center; color:#cbd5e1;">
+                                <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="Current Hirer: ${escapeHtml(c.cliente_nome)}">
+                                    👤 ${escapeHtml(c.cliente_nome)}
+                                </span>
+                                ${waBtn}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    statusHtml = '<span class="badge badge-info">Rented</span>';
+                }
             } else if (isSold) {
-                statusBadge = '<span class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4);">Sold</span>';
+                if (m.last_contract) {
+                    const c = m.last_contract;
+                    statusHtml = `
+                        <div>
+                            <a href="/contratos/${c.id}" class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4); text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;" title="View Sale Contract #${c.id}">
+                                Sold #${c.id} ↗
+                            </a>
+                            ${c.cliente_nome ? `
+                            <div style="font-size:0.75rem; margin-top:4px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="Buyer: ${escapeHtml(c.cliente_nome)}">
+                                👤 ${escapeHtml(c.cliente_nome)}
+                            </div>` : ''}
+                        </div>
+                    `;
+                } else {
+                    statusHtml = '<span class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4);">Sold</span>';
+                }
+            } else if (st === 'available' || st === 'disponível') {
+                if (m.last_contract) {
+                    const c = m.last_contract;
+                    statusHtml = `
+                        <div>
+                            <span class="badge badge-success">Available</span>
+                            <div style="font-size:0.72rem; margin-top:3px; opacity:0.8;">
+                                <a href="/contratos/${c.id}" style="color:var(--text-secondary); text-decoration:none;" title="Previous Contract #${c.id} (${escapeHtml(c.cliente_nome)})">
+                                    Last: #${c.id} ↗
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    statusHtml = '<span class="badge badge-success">Available</span>';
+                }
+            } else if (st === 'maintenance' || st === 'manutenção') {
+                if (m.last_contract) {
+                    const c = m.last_contract;
+                    statusHtml = `
+                        <div>
+                            <span class="badge badge-warning">Maintenance</span>
+                            <div style="font-size:0.72rem; margin-top:3px; opacity:0.8;">
+                                <a href="/contratos/${c.id}" style="color:var(--text-secondary); text-decoration:none;" title="Previous Contract #${c.id} (${escapeHtml(c.cliente_nome)})">
+                                    Last: #${c.id} ↗
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    statusHtml = '<span class="badge badge-warning">Maintenance</span>';
+                }
+            } else if (isPound) {
+                statusHtml = '<span class="badge" style="background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid rgba(239,68,68,0.4); font-weight:700;" title="Out of operation (Impounded / Off-road)">🏛️ Pound</span>';
             } else {
-                statusBadge = `<span class="badge badge-danger">${escapeHtml(m.status)}</span>`;
+                statusHtml = `<span class="badge badge-danger">${escapeHtml(m.status)}</span>`;
             }
             
             const milhagemFormatada = Number(m.milhagem_atual || 0).toLocaleString('en-GB') + ' mi';
@@ -116,12 +241,33 @@ async function carregarMotos() {
                 ? `<span class="badge" style="background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); font-size:0.75rem; cursor:pointer;" title="View ${trackersCount} GPS tracker(s)" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabTrackers', motosCache['${escapeHtml(m.placa)}'])">📡 ${trackersCount} GPS</span>`
                 : `<span style="opacity:0.4; font-size:0.75rem; color:var(--text-secondary); cursor:pointer; text-decoration: underline;" title="Register tracker" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabTrackers', motosCache['${escapeHtml(m.placa)}'])">+ Tracker</span>`;
 
-            const btnEdit = `<button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:8px 14px; min-width:64px; min-height:36px; border-radius:6px; cursor:pointer; font-weight:600;">Manage</button>`;
+            // Actions Column: "+ Rent" for Available bikes and "Manage"
+            let actionsHtml = '';
+            if (st === 'available' || st === 'disponível') {
+                actionsHtml = `
+                    <div style="display:inline-flex; gap:6px; align-items:center;">
+                        <a href="/contratos/novo?moto_placa=${encodeURIComponent(m.placa)}" class="btn-primary" style="padding:6px 10px; font-size:0.78rem; text-decoration:none; display:inline-flex; align-items:center; gap:3px; border-radius:6px; background:var(--accent); color:#fff; font-weight:700; white-space:nowrap;" title="Create new agreement with ${escapeHtml(m.placa)}">+ Rent</a>
+                        <button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--text-secondary); border:1px solid rgba(255,255,255,0.15); padding:6px 10px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.78rem;">Manage</button>
+                    </div>
+                `;
+            } else {
+                actionsHtml = `
+                    <button type="button" class="btn-edit" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" data-placa="${escapeHtml(m.placa)}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:7px 14px; min-width:64px; min-height:34px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.82rem;">Manage</button>
+                `;
+            }
+
+            // Plate with DVLA check button stacked vertically underneath to prevent horizontal stretching
+            const plateHtml = `
+                <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px;">
+                    <span class="badge-plate" style="cursor:pointer;" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])">${escapeHtml(m.placa)}</span>
+                    <a href="https://www.check-mot.service.gov.uk/" target="_blank" rel="noopener noreferrer" class="dvla-btn" onclick="copiarPlacaDVLA(event, '${escapeHtml(m.placa)}')" title="Check MOT & Tax on GOV.UK (copies plate to clipboard)">DVLA ↗</a>
+                </div>
+            `;
 
             tr.innerHTML = `
-                <td class="nowrap"><span class="badge-plate" style="cursor:pointer;" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])">${escapeHtml(m.placa)}</span></td>
+                <td class="nowrap">${plateHtml}</td>
                 <td>${escapeHtml(m.modelo)}</td>
-                <td>${escapeHtml(m.cor)}</td>
+                <td>${escapeHtml(m.cor || '-')}</td>
                 <td data-sort="${m.milhagem_atual || 0}" style="font-weight: 600; color: #f8fafc;"><span style="color: var(--accent); font-weight:700;">${milhagemFormatada}</span></td>
                 <td data-sort="${isPound ? 'POUND' : (m.tax_sorn ? 'SORN' : (m.vencimento_tax || ''))}" class="nowrap">${taxBadge}</td>
                 <td data-sort="${isPound ? 'POUND' : (m.vencimento_mot || '')}" class="nowrap">${motBadge}</td>
@@ -131,8 +277,8 @@ async function carregarMotos() {
                         ${trackerBadge}
                     </div>
                 </td>
-                <td>${statusBadge}</td>
-                <td>${btnEdit}</td>
+                <td>${statusHtml}</td>
+                <td>${actionsHtml}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -152,7 +298,7 @@ async function carregarMotos() {
         
     } catch(e) {
         console.error('Error loading motorbikes:', e);
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--error);">Failed to load motorbikes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--error); padding:2rem;">Failed to load motorbikes.</td></tr>';
     }
 }
 
@@ -214,12 +360,57 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (val === 'all') {
                 statusFiltro = 'all';
                 v5cFiltro = '';
+            } else if (val === 'warnings') {
+                statusFiltro = 'warnings';
+                v5cFiltro = '';
             } else {
                 statusFiltro = val;
                 v5cFiltro = '';
             }
+            sincronizarKpiCardAtivo();
             paginaAtual = 1;
             carregarMotos();
+        });
+    }
+
+    // KPI Cards click handler to filter table
+    document.querySelectorAll('.kpi-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const filter = card.dataset.filter;
+            const sf = document.getElementById('statusFilter');
+            if (filter === 'missing_v5c') {
+                statusFiltro = '';
+                v5cFiltro = 'missing';
+                if (sf) sf.value = 'missing_v5c';
+            } else if (filter === 'all') {
+                statusFiltro = 'all';
+                v5cFiltro = '';
+                if (sf) sf.value = 'all';
+            } else if (filter === 'warnings') {
+                statusFiltro = 'warnings';
+                v5cFiltro = '';
+                if (sf) sf.value = 'warnings';
+            } else {
+                statusFiltro = filter;
+                v5cFiltro = '';
+                if (sf) sf.value = filter;
+            }
+            sincronizarKpiCardAtivo();
+            paginaAtual = 1;
+            carregarMotos();
+        });
+    });
+
+    // PDF Report button handler
+    const btnExport = document.getElementById('btnExportPdf');
+    if (btnExport) {
+        btnExport.addEventListener('click', () => {
+            const queryParams = new URLSearchParams({
+                search: termoBusca
+            });
+            if (statusFiltro) queryParams.set('status', statusFiltro);
+            if (v5cFiltro) queryParams.set('v5c', v5cFiltro);
+            window.open(`/motos/relatorio-pdf?${queryParams.toString()}`, '_blank');
         });
     }
 
