@@ -287,6 +287,8 @@ class FinancialTransaction(db.Model):
     nota = db.Column(db.Text, nullable=True)
     id_transacao_origem = db.Column(db.Integer, nullable=True)
     registrado_por_nome = db.Column(db.String(100), nullable=True)
+    ultimo_lembrete = db.Column(db.DateTime, nullable=True)
+    ultimo_lembrete_por = db.Column(db.String(100), nullable=True)
 
     __table_args__ = (
         db.Index('idx_ft_status_vencimento', 'status', 'data_vencimento'),
@@ -622,6 +624,16 @@ def init_db(app):
                         conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN perm_claims BOOLEAN DEFAULT 0"))
                         conn.commit()
                         conn.execute(db.text("UPDATE usuarios SET perm_claims = 1 WHERE role = 'admin'"))
+                        conn.commit()
+
+                # Transações Financeiras: Suporte a Registro de Lembretes
+                if 'financeiro_transacoes' in existing_tables:
+                    cols_ft = [col['name'] for col in inspector.get_columns('financeiro_transacoes')]
+                    if 'ultimo_lembrete' not in cols_ft:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN ultimo_lembrete TIMESTAMP;"))
+                        conn.commit()
+                    if 'ultimo_lembrete_por' not in cols_ft:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN ultimo_lembrete_por VARCHAR(100);"))
                         conn.commit()
 
                 # Performance: Auto-create essential indexes on existing database

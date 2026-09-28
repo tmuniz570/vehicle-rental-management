@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Daily Closing Sheet &bull; {{ data_formatada }} | FF Motors Birmingham</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm 10mm 12mm;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #ffffff;
+            color: #0f172a;
+            padding: 1.5rem 2rem;
+            margin: 0;
+            font-size: 8.5pt;
+            line-height: 1.35;
+        }
+        h1, h2, h3, h4, p { margin: 0; }
+        
+        .no-print {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .btn-action {
+            background: #0f172a;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: background 0.15s ease;
+        }
+        .btn-action:hover {
+            background: #1e293b;
+        }
+        .btn-back {
+            background: #64748b;
+        }
+        .btn-back:hover {
+            background: #475569;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .brand-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .report-subtitle {
+            font-size: 1rem;
+            color: #047857;
+            font-weight: 700;
+            margin-top: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .header-meta {
+            text-align: right;
+            font-size: 8pt;
+            color: #475569;
+        }
+        .badge-status {
+            display: inline-block;
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 7.5pt;
+            margin-top: 4px;
+            letter-spacing: 0.4px;
+        }
+
+        /* Grand Total Strip */
+        .grand-total-strip {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 0.9rem 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .grand-total-label {
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .grand-total-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #ffffff;
+            margin-top: 2px;
+        }
+        .grand-total-amount {
+            font-size: 1.7rem;
+            font-weight: 800;
+            color: #34d399;
+            text-align: right;
+            line-height: 1;
+        }
+        .grand-total-sub {
+            font-size: 7.5pt;
+            color: #cbd5e1;
+            margin-top: 3px;
+            text-align: right;
+        }
+
+        /* Method Breakdown Grid */
+        .methods-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.65rem;
+            margin-bottom: 1.15rem;
+        }
+        .method-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.65rem 0.75rem;
+            text-align: center;
+        }
+        .method-card.card-cash { border-top: 3px solid #10b981; }
+        .method-card.card-card { border-top: 3px solid #3b82f6; }
+        .method-card.card-bank { border-top: 3px solid #8b5cf6; }
+        .method-card.card-exchange { border-top: 3px solid #f59e0b; }
+        .method-card.card-deposit { border-top: 3px solid #64748b; }
+
+        .method-label {
+            font-size: 7pt;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            letter-spacing: 0.4px;
+        }
+        .method-value {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 3px 0 1px;
+        }
+        .method-count {
+            font-size: 7pt;
+            color: #94a3b8;
+        }
+
+        /* Till Balancing Box */
+        .balancing-box {
+            background: #fffbeb;
+            border: 1px solid #fef3c7;
+            border-left: 4px solid #f59e0b;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.25rem;
+        }
+        .balancing-title {
+            font-size: 8pt;
+            font-weight: 700;
+            color: #b45309;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .balancing-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            font-size: 8pt;
+        }
+        .balancing-field {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .balancing-field label {
+            color: #78350f;
+            font-size: 7pt;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .balancing-field .field-line {
+            border-bottom: 1px dashed #d97706;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        /* Ledger Table */
+        .section-heading {
+            font-size: 9pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #334155;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+            margin-bottom: 1.25rem;
+        }
+        thead th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+            text-align: left;
+            padding: 5px 7px;
+            border-top: 1px solid #cbd5e1;
+            border-bottom: 2px solid #94a3b8;
+            font-size: 7.2pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        tbody td {
+            padding: 5px 7px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #1e293b;
+            vertical-align: middle;
+        }
+        tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+        tbody tr {
+            page-break-inside: avoid;
+        }
+        tfoot td {
+            padding: 6px 7px;
+            font-weight: 700;
+            border-top: 2px solid #0f172a;
+            background: #f8fafc;
+        }
+
+        .badge-plate {
+            display: inline-block;
+            background: #fef08a;
+            color: #000;
+            font-family: monospace;
+            font-weight: 800;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-size: 7.2pt;
+            border: 1px solid #eab308;
+            letter-spacing: 0.5px;
+        }
+        .badge-method {
+            display: inline-block;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 7pt;
+            font-weight: 600;
+        }
+        .method-cash { background: #dcfce7; color: #166534; }
+        .method-card-badge { background: #dbeafe; color: #1e40af; }
+        .method-bank { background: #f3e8ff; color: #6b21a8; }
+        .method-exchange { background: #fef3c7; color: #92400e; }
+        .method-deposit-badge { background: #f1f5f9; color: #475569; }
+
+        /* Sign-off Box */
+        .signoff-box {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 1.5rem;
+            padding-top: 1rem;
+            border-top: 1px solid #cbd5e1;
+            page-break-inside: avoid;
+        }
+        .signoff-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            background: #fafafa;
+        }
+        .signoff-title {
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            letter-spacing: 0.5px;
+            margin-bottom: 1.5rem;
+        }
+        .signoff-line {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #cbd5e1;
+            padding-bottom: 3px;
+            margin-bottom: 0.5rem;
+            font-size: 8pt;
+        }
+
+        .footer {
+            margin-top: 1.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 7pt;
+            color: #94a3b8;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- On-screen Navigation Bar -->
+    <div class="no-print">
+        <a href="/financeiro" class="btn-action btn-back">&larr; Back to Finance Hub</a>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input type="date" id="datePicker" value="{{ data_iso }}" onchange="window.location.href='/financeiro/fechamento-caixa/print?data=' + this.value" style="padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #cbd5e1; font-family: inherit; font-size: 0.85rem; cursor: pointer;">
+            <button onclick="window.print()" class="btn-action">🖨️ Print / Save PDF</button>
+        </div>
+    </div>
+
+    <!-- Official Header -->
+    <div class="header">
+        <div>
+            <div class="brand-title">
+                <span>FF MOTORS BIRMINGHAM</span>
+            </div>
+            <div class="report-subtitle">Daily Cashing Up &bull; End-of-Day Closing Sheet</div>
+            <div style="font-size: 7.5pt; color: #64748b; margin-top: 3px;">
+                109 Windmill Lane, Birmingham, B66 3EW &bull; Phone: 0121 492 0697 &bull; app.ffmotors.co.uk
+            </div>
+        </div>
+        <div class="header-meta">
+            <div><strong>Reconciliation Date:</strong> <span style="font-size: 9.5pt; font-weight: 800; color: #0f172a;">{{ data_formatada }}</span></div>
+            <div><strong>Generated:</strong> {{ data_geracao }} (London Time)</div>
+            <div><strong>Operator on Duty:</strong> {{ operador }}</div>
+            <div><span class="badge-status">✓ VERIFIED & RECONCILED</span></div>
+        </div>
+    </div>
+
+    <!-- Executive Grand Total Strip -->
+    <div class="grand-total-strip">
+        <div>
+            <div class="grand-total-label">Register Summary &bull; Day Total</div>
+            <div class="grand-total-title">Total Arrecadado (Grand Total Collected)</div>
+            <div style="font-size: 7.5pt; color: #94a3b8; margin-top: 2px;">All cleared rental fees, vehicle sales installments, deposits & incident charges</div>
+        </div>
+        <div>
+            <div class="grand-total-amount">£{{ "%.2f"|format(total_arrecadado) }}</div>
+            <div class="grand-total-sub">{{ total_transacoes }} confirmed payment transaction(s)</div>
+        </div>
+    </div>
+
+    <!-- Payment Methods Breakdown Cards -->
+    <div class="methods-grid">
+        <div class="method-card card-cash">
+            <div class="method-label">💵 Cash in Till</div>
+            <div class="method-value">£{{ "%.2f"|format(metodos['Cash']['total']) }}</div>
+            <div class="method-count">{{ metodos['Cash']['qtd'] }} transaction(s)</div>
+        </div>
+        <div class="method-card card-card">
+            <div class="method-label">💳 Card Terminal</div>
+            <div class="method-value">£{{ "%.2f"|format(metodos['Card']['total']) }}</div>
+            <div class="method-count">{{ metodos['Card']['qtd'] }} transaction(s)</div>
+        </div>
+        <div class="method-card card-bank">
+            <div class="method-label">🏦 Bank Transfer</div>
+            <div class="method-value">£{{ "%.2f"|format(metodos['Bank Transfer']['total']) }}</div>
+            <div class="method-count">{{ metodos['Bank Transfer']['qtd'] }} transaction(s)</div>
+        </div>
+        <div class="method-card card-exchange">
+            <div class="method-label">🛵 Trade-in / Exch.</div>
+            <div class="method-value">£{{ "%.2f"|format(metodos['Exchange']['total']) }}</div>
+            <div class="method-count">{{ metodos['Exchange']['qtd'] }} transaction(s)</div>
+        </div>
+        <div class="method-card card-deposit">
+            <div class="method-label">🔄 Deposit / Other</div>
+            <div class="method-value">£{{ "%.2f"|format(metodos['Deposit']['total'] + metodos['Other']['total']) }}</div>
+            <div class="method-count">{{ metodos['Deposit']['qtd'] + metodos['Other']['qtd'] }} transaction(s)</div>
+        </div>
+    </div>
+
+    <!-- Cash Drawer Physical Balancing Box -->
+    <div class="balancing-box">
+        <div class="balancing-title">
+            <span>🧮</span> Physical Cash Drawer Reconciliation & Float Audit
+        </div>
+        <div class="balancing-grid">
+            <div class="balancing-field">
+                <label>1. Opening Float (Fundo de Troco):</label>
+                <div class="field-line">£ ____________________</div>
+            </div>
+            <div class="balancing-field">
+                <label>2. Expected Cash from System:</label>
+                <div class="field-line">£ {{ "%.2f"|format(metodos['Cash']['total']) }}</div>
+            </div>
+            <div class="balancing-field">
+                <label>3. Actual Physical Cash Counted:</label>
+                <div class="field-line">£ ____________________</div>
+            </div>
+            <div class="balancing-field">
+                <label>4. Variance / Discrepancy (+ / -):</label>
+                <div class="field-line">£ ____________________</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Transactions Ledger -->
+    <div class="section-heading">
+        <span>Detailed Itemized Transactions Log ({{ itens|length }})</span>
+        <span style="font-size: 7.5pt; font-weight: normal; color: #64748b;">Sorted chronologically by payment time</span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 45px;">Time</th>
+                <th style="width: 60px;">Tx #</th>
+                <th style="width: 70px;">Contract</th>
+                <th>Customer</th>
+                <th style="width: 80px;">Bike (Reg)</th>
+                <th>Item / Description</th>
+                <th style="width: 95px;">Method</th>
+                <th style="width: 90px;">Recorded By</th>
+                <th style="text-align: right; width: 80px;">Amount (£)</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if itens %}
+                {% for item in itens %}
+                {% set forma = (item.forma_especifica or '').lower() %}
+                <tr>
+                    <td style="font-weight: 600; color: #475569;">{{ item.hora }}</td>
+                    <td style="font-weight: 700; color: #64748b;">#{{ item.id }}</td>
+                    <td><strong style="color: #0f172a;">Contr. #{{ item.id_contrato }}</strong></td>
+                    <td style="font-weight: 600;">{{ item.cliente }}</td>
+                    <td>
+                        {% if item.placa and item.placa != '-' %}
+                        <span class="badge-plate">{{ item.placa }}</span>
+                        {% else %}
+                        <span style="color: #94a3b8;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span>{{ item.tipo }}</span>
+                        {% if item.nota %}
+                        <small style="display: block; color: #64748b; font-size: 7pt; font-style: italic;">Note: {{ item.nota }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if 'cash' in forma or 'dinheiro' in forma %}
+                        <span class="badge-method method-cash">💵 Cash</span>
+                        {% elif 'card' in forma or 'cartao' in forma or 'cartão' in forma %}
+                        <span class="badge-method method-card-badge">💳 Card</span>
+                        {% elif 'transfer' in forma or 'bank' in forma %}
+                        <span class="badge-method method-bank">🏦 Bank</span>
+                        {% elif 'exchange' in forma or 'trade' in forma %}
+                        <span class="badge-method method-exchange">🛵 Exchange</span>
+                        {% elif 'deposit' in forma %}
+                        <span class="badge-method method-deposit-badge">🔄 Deposit</span>
+                        {% else %}
+                        <span class="badge-method">{{ item.forma_especifica }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="color: #64748b; font-size: 7.5pt;">{{ item.registrado_por or '-' }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0f172a;">£{{ "%.2f"|format(item.valor) }}</td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b; font-size: 9pt;">
+                        No payment transactions recorded on {{ data_formatada }}.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="8" style="text-align: right; text-transform: uppercase; font-size: 8pt; color: #334155;">
+                    Total Cleared Collections for {{ data_formatada }}:
+                </td>
+                <td style="text-align: right; font-size: 10pt; font-weight: 800; color: #047857;">
+                    £{{ "%.2f"|format(total_arrecadado) }}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+
+    <!-- Formal Sign-Off Section -->
+    <div class="signoff-box">
+        <div class="signoff-card">
+            <div class="signoff-title">1. Cashier / Counter Staff Verification</div>
+            <div class="signoff-line">
+                <span>Staff Name:</span>
+                <strong>{{ operador }}</strong>
+            </div>
+            <div class="signoff-line">
+                <span>Physical Till Checked:</span>
+                <strong>[ &nbsp; ] Verified & Balanced</strong>
+            </div>
+            <div class="signoff-line" style="margin-top: 1rem;">
+                <span>Signature:</span>
+                <span style="color: #cbd5e1;">_____________________________________</span>
+            </div>
+        </div>
+
+        <div class="signoff-card">
+            <div class="signoff-title">2. Duty Manager / Supervisor Sign-off</div>
+            <div class="signoff-line">
+                <span>Manager Name:</span>
+                <span style="color: #cbd5e1;">_____________________________________</span>
+            </div>
+            <div class="signoff-line">
+                <span>Safe Drop Executed:</span>
+                <strong>[ &nbsp; ] Yes &nbsp;&nbsp;&nbsp; [ &nbsp; ] N/A</strong>
+            </div>
+            <div class="signoff-line" style="margin-top: 1rem;">
+                <span>Signature:</span>
+                <span style="color: #cbd5e1;">_____________________________________</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <div>FF Motors (Gasparzinho LTD) &bull; Official Register Closing Sheet &bull; Confidential Internal Record</div>
+        <div>Page 1 of 1 &bull; System Timestamp: {{ data_geracao }}</div>
+    </div>
+
+</body>
+</html>

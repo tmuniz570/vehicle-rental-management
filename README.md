@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.13--Dashboard%20Hub%20%26%20Fleet%20PDF-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.17--Universal%20WhatsApp%20Format-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -104,11 +104,25 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Client-Side Image Compression:** Automatic compression via `browser-image-compression` converting high-res smartphone captures to lightweight WebP formats before upload, saving bandwidth and cloud storage.
 * **High-Definition Gallery:** Inspection modals with zoomable image grids and timestamped condition logs.
 
-### 💳 7. Financial Statements, Multi-Payment (Split) & Partial Settlements
+### 💳 7. Advanced Financial Hub, Cashing Up & High-Density Statements
+* **Smart Synchronized Filters (Status & Date Field Alignment):** Intelligent cross-filter tracking across the entire financial command center:
+  - Selecting `Paid Only` (or clicking `Collected Today` / `This Week`) automatically aligns the date control to `💳 Payment Date` and sets sorting to `data_pagamento desc` (newest collections first), ensuring quick pills (`Today`, `Yesterday`, `This Week`, etc.) and custom dates filter by actual money received, rather than original due date.
+  - Selecting `Pending Only`, `Overdue Only` or `Cancelled` automatically switches the date control to `📅 Due Date` and resets the payment method filter, preventing impossible empty states.
+  - Selecting a payment method (`Cash`, `Card`, `Bank Transfer`, etc.) automatically migrates status to `Paid` and date field to `Payment Date`.
+  - Selecting `Payment Date` directly while viewing pending charges automatically transitions status to `Paid`.
+  - Clicking `Today` from `Overdue` status gracefully shifts to `Pending` to show today's scheduled payments.
+  - Custom date inputs automatically deselect quick pills to eliminate visual contradictions.
+* **Centralized Financial Management Hub (`/financeiro`):** Comprehensive executive command center for financial operations with real-time KPI cards (Pending Collections, Overdue Debts, Collected Today, This Week / Month), 1-click date shortcut pills (Today, Yesterday, Week, Month, All Time), dynamic search, and multi-criteria filters (Status, Type, Method, Date Range, Page Size).
+* **High-Density Table Layout (Ultra-Compact):** Cell padding reduced by >50% (`0.35rem 0.55rem`) with tight `line-height: 1.25`, reducing row height to ~35px and doubling the visible records per viewport. Concise column headers (`#`, `Contr.`, `Customer`, `Bike`, `Type`, `Amount`, `Due Date`, `Payment`, `Status`, `Actions`) save over 160px of horizontal width, completely eliminating horizontal scroll bars on standard screens and laptops.
+* **Exact 1-Click Inline Filters:** Clicking inline search icons on contracts (`🔍`), customer names, or registration plates applies strict backend SQL parameters (`contrato_id`, `cliente_id`, `placa`) instead of fuzzy text searching, with an active filter pill indicator (`#activeFilterPillContainer`) for 100% exact filtering.
+* **Executive Daily Closing Sheet (`/financeiro/fechamento-caixa/print`):** Dedicated formal A4 printable statement for end-of-day register reconciliation, featuring a Grand Total Collected banner, payment method breakdowns, a physical cash drawer balancing box (opening float, expected cash, counted cash, variance), an itemized chronological payment ledger, and formal signature lines for cashier and manager safe drops.
+* **High Debt Risk Badge (`🔴 N Late`):** Proactive visual risk indicator automatically flagging customers who accumulate 2 or more overdue charges (`data_vencimento < inicio_hoje`), strictly excluding future scheduled weeks.
+* **Aesthetic WhatsApp Reminder Micro-Badge:** Compact horizontal translucent emerald badge (`✓ Just now`, `✓ Today 14:20`, `✓ 2h ago`, `✓ Yesterday`) aligned directly next to customer phone numbers, with full hover tooltips (operator name and exact recorded timestamp) and optimistic instant UI updates upon sending.
+* **Printable Executive Statement (`/financeiro/relatorio-pdf`):** Clean formal A4 printable/PDF report opening in the same window with institutional text typography and dynamic totals.
 * **Full Contract Ledger:** Itemized breakdown of Rent, Security Deposits, Fines, and Repair charges with status tracking (`Pending`, `Paid`, `Overdue`).
 * **Financial Statement Sorting & Pagination:** Interactive multi-column table sorting (Type, Amount, Due Date, Payment Date, Status) with directional indicator arrows, and smart pagination (10, 25, 50, All) while preserving contract-wide financial summary calculations.
 * **Multi-Payment Methods (Split Payments & Part-Exchange):** Seamless division of any charge across multiple simultaneous payment forms (Cash, Card, Bank Transfer, Exchange (Vehicle Trade-in), Deposit, Other).
-* **Intelligent Partial Settlement:** Clients can pay partial amounts towards any charge; the paid portion is receipted and the outstanding remainder is automatically spun off into a linked child balance transaction with the original due date.
+* **Intelligent Partial Settlement:** Clients can pay partial amounts towards any charge; the paid portion is receipted and the outstanding remainder is automatically spun off into a linked child balance transaction with the original due date (`⚡ Bal #ID`).
 * **Reversal with Auto-Merge:** Reverting a partial payment automatically re-merges child balance transactions back into the parent, maintaining immaculate ledger accuracy.
 * **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions. Charges due today remain pending for the entire day and strictly transition to overdue at 00:00:00 of the following day if unpaid.
 * **Receipt Printing & Payment Notes:** Optional payment note and reference field captured upon marking charges as paid (e.g. part-exchange bike details, bank transfer reference, discount authorizations). Notes appear on printable payment receipts, transaction ledgers, and audit logs.

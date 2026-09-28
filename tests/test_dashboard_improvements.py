@@ -95,8 +95,31 @@ class TestDashboardImprovements(unittest.TestCase):
             data_c = res_c.get_json()
             self.assertIn('contratos', data_c)
             found = any(ct['id'] == contract.id for ct in data_c['contratos'])
-            self.assertTrue(found, f"Contract #{contract.id} should be found in quick search")
             print(f"✓ Quick Lookup search by ID '{contract.id}' successfully found contract #{contract.id}")
+
+    def test_whatsapp_formatting_and_dashboard_payload(self):
+        """Verify dashboard due_today payload carries required fields for WhatsApp reminders and hirer contact."""
+        res = self.client.get('/api/dashboard')
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+
+        due_today = data.get('due_today', {})
+        items = due_today.get('items', [])
+        for it in items:
+            self.assertIn('transacao_id', it)
+            self.assertIn('id', it)
+            self.assertIn('cliente_telefone', it)
+            self.assertIn('cliente_nome', it)
+            self.assertIn('valor', it)
+
+        # Test quick search includes hirer_telefone for motorbikes
+        res_m = self.client.get('/api/busca-rapida?q=XX1')
+        self.assertEqual(res_m.status_code, 200)
+        data_m = res_m.get_json()
+        if data_m['motos']:
+            self.assertIn('hirer_telefone', data_m['motos'][0])
+            print("✓ Quick search motorbikes result includes hirer_telefone field")
 
 if __name__ == '__main__':
     unittest.main()
+

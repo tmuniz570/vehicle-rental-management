@@ -4,6 +4,104 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.17] — 2026-09-28 — *Unified Universal WhatsApp Link Formatting Across Dashboard & Fleet*
+
+### 💬 Normalização Universal de Links do WhatsApp
+* **Padronização Global E.164 (`window.formatWhatsAppNumber`) em `static/js/app_shared.js`**:
+  - Implementada função universal de formatação e higienização de telefones para deep links do WhatsApp (`https://wa.me/<digits>`), disponível globalmente em todas as telas da aplicação.
+  - **Tratamento Preciso do Padrão Britânico**:
+    - Telefones UK com prefixo local `07...` têm o `0` inicial substituído por `44` (`07360 123456` &rarr; `447360123456`), eliminando a mensagem de erro *"Phone number shared via url is invalid"* do WhatsApp.
+    - Suporte a digitação com 10 dígitos iniciando em `7` (`7360123456` &rarr; `447360123456`).
+    - Remoção do zero redundante em números com prefixo internacional e nacional misturados (`+44 07...` &rarr; `447...`).
+    - Higienização segura de números internacionais com `+` ou `00`.
+* **Correção dos Links do WhatsApp no Dashboard Principal (`templates/index.html`)**:
+  - **Seção "Payments Due Today"**: O botão `💬 Remind` agora utiliza `formatWhatsAppNumber`, gerando o link internacional correto com mensagem personalizada cordial em inglês britânico.
+  - **Timestamp Automático de Cobrança**: Ao clicar em `💬 Remind` no dashboard, o sistema dispara requisição assíncrona para `/api/financeiro/<id>/lembrete`, registrando o horário e operador que enviou a cobrança.
+  - **Badge de Status**: Exibição da etiqueta `✓ Reminded` caso a cobrança já tenha recebido lembrete.
+  - **Busca Rápida Universal (Quick Search)**:
+    - Cartões de **Customers**: Adicionado atalho direto com botão `💬` formatado ao lado do telefone para iniciar conversa imediata com o cliente.
+    - Cartões de **Motorbikes**: Para motos alugadas com condutor ativo, o telefone do condutor recebe atalho direto com botão `💬` no popover de busca.
+* **Sincronização em Todo o Ecossistema**:
+  - Unificação em `static/js/financeiro.js`, `static/js/motos.js`, `static/js/clientes.js` e `static/js/detalhe_contrato.js`.
+  - Cachebusters incrementados (`app_shared.js?v=6`, `financeiro.js?v=21`, `motos.js?v=14`).
+
+## [1.9.16] — 2026-09-28 — *Smart Synchronized Financial Filters (Paid -> Payment Date, Pending -> Due Date)*
+
+### 🔄 Sincronização Inteligente de Filtros de Status e Datas
+* **Acompanhamento Automático de Campo de Data por Status**:
+  - **Status `Paid` (Pagos) &rarr; Data de Pagamento (`Payment Date`)**:
+    - Ao selecionar `Paid Only` (ou via cards de KPI `Collected Today` / `This Week`), o seletor de data alterna automaticamente para `💳 Payment Date` (`campoData = 'pagamento'`), garantindo que períodos rápidos como `Today`, `Yesterday`, `This Week` e datas manuais filtrem estritamente as cobranças **efetivamente pagas/arrecadadas no período**, em vez de filtrar por quando elas venciam.
+    - Ordenação padrão sincronizada para `data_pagamento desc` (recebimentos mais recentes no topo).
+  - **Status `Pending` / `Overdue` / `Cancelled` &rarr; Data de Vencimento (`Due Date`)**:
+    - Ao selecionar `Pending Only`, `Overdue Only` ou `Cancelled`, o seletor de data alterna automaticamente para `📅 Due Date` (`campoData = 'vencimento'`), impedindo que filtros por data de pagamento (inexistente em não pagos) resultem em listagens vazias.
+    - Qualquer método de pagamento selecionado é automaticamente limpo (já que transações pendentes não possuem forma de pagamento).
+    - Ordenação padrão sincronizada para `data_vencimento asc` (vencimentos mais próximos no topo).
+  - **Seleção Manual de Data de Pagamento**:
+    - Ao selecionar manualmente `💳 Payment Date` no dropdown quando o status estiver em `Pending` ou `Overdue`, o sistema migra automaticamente o status para `Paid Only`.
+  - **Seleção de Forma de Pagamento (`Method`)**:
+    - Ao filtrar por um método específico (`Cash`, `Card`, `Bank Transfer`, etc.), o sistema migra automaticamente o status para `Paid Only` e ativa a data de pagamento.
+  - **Cards de KPI**:
+    - `cardKpiPending` e `cardKpiOverdue` reconfiguram o campo de data para `vencimento` e removem eventuais filtros de método.
+    - `cardKpiToday` e `cardKpiWeek` ativam status `Paid`, campo de data `pagamento`, período rápido correspondente e ordenação decrescente por pagamento.
+  - **Pills de Atalho de Período (`Today`, `Yesterday`, etc.)**:
+    - Se o operador estiver na visualização `Overdue` e clicar em `Today`, o status migra inteligentemente para `Pending` para exibir os lançamentos que vencem hoje (já que atrasados, por definição contábil britânica, só contemplam datas anteriores a hoje).
+    - Edição manual dos campos `From` / `To` desmarca as pílulas para evitar estados visuais contraditórios, reativando `All Time` caso os campos sejam esvaziados.
+  - **Botão de Fechar Pílula de Filtro Exato (`#btnRemoveActiveFilter`)**:
+    - Implementado listener para o botão `✕`, permitindo remover contratos, clientes ou placas com um clique.
+
+### 🛡️ Proteção de Fallback no Backend (`app.py`)
+* **Tratamento Seguro de `campo_data` e Ordenação**:
+  - Nas rotas `/api/financeiro`, `/api/financeiro/exportar-csv` e `/financeiro/relatorio-pdf`, se `campo_data` não for explicitado e `status == 'paid'`, o backend assume `pagamento`.
+  - Se `status` for pendente ou overdue mas `campo_data == 'pagamento'`, o backend protege a consulta caindo com segurança para `data_vencimento`.
+  - No Relatório PDF A4 (`/financeiro/relatorio-pdf`), a ordenação respeita `data_pagamento desc` quando filtrado por pagamento e exibe a descrição no cabeçalho: `Date (Payment Date): ...` vs `Date (Due Date): ...`.
+
+## [1.9.15] — 2026-09-28 — *Financial High-Density UI, Exact Inline Filters, Daily Closing Sheet & Audit Refinements*
+
+### ⚡ Tabela Financeira de Alta Densidade (Ultra-Compact Layout)
+* **Redução Significativa da Altura das Linhas & Otimização de Espaço Vertical**:
+  - **Padding de Células Reduzido em >50%**: O espaçamento interno dos `td` da tabela financeira foi ajustado para `0.35rem 0.55rem` com `line-height: 1.25`, reduzindo a altura média das linhas de ~70px para ~35px.
+  - **Visualização Dobrada por Viewport**: O operador consegue visualizar aproximadamente o dobro de registros simultaneamente sem necessidade de scroll contínuo.
+  - **Badges e Botões Slim**: Tipografia de status e tipos refinada para `0.68rem - 0.74rem`, botões de ação enxutos (`3px 8px`, `Mark Paid`, `🧾 Rec.`, `↩ Rev.`), e alinhamento vertical centralizado.
+  - **Célula de Cliente Compacta**: Nome do cliente em linha única com badge de risco, e telefone, WhatsApp e chip de lembrete contíguos na linha inferior com espaçamento reduzido.
+
+### 📐 Enxugamento Horizontal da Tabela (Zero Barra de Rolagem)
+* **Cabeçalhos e Larguras Compactas**:
+  - Encurtamento de títulos de colunas para termos objetivos: `ID` &rarr; `#`, `Contract` &rarr; `Contr.` (exibindo `#ID 🔍`), `Motorbike` &rarr; `Bike`, `Type & Description` &rarr; `Type`, `Payment Date & Method` &rarr; `Payment`.
+  - Economia de mais de 160px na largura total da tabela, garantindo encaixe perfeito na viewport em telas padrão e laptops sem acionar barra de rolagem horizontal desnecessária.
+
+### 🔍 Filtros Inline Exatos (Exact Inline Filtering)
+* **Precisão de 100% sem Ruído de Busca Textual**:
+  - **Parâmetros Dedicados no Backend (`app.py`)**: Ao clicar nas lupas inline de contrato (`🔍`), nome do cliente ou placa da moto, a consulta envia parâmetros SQL estritos (`contrato_id`, `cliente_id`, `placa`) em vez de injetar texto difuso no `#searchInput`.
+  - **Pílula de Filtro Ativo (`#activeFilterPillContainer`)**: Exibição destacada no topo da tabela indicando o filtro em vigor (ex: `📋 Contract #1` ou `👤 Customer: John Doe`) com botão `✕` para cancelamento rápido.
+
+### 🖨️ Folha de Fechamento de Caixa Diário Executiva (*Daily Closing Sheet*)
+* **Documento Imprimível A4 Dedicado (`/financeiro/fechamento-caixa/print`)**:
+  - Substituição da impressão de tela do navegador (`window.print()`) por uma rota e template dedicado formal ([templates/relatorio_fechamento_caixa.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_fechamento_caixa.html)) diagramado para folha A4 e PDF.
+  - **Estrutura Completa de Caixa**: Cabeçalho institucional formal em texto puro (sem imagens de logo), banner com *Grand Total Arrecadado*, cards de método (*Cash in Till*, *Card Terminal*, *Bank Transfer*, *Trade-in*, *Deposit*).
+  - **Quadro de Conciliação Física de Gaveta**: Campos estruturados para anotação de Fundo de Troco Inicial (*Opening Float*), Dinheiro Esperado do Sistema, Dinheiro Físico Contado e Diferença / Quebra de Caixa (+/-).
+  - **Livro Cronológico de Entradas**: Listagem detalhada de todos os recebimentos do dia com horário, transação, contrato, cliente, placa, descrição, método e operador.
+  - **Auditoria & Sign-off**: Campos formais de assinatura para o operador de caixa (*Cashier Verification*) e para o gerente de plantão (*Duty Manager Sign-off & Safe Drop*).
+
+### 🚨 High Debt Risk Badge (Contagem Exclusiva de Vencidas)
+* **Correção da Métrica de Risco de Inadimplência**:
+  - A contagem de dívidas por cliente foi refinada no backend (`app.py`) para considerar **estritamente cobranças com data de vencimento no passado (`FinancialTransaction.data_vencimento < inicio_hoje`)** e status pendente.
+  - Parcelas de aluguel ou financiamento agendadas para semanas ou meses futuros deixam de poluir a contagem de risco.
+  - Badge reestilizada para `🔴 N Late` com tooltip indicativo de cobranças vencidas.
+
+### 💬 Lembrete de Cobrança WhatsApp Estético
+* **Micro-Badge Esmeralda Translúcido**:
+  - Exibição inline contígua ao número de telefone do cliente (`✓ Just now`, `✓ Today 14:20`, `✓ 2h ago`, `✓ Yesterday`).
+  - Tooltip completo ao passar o mouse contendo o nome do operador e a data/hora exata do registro.
+  - Atualização otimista instantânea na tela ao clicar no ícone do WhatsApp.
+
+### 🧹 Limpeza de Layout & Massa de Demonstração
+* **Remoção de Elementos Desnecessários**:
+  - Removido o botão e controle de seleção de pagamentos em lote (*Batch Pay Selection*).
+  - Removidas imagens de logomarca dos cabeçalhos dos relatórios imprimíveis A4 ([templates/relatorio_financeiro.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_financeiro.html) e [templates/relatorio_fechamento_caixa.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_fechamento_caixa.html)).
+* **Atualização dos Scripts Operacionais (`reset_data.py` & `seed_data.py`)**:
+  - Suporte completo às novas tabelas (`MotorcycleV5C`, `MotorcycleTracker`).
+  - População de cenários financeiros realistas para o dia de hoje (£740.00 arrecadados entre Dinheiro, Cartão, Transferência Bancária e Pagamento Misto/Split), além de transações com lembrete gravado e saldos devedores remanescentes (`⚡ Bal #1`).
+
 ## [1.9.14] — 2026-09-27 — *Universal Search Sold Bike Drilldown, Fleet Horizontal Zero-Scroll Optimization & DVLA Quick Actions*
 
 ### 📌 Menu Lateral Fixo / Sticky na Rolagem Vertical (`static/css/styles.css`)

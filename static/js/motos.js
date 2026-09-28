@@ -149,11 +149,14 @@ async function carregarMotos() {
                     const c = m.active_contract;
                     let waBtn = '';
                     if (c.cliente_telefone) {
-                        let phoneClean = c.cliente_telefone.replace(/\D/g, '');
-                        if (phoneClean.startsWith('0') && phoneClean.length === 11) {
-                            phoneClean = '44' + phoneClean.slice(1);
-                        }
-                        waBtn = `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>`;
+                        const phoneClean = (typeof formatWhatsAppNumber === 'function')
+                            ? formatWhatsAppNumber(c.cliente_telefone)
+                            : (() => {
+                                let w = c.cliente_telefone.replace(/\D/g, '');
+                                if (w.startsWith('0')) w = '44' + w.substring(1);
+                                return w;
+                            })();
+                        waBtn = phoneClean ? `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>` : '';
                     }
                     statusHtml = `
                         <div>

@@ -1,12 +1,28 @@
 function formatWhatsAppNumber(phone) {
+    if (typeof window.formatWhatsAppNumber === 'function' && window.formatWhatsAppNumber !== formatWhatsAppNumber) {
+        return window.formatWhatsAppNumber(phone);
+    }
     if (!phone) return '';
     const raw = String(phone).trim();
-    if (raw.startsWith('+')) return raw.replace(/\D/g, '');
-    if (raw.startsWith('00')) return raw.replace(/\D/g, '').substring(2);
+    if (!raw) return '';
+    if (raw.startsWith('+')) {
+        let digits = raw.replace(/\D/g, '');
+        if (digits.startsWith('440') && digits.length >= 12) digits = '44' + digits.substring(3);
+        return digits;
+    }
+    if (raw.startsWith('00')) {
+        let digits = raw.replace(/\D/g, '').substring(2);
+        if (digits.startsWith('440') && digits.length >= 12) digits = '44' + digits.substring(3);
+        return digits;
+    }
     const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
     if (digits.startsWith('0')) return '44' + digits.substring(1);
     if (digits.startsWith('7') && digits.length === 10) return '44' + digits;
-    if (digits.startsWith('44') && digits.length >= 11) return digits;
+    if (digits.startsWith('44')) {
+        if (digits.startsWith('440') && digits.length >= 12) return '44' + digits.substring(3);
+        return digits;
+    }
     return digits;
 }
 

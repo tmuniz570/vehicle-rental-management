@@ -1547,7 +1547,13 @@
 
         let html = '<div style="display: flex; flex-direction: column; gap: 0.65rem;">';
         items.forEach(item => {
-            const phoneClean = (item.cliente_telefone || '').replace(/\D/g, '');
+            const waNum = (typeof formatWhatsAppNumber === 'function')
+                ? formatWhatsAppNumber(item.cliente_telefone)
+                : (() => {
+                    let w = (item.cliente_telefone || '').replace(/\D/g, '');
+                    if (w.startsWith('0')) w = '44' + w.substring(1);
+                    return w;
+                })();
             const valorNum = Number(item.valor || item.valor_semanal || 0);
 
             // Determine charge type label and style
@@ -1589,7 +1595,7 @@
             const whatsappMsg = encodeURIComponent(
                 `Hello ${item.cliente_nome}, this is FF Motors. A friendly reminder that your ${chargeDescription} of £${valorNum.toFixed(2)} for motorbike ${plateOrRef} is due today. If you have already made this payment, please disregard this message. Thank you!`
             );
-            const waLink = phoneClean ? `https://wa.me/${phoneClean}?text=${whatsappMsg}` : '#';
+            const waLink = waNum ? `https://wa.me/${waNum}?text=${whatsappMsg}` : '#';
 
             html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0.9rem; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; gap: 0.5rem; flex-wrap: wrap;">
@@ -1606,12 +1612,13 @@
                             <span class="badge" style="${typeBadgeStyle} font-size: 0.7rem; padding: 1px 6px; font-weight: 600;">${escapeHtml(typeLabel)}</span>
                             <span>Due: <strong style="color: var(--accent);">${formatoMoeda.format(valorNum)}</strong></span>
                             ${item.cliente_telefone ? `<span>📞 ${escapeHtml(item.cliente_telefone)}</span>` : ''}
+                            ${item.ultimo_lembrete ? `<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.7rem; padding: 1px 5px;" title="Reminder sent ${escapeHtml(item.ultimo_lembrete_por ? 'by ' + item.ultimo_lembrete_por : '')}">✓ Reminded</span>` : ''}
                             ${item.nota ? `<span style="color: var(--text-secondary); font-size: 0.75rem; font-style: italic;">(${escapeHtml(item.nota)})</span>` : ''}
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        ${phoneClean ? `
-                            <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding: 5px 9px; font-size: 0.78rem; color: #22c55e; border-color: rgba(34, 197, 94, 0.35); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Send WhatsApp payment reminder">
+                        ${waNum ? `
+                            <a href="${waLink}" target="_blank" rel="noopener noreferrer" class="btn-action btn-dash-wa-reminder" data-id="${item.transacao_id || item.id || ''}" style="padding: 5px 9px; font-size: 0.78rem; color: #22c55e; border-color: rgba(34, 197, 94, 0.35); text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Send WhatsApp payment reminder">
                                 💬 Remind
                             </a>
                         ` : ''}
@@ -1630,6 +1637,16 @@
         });
         html += '</div>';
         container.innerHTML = html;
+
+        // Asynchronously record reminder timestamp on click
+        container.querySelectorAll('.btn-dash-wa-reminder').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tid = btn.getAttribute('data-id');
+                if (tid) {
+                    fetch(`/api/financeiro/${tid}/lembrete`, { method: 'POST' }).catch(() => {});
+                }
+            });
+        });
     }
 
     // Universal Quick Lookup Search
@@ -1683,6 +1700,10 @@
                             const motoFleetUrl = `/motos?search=${encodeURIComponent(m.placa)}&status=all`;
                             const agreementId = m.contract_id || m.contrato_ativo_id;
 
+                            const hirerTel = m.hirer_telefone || '';
+                            const hirerWaNum = (hirerTel && typeof formatWhatsAppNumber === 'function') ? formatWhatsAppNumber(hirerTel) : '';
+                            const hirerWaBtn = hirerWaNum ? `<a href="https://wa.me/${hirerWaNum}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.82rem;" title="WhatsApp ${escapeHtml(m.hirer_name || m.cliente_atual)}" onclick="event.stopPropagation();">💬</a>` : '';
+
                             outHtml += `
                                 <div class="search-result-card">
                                     <a href="${motoFleetUrl}" class="search-card-main">
@@ -1697,7 +1718,7 @@
                                             <span style="font-size: 0.75rem; font-weight: 600; color: ${statusColor}; margin-left: auto;">● ${escapeHtml(m.status)}</span>
                                         </div>
                                         <div class="search-card-details">
-                                            ${(m.hirer_name || m.cliente_atual) ? `<span>👤 Driver: <strong style="color: var(--text-primary);">${escapeHtml(m.hirer_name || m.cliente_atual)}</strong></span>` : `<span style="color: var(--text-secondary);">No active driver</span>`}
+                                            ${(m.hirer_name || m.cliente_atual) ? `<span>👤 Driver: <strong style="color: var(--text-primary);">${escapeHtml(m.hirer_name || m.cliente_atual)}</strong>${hirerWaBtn}</span>` : `<span style="color: var(--text-secondary);">No active driver</span>`}
                                             ${m.milhagem ? `<span style="margin-left: 8px;">• ${Number(m.milhagem).toLocaleString()} miles</span>` : ''}
                                         </div>
                                     </a>
@@ -1733,6 +1754,9 @@
                                 typeBadge = `<span class="badge" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(59,130,246,0.14); color: #60a5fa; border: 1px solid rgba(59,130,246,0.28); flex-shrink: 0; font-weight: 600;">${escapeHtml(typeName)}</span>`;
                             }
 
+                            const waNum = (c.telefone && typeof formatWhatsAppNumber === 'function') ? formatWhatsAppNumber(c.telefone) : '';
+                            const waBtn = waNum ? `<a href="https://wa.me/${waNum}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp" onclick="event.stopPropagation();">💬</a>` : '';
+
                             outHtml += `
                                 <div class="search-result-card">
                                     <a href="${clientUrl}" class="search-card-main">
@@ -1745,7 +1769,7 @@
                                         </div>
                                         <div class="search-card-details">
                                             ${c.moto_placa ? `<span style="color: var(--accent); font-weight: 600; flex-shrink: 0;">🛵 ${escapeHtml(c.moto_placa)}</span>` : ''}
-                                            ${c.telefone ? `<span>📞 ${escapeHtml(c.telefone)}</span>` : ''}
+                                            ${c.telefone ? `<span style="display:inline-flex; align-items:center;">📞 ${escapeHtml(c.telefone)}${waBtn}</span>` : ''}
                                             ${c.email ? `<span style="margin-left: 6px;">✉️ ${escapeHtml(c.email)}</span>` : ''}
                                             ${(!c.telefone && !c.email && !c.moto_placa) ? `<span>No active contract or contact info</span>` : ''}
                                         </div>

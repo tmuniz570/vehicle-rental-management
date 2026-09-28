@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Financial Report | FF Motors Birmingham</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 10mm 12mm 10mm 12mm;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #fff;
+            color: #0f172a;
+            padding: 1.5rem 2rem;
+            margin: 0;
+            font-size: 8.5pt;
+            line-height: 1.35;
+        }
+        h1, h2, h3, p { margin: 0; }
+        
+        .no-print {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .btn-action {
+            background: #0f172a;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .btn-action:hover {
+            background: #1e293b;
+        }
+        .btn-back {
+            background: #64748b;
+        }
+        .btn-back:hover {
+            background: #475569;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        .brand-title {
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .report-subtitle {
+            font-size: 0.95rem;
+            color: #475569;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+        .header-meta {
+            text-align: right;
+            font-size: 8pt;
+            color: #475569;
+        }
+        .filter-badge {
+            display: inline-block;
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 8pt;
+            margin-top: 4px;
+        }
+
+        .summary-bar {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.25rem;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.75rem;
+            text-align: center;
+        }
+        .summary-item {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e2e8f0;
+            padding: 0 0.5rem;
+        }
+        .summary-item:last-child {
+            border-right: none;
+        }
+        .summary-label {
+            font-size: 7pt;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #64748b;
+            letter-spacing: 0.5px;
+        }
+        .summary-value {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-top: 2px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8pt;
+        }
+        thead th {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+            text-align: left;
+            padding: 6px 8px;
+            border-top: 1px solid #cbd5e1;
+            border-bottom: 2px solid #94a3b8;
+            font-size: 7.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        tbody td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            color: #1e293b;
+            vertical-align: middle;
+        }
+        tbody tr:nth-child(even) {
+            background: #fafafa;
+        }
+        tbody tr {
+            page-break-inside: avoid;
+        }
+
+        .badge-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 7pt;
+            text-align: center;
+        }
+        .status-paid {
+            background: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+        }
+        .status-overdue {
+            background: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+        }
+        .status-pending {
+            background: #fef3c7;
+            color: #b45309;
+            border: 1px solid #fde68a;
+        }
+        .status-cancelled {
+            background: #f1f5f9;
+            color: #64748b;
+            border: 1px solid #cbd5e1;
+        }
+
+        .badge-plate {
+            display: inline-block;
+            background: #fef08a;
+            color: #000;
+            font-family: monospace;
+            font-weight: 800;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 7.5pt;
+            border: 1px solid #eab308;
+            letter-spacing: 0.5px;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 7.5pt;
+            color: #64748b;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="no-print">
+        <a href="/financeiro" class="btn-action btn-back">&larr; Back to Finance</a>
+        <button onclick="window.print()" class="btn-action">🖨️ Print / Save PDF</button>
+    </div>
+
+    <div class="header">
+        <div>
+            <div class="brand-title">
+                <span>FF MOTORS BIRMINGHAM</span>
+            </div>
+            <div class="report-subtitle">Official Financial Transactions Statement</div>
+            <div style="font-size: 7.5pt; color: #64748b; margin-top: 2px;">
+                109 Windmill Lane, Birmingham, B66 3EW &bull; Phone: 0121 492 0697 &bull; app.ffmotors.co.uk
+            </div>
+        </div>
+        <div class="header-meta">
+            <div><strong>Generated:</strong> {{ data_geracao }} (London Time)</div>
+            <div><strong>Staff Operator:</strong> {{ operador }}</div>
+            <div class="filter-badge">Filter: {{ filtro_ativo }}</div>
+        </div>
+    </div>
+
+    <div class="summary-bar">
+        <div class="summary-item">
+            <span class="summary-label">Total Transactions</span>
+            <span class="summary-value">{{ totais.total_count }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label">Total Amount</span>
+            <span class="summary-value">£{{ "%.2f"|format(totais.total_valor) }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label" style="color: #15803d;">Collected (Paid)</span>
+            <span class="summary-value" style="color: #15803d;">£{{ "%.2f"|format(totais.total_pago) }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label" style="color: #b45309;">Pending</span>
+            <span class="summary-value" style="color: #b45309;">£{{ "%.2f"|format(totais.total_pendente) }}</span>
+        </div>
+        <div class="summary-item">
+            <span class="summary-label" style="color: #b91c1c;">Overdue</span>
+            <span class="summary-value" style="color: #b91c1c;">£{{ "%.2f"|format(totais.total_overdue) }}</span>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 45px;">ID</th>
+                <th style="width: 70px;">Contract</th>
+                <th>Customer</th>
+                <th style="width: 75px;">Vehicle</th>
+                <th>Type & Description</th>
+                <th style="text-align: right; width: 75px;">Amount</th>
+                <th style="width: 75px;">Due Date</th>
+                <th>Payment & Method</th>
+                <th style="width: 70px; text-align: center;">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in transacoes %}
+            <tr>
+                <td style="font-weight: 700; color: #64748b;">#{{ t.id }}</td>
+                <td><strong>#{{ t.id_contrato }}</strong></td>
+                <td>
+                    <strong>{{ t.cliente or '-' }}</strong>
+                    {% if t.cliente_telefone %}
+                    <div style="font-size: 7pt; color: #64748b;">{{ t.cliente_telefone }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if t.placa %}
+                    <span class="badge-plate">{{ t.placa }}</span>
+                    {% else %}
+                    <span style="color: #94a3b8;">-</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong>{{ t.descricao }}</strong>
+                    {% if t.id_transacao_origem %}
+                    <div style="font-size: 7pt; color: #f59e0b; font-weight: 600;">⚡ Balance of #{{ t.id_transacao_origem }}</div>
+                    {% endif %}
+                </td>
+                <td style="text-align: right; font-weight: 700; font-size: 8.5pt;">
+                    £{{ "%.2f"|format(t.valor) }}
+                </td>
+                <td>
+                    {{ t.data_vencimento_fmt }}
+                    {% if t.is_overdue %}
+                    <span style="color: #ef4444; font-weight: 700;">⚠️</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if t.data_pagamento_fmt %}
+                    <strong>{{ t.data_pagamento_fmt }}</strong>
+                    <div style="font-size: 7pt; color: #64748b;">{{ t.forma_pagamento or 'Paid' }}</div>
+                    {% if t.nota %}
+                    <div style="font-size: 7pt; color: #475569; font-style: italic;">📝 {{ t.nota }}</div>
+                    {% endif %}
+                    {% else %}
+                    <span style="color: #94a3b8;">-</span>
+                    {% endif %}
+                </td>
+                <td style="text-align: center;">
+                    {% if t.status == 'Paid' %}
+                    <span class="badge-status status-paid">PAID</span>
+                    {% elif t.is_overdue %}
+                    <span class="badge-status status-overdue">OVERDUE</span>
+                    {% elif t.status == 'Pending' %}
+                    <span class="badge-status status-pending">PENDING</span>
+                    {% elif t.status == 'Cancelled' %}
+                    <span class="badge-status status-cancelled">CANCELLED</span>
+                    {% else %}
+                    <span class="badge-status">{{ t.status }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
+                    No transactions match the selected criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div>FF Motors Ltd &bull; Fleet Rental & Vehicle Sales Financial Record &bull; Confidential</div>
+        <div>Page 1 &bull; Document verified electronically</div>
+    </div>
+
+</body>
+</html>

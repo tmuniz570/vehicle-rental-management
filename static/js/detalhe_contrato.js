@@ -1,18 +1,27 @@
 function formatWhatsAppNumber(phone) {
+    if (typeof window.formatWhatsAppNumber === 'function' && window.formatWhatsAppNumber !== formatWhatsAppNumber) {
+        return window.formatWhatsAppNumber(phone);
+    }
     if (!phone) return '';
     const raw = String(phone).trim();
+    if (!raw) return '';
     
     // 1. If it already starts with '+', keep country code (strip non-digits)
     if (raw.startsWith('+')) {
-        return raw.replace(/\D/g, '');
+        let digits = raw.replace(/\D/g, '');
+        if (digits.startsWith('440') && digits.length >= 12) digits = '44' + digits.substring(3);
+        return digits;
     }
     
     // 2. If it starts with '00' (international prefix)
     if (raw.startsWith('00')) {
-        return raw.replace(/\D/g, '').substring(2);
+        let digits = raw.replace(/\D/g, '').substring(2);
+        if (digits.startsWith('440') && digits.length >= 12) digits = '44' + digits.substring(3);
+        return digits;
     }
     
     const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
     
     // 3. If UK number with leading 0 (e.g. 07360469902 -> 447360469902)
     if (digits.startsWith('0')) {
@@ -25,7 +34,8 @@ function formatWhatsAppNumber(phone) {
     }
     
     // 5. If already has 44 prefix (e.g. 447360469902)
-    if (digits.startsWith('44') && digits.length >= 11) {
+    if (digits.startsWith('44')) {
+        if (digits.startsWith('440') && digits.length >= 12) return '44' + digits.substring(3);
         return digits;
     }
     

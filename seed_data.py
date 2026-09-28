@@ -8,7 +8,7 @@ from app import app
 from database import (
     db, Motorcycle, Client, Contract, Inspection, FinancialTransaction, User, AuditLog, Claim,
     ContractAttachment, JobExecutionLock, MotoStatus, ContractStatus, InspectionType,
-    TransactionType, TransactionStatus, ContractType
+    TransactionType, TransactionStatus, ContractType, MotorcycleV5C, MotorcycleTracker
 )
 
 def seed():
@@ -53,6 +53,8 @@ def seed():
         Inspection.query.delete()
         Claim.query.delete()
         Contract.query.delete()
+        MotorcycleV5C.query.delete()
+        MotorcycleTracker.query.delete()
         Motorcycle.query.delete()
         Client.query.delete()
         JobExecutionLock.query.delete()
@@ -61,7 +63,7 @@ def seed():
         # Reset sqlite autoincrement sequence if SQLite
         conn = db.session.connection()
         try:
-            conn.execute(db.text("DELETE FROM sqlite_sequence WHERE name IN ('usuarios', 'clientes', 'contratos', 'contrato_anexos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims', 'job_locks');"))
+            conn.execute(db.text("DELETE FROM sqlite_sequence WHERE name IN ('usuarios', 'clientes', 'contratos', 'contrato_anexos', 'vistorias', 'financeiro_transacoes', 'logs_auditoria', 'claims', 'job_locks', 'moto_v5c', 'moto_trackers');"))
         except Exception:
             pass
         db.session.commit()
@@ -817,6 +819,140 @@ def seed():
             descricao=f"Contrato de Venda Parcelada #{ct_sale_inst.id} aberto para {client_ms.nome} ({moto_ms.placa}) por {u_staff1.nome} (Entrada: £1215.00, Saldo: £2000.00)",
             ip_origem="127.0.0.1"
         ))
+
+        # --- SEEDING RICH TODAY PAYMENTS & FINANCIAL AUDIT DATA ---
+        print("Seeding diverse payments for Today (Cash, Card, Bank, Exchange, Split) & WhatsApp Reminders...")
+        today_morning = datetime.combine(hoje_date, datetime.min.time())
+
+        # 1. Today's confirmed payments across all payment methods
+        t_today_1 = FinancialTransaction(
+            id_contrato=1,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=today_morning + timedelta(hours=9, minutes=30),
+            data_pagamento=today_morning + timedelta(hours=9, minutes=35),
+            valor=100.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Card",
+            nota="Weekly rent paid at counter via Barclaycard terminal",
+            registrado_por_nome=u_staff1.nome
+        )
+        t_today_2 = FinancialTransaction(
+            id_contrato=2,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=today_morning + timedelta(hours=10, minutes=15),
+            data_pagamento=today_morning + timedelta(hours=10, minutes=20),
+            valor=80.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Cash",
+            nota="Received £80 cash in till",
+            registrado_por_nome=u_staff2.nome
+        )
+        t_today_3 = FinancialTransaction(
+            id_contrato=3,
+            tipo=TransactionType.DEPOSIT.value,
+            data_vencimento=today_morning + timedelta(hours=11, minutes=45),
+            data_pagamento=today_morning + timedelta(hours=11, minutes=50),
+            valor=350.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Bank Transfer",
+            nota="Deposit paid via Faster Payments ref: DEP-BK22",
+            registrado_por_nome=u_admin.nome
+        )
+        t_today_4 = FinancialTransaction(
+            id_contrato=4,
+            tipo=TransactionType.FINE.value,
+            data_vencimento=today_morning + timedelta(hours=13, minutes=10),
+            data_pagamento=today_morning + timedelta(hours=13, minutes=15),
+            valor=65.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Card",
+            nota="Clean Air Zone penalty charge notice settlement",
+            registrado_por_nome=u_staff1.nome
+        )
+        t_today_5 = FinancialTransaction(
+            id_contrato=5,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=today_morning + timedelta(hours=14, minutes=30),
+            data_pagamento=today_morning + timedelta(hours=14, minutes=35),
+            valor=100.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Split",
+            detalhes_pagamento_json=json.dumps([{"forma": "Cash", "valor": 50.0}, {"forma": "Card", "valor": 50.0}]),
+            nota="Split payment: £50 Cash + £50 Card",
+            registrado_por_nome=u_staff2.nome
+        )
+        t_today_6 = FinancialTransaction(
+            id_contrato=6,
+            tipo=TransactionType.DAMAGE.value,
+            data_vencimento=today_morning + timedelta(hours=15, minutes=45),
+            data_pagamento=today_morning + timedelta(hours=15, minutes=50),
+            valor=45.0,
+            status=TransactionStatus.PAID.value,
+            forma_pagamento="Cash",
+            nota="Right mirror replacement part & fitting fee",
+            registrado_por_nome=u_staff1.nome
+        )
+        db.session.add_all([t_today_1, t_today_2, t_today_3, t_today_4, t_today_5, t_today_6])
+
+        # 2. Overdue transactions with WhatsApp Reminders and High Debt Risk (David Johnson - Contr. #12)
+        t_overdue_reminded_1 = FinancialTransaction(
+            id_contrato=12,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=hoje - timedelta(days=14),
+            data_pagamento=None,
+            valor=85.0,
+            status=TransactionStatus.PENDING.value,
+            ultimo_lembrete=hoje - timedelta(hours=2, minutes=15),
+            ultimo_lembrete_por=u_staff1.nome
+        )
+        t_overdue_reminded_2 = FinancialTransaction(
+            id_contrato=12,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=hoje - timedelta(days=7),
+            data_pagamento=None,
+            valor=85.0,
+            status=TransactionStatus.PENDING.value,
+            ultimo_lembrete=hoje - timedelta(minutes=40),
+            ultimo_lembrete_por=u_staff2.nome
+        )
+        t_overdue_reminded_3 = FinancialTransaction(
+            id_contrato=13,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=hoje - timedelta(days=8),
+            data_pagamento=None,
+            valor=80.0,
+            status=TransactionStatus.PENDING.value,
+            ultimo_lembrete=hoje - timedelta(days=1, hours=3),
+            ultimo_lembrete_por=u_staff1.nome
+        )
+        # Partial balance transaction with origin link (⚡ Bal #1)
+        t_balance_origin = FinancialTransaction(
+            id_contrato=1,
+            tipo=TransactionType.DAMAGE.value,
+            data_vencimento=hoje - timedelta(days=2),
+            data_pagamento=None,
+            valor=35.0,
+            status=TransactionStatus.PENDING.value,
+            id_transacao_origem=1,
+            nota="Remaining balance of £100 damage charge after partial £65 payment"
+        )
+        db.session.add_all([t_overdue_reminded_1, t_overdue_reminded_2, t_overdue_reminded_3, t_balance_origin])
+
+        # 3. Seed V5C & GPS Trackers for Fleet
+        v5c_data = [
+            MotorcycleV5C(placa="XX10YYY", url_arquivo="/static/uploads/demo_contract_scan.pdf", nome_original="V5C_XX10YYY.pdf", tipo_arquivo="pdf", criado_por_nome=u_admin.nome),
+            MotorcycleV5C(placa="FF27MOT", url_arquivo="/static/uploads/demo_vision_front.webp", nome_original="V5C_Logbook_Scan.png", tipo_arquivo="image", criado_por_nome=u_admin.nome),
+            MotorcycleV5C(placa="BK22NMX", url_arquivo="/static/uploads/demo_forza_front.webp", nome_original="V5C_BK22NMX.jpg", tipo_arquivo="image", criado_por_nome=u_staff1.nome),
+        ]
+        db.session.add_all(v5c_data)
+
+        trackers_data = [
+            MotorcycleTracker(placa="XX10YYY", numero="TRK-9821-XX", tipo_propriedade="Company", observacoes="Installed under rear tail cowling. SIM: Vodafone M2M."),
+            MotorcycleTracker(placa="FF27MOT", numero="TRK-4410-FF", tipo_propriedade="Company", observacoes="Installed under battery tray. SIM: EE Fleet."),
+            MotorcycleTracker(placa="BK22NMX", numero="CUST-TRK-771", tipo_propriedade="Customer", observacoes="Customer provided Apple AirTag + Monimoto device."),
+        ]
+        db.session.add_all(trackers_data)
+        db.session.flush()
 
         # Add recent staff payment received logs for rich audit stream
         recent_payments = FinancialTransaction.query.filter_by(status=TransactionStatus.PAID.value).limit(10).all()

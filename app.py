@@ -3680,18 +3680,53 @@ def listar_vistorias():
 @alugueis_required
 def listar_financeiro():
     page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 50, type=int)
+    limit = request.args.get('limit', 20, type=int)
+    if limit <= 0 or limit > 500:
+        limit = 500
     search = request.args.get('search', '', type=str)
+    contrato_id = request.args.get('contrato_id', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
+    placa_filtro = request.args.get('placa', '', type=str).strip()
     status_filtro = request.args.get('status', '', type=str)
     tipo_filtro = request.args.get('tipo', '', type=str)
+    metodo_filtro = request.args.get('metodo', '', type=str).strip()
     pendentes = request.args.get('pendentes') == 'true'
     data_inicio = request.args.get('data_inicio', '', type=str).strip()
     data_fim = request.args.get('data_fim', '', type=str).strip()
-    campo_data = request.args.get('campo_data', 'vencimento', type=str).strip().lower()
-    sort_by = request.args.get('sort_by', 'data_vencimento', type=str).strip().lower()
-    sort_order = request.args.get('sort_order', 'asc', type=str).strip().lower()
+    campo_data = request.args.get('campo_data', '', type=str).strip().lower()
+    if not campo_data:
+        if status_filtro and status_filtro.lower() in ['paid', 'pago']:
+            campo_data = 'pagamento'
+        else:
+            campo_data = 'vencimento'
+    elif campo_data == 'pagamento' and (status_filtro in ['overdue', 'vencidos', 'vencido', 'pending', 'pendente'] or pendentes):
+        campo_data = 'vencimento'
+
+    sort_by = request.args.get('sort_by', '', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', '', type=str).strip().lower()
+    if not sort_by:
+        if campo_data == 'pagamento' or (status_filtro and status_filtro.lower() in ['paid', 'pago']):
+            sort_by = 'data_pagamento'
+            if not sort_order:
+                sort_order = 'desc'
+        else:
+            sort_by = 'data_vencimento'
+            if not sort_order:
+                sort_order = 'asc'
+    elif not sort_order:
+        sort_order = 'desc' if sort_by in ['data_pagamento', 'pagamento'] else 'asc'
     
     query = FinancialTransaction.query.outerjoin(Contract, FinancialTransaction.id_contrato == Contract.id).outerjoin(Client, Contract.id_cliente == Client.id)
+    
+    # Precise Exact Filters (1-Click Filters)
+    if contrato_id:
+        query = query.filter(FinancialTransaction.id_contrato == contrato_id)
+    if cliente_id:
+        query = query.filter(Contract.id_cliente == cliente_id)
+    if placa_filtro:
+        placa_clean = placa_filtro.replace(' ', '')
+        query = query.filter(db.or_(Contract.placa.ilike(placa_clean), Contract.placa.ilike(placa_filtro)))
+
     if search:
         search_clean = search.strip().replace(' ', '')
         search_term = f"%{search.strip()}%"
@@ -3753,6 +3788,9 @@ def listar_financeiro():
         else:
             query = query.filter(FinancialTransaction.tipo == tipo_filtro)
 
+    if metodo_filtro:
+        query = query.filter(FinancialTransaction.forma_pagamento.ilike(f"%{metodo_filtro}%"))
+
     # Date Range Filter
     col_data = FinancialTransaction.data_pagamento if campo_data == 'pagamento' else FinancialTransaction.data_vencimento
     if data_inicio:
@@ -3789,6 +3827,24 @@ def listar_financeiro():
     paginated = query.options(
         contains_eager(FinancialTransaction.contrato).contains_eager(Contract.cliente)
     ).order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+
+    # Compute high-risk debt counts (overdue transactions per client)
+    client_ids = list(set([t.contrato.id_cliente for t in paginated.items if t.contrato and t.contrato.id_cliente]))
+    dividas_map = {}
+    if client_ids:
+        inicio_hoje = datetime.combine(get_london_date(), datetime.min.time())
+        contagem_dividas = db.session.query(
+            Contract.id_cliente,
+            db.func.count(FinancialTransaction.id)
+        ).join(
+            FinancialTransaction, Contract.id == FinancialTransaction.id_contrato
+        ).filter(
+            Contract.id_cliente.in_(client_ids),
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+            FinancialTransaction.data_vencimento < inicio_hoje
+        ).group_by(Contract.id_cliente).all()
+        for cid, cnt in contagem_dividas:
+            dividas_map[cid] = int(cnt or 0)
     
     itens = [{
         'id': t.id,
@@ -3805,7 +3861,12 @@ def listar_financeiro():
         'nota': t.nota,
         'registrado_por_nome': t.registrado_por_nome or '',
         'placa': t.contrato.placa if t.contrato else '',
-        'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else ''
+        'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else '',
+        'cliente_id': t.contrato.id_cliente if t.contrato else None,
+        'cliente_telefone': t.contrato.cliente.telefone if (t.contrato and t.contrato.cliente) else '',
+        'cliente_dividas_pendentes': dividas_map.get(t.contrato.id_cliente, 0) if (t.contrato and t.contrato.id_cliente) else 0,
+        'ultimo_lembrete': t.ultimo_lembrete.isoformat() if t.ultimo_lembrete else None,
+        'ultimo_lembrete_por': t.ultimo_lembrete_por or ''
     } for t in paginated.items]
     
     return jsonify({
@@ -3814,6 +3875,796 @@ def listar_financeiro():
         'paginas': paginated.pages,
         'pagina_atual': paginated.page
     })
+
+@app.route('/api/financeiro/<int:id>/lembrete', methods=['POST'])
+@alugueis_required
+def registrar_lembrete_cobranca(id):
+    t = db.session.get(FinancialTransaction, id)
+    if not t:
+        return jsonify({'error': 'Transaction not found', 'erro': 'Transação não encontrada'}), 404
+        
+    agora = get_local_now()
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'Staff'
+    t.ultimo_lembrete = agora
+    t.ultimo_lembrete_por = operador
+    db.session.commit()
+    
+    return jsonify({
+        'sucesso': True,
+        'message': 'Reminder logged successfully',
+        'mensagem': 'Lembrete registrado com sucesso',
+        'ultimo_lembrete': agora.isoformat(),
+        'ultimo_lembrete_por': operador
+    }), 200
+
+@app.route('/api/financeiro/pagar-lote', methods=['POST'])
+@alugueis_required
+def pagar_transacoes_lote():
+    data = request.get_json() or {}
+    ids = data.get('ids', [])
+    forma = (data.get('forma_pagamento') or 'Cash').strip()
+    nota = (data.get('nota') or '').strip() or None
+    
+    if not ids or not isinstance(ids, list):
+        return jsonify({'error': 'No transactions selected', 'erro': 'Nenhuma transação selecionada'}), 400
+        
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'Staff'
+    agora = get_local_now()
+    
+    transacoes = FinancialTransaction.query.filter(
+        FinancialTransaction.id.in_(ids),
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
+    ).all()
+    
+    if not transacoes:
+        return jsonify({'error': 'No pending transactions found for the selected IDs', 'erro': 'Nenhuma cobrança pendente encontrada para os IDs selecionados'}), 400
+        
+    total_pago = 0.0
+    qtd_pagas = 0
+    contratos_afetados = set()
+    
+    for t in transacoes:
+        t.status = TransactionStatus.PAID.value
+        t.data_pagamento = agora
+        t.forma_pagamento = forma
+        t.detalhes_pagamento_json = json.dumps([{'forma': forma, 'valor': float(t.valor)}])
+        if nota:
+            t.nota = f"{t.nota} | {nota}" if t.nota else nota
+        t.registrado_por_nome = operador
+        total_pago += float(t.valor)
+        qtd_pagas += 1
+        if t.contrato:
+            contratos_afetados.add(t.contrato)
+            
+    # Auto-conclusão para contratos de venda que tiveram todas as pendências quitadas
+    for c in contratos_afetados:
+        if c.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
+            pendentes = FinancialTransaction.query.filter(
+                FinancialTransaction.id_contrato == c.id,
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
+            ).count()
+            if pendentes == 0 and c.status != ContractStatus.COMPLETED.value:
+                c.status = ContractStatus.COMPLETED.value
+                registrar_log('CONTRACT_COMPLETED', 'Contract', c.id, f"Contrato de venda #{c.id} ({c.tipo_contrato}) concluído com sucesso após quitação integral em lote.")
+                
+    db.session.commit()
+    registrar_log('BATCH_PAYMENT', 'Transaction', f"{qtd_pagas} items", f"Baixa em lote de {qtd_pagas} cobranças (£{total_pago:.2f}) via {forma} por {operador}")
+    
+    return jsonify({
+        'sucesso': True,
+        'message': f'{qtd_pagas} payments recorded successfully',
+        'mensagem': f'{qtd_pagas} pagamentos registrados com sucesso',
+        'count': qtd_pagas,
+        'atualizados': qtd_pagas,
+        'total': round(total_pago, 2),
+        'total_pago': round(total_pago, 2)
+    }), 200
+
+@app.route('/api/financeiro/resumo', methods=['GET'])
+@alugueis_required
+def financeiro_resumo():
+    agora_london = get_london_now()
+    hoje_inicio = agora_london.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    hoje_fim = hoje_inicio + timedelta(days=1)
+    inicio_semana = hoje_inicio - timedelta(days=agora_london.weekday())
+    inicio_mes = hoje_inicio.replace(day=1)
+    
+    # 1. Total Pendente
+    res_pend = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
+    ).first()
+    total_pendente = float(res_pend[0] or 0.0)
+    qtd_pendente = int(res_pend[1] or 0)
+    
+    # 2. Overdue (Vencidos)
+    res_overdue = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento < hoje_inicio
+    ).first()
+    total_overdue = float(res_overdue[0] or 0.0)
+    qtd_overdue = int(res_overdue[1] or 0)
+    
+    # 3. Recebido Hoje
+    res_hoje = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= hoje_inicio,
+        FinancialTransaction.data_pagamento < hoje_fim
+    ).first()
+    total_hoje = float(res_hoje[0] or 0.0)
+    qtd_hoje = int(res_hoje[1] or 0)
+    
+    # 4. Recebido na Semana
+    res_semana = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= inicio_semana,
+        FinancialTransaction.data_pagamento < hoje_fim
+    ).first()
+    total_semana = float(res_semana[0] or 0.0)
+    qtd_semana = int(res_semana[1] or 0)
+    
+    # 5. Recebido no Mês
+    res_mes = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= inicio_mes,
+        FinancialTransaction.data_pagamento < hoje_fim
+    ).first()
+    total_mes = float(res_mes[0] or 0.0)
+    qtd_mes = int(res_mes[1] or 0)
+    
+    return jsonify({
+        'pendente': {'total': round(total_pendente, 2), 'qtd': qtd_pendente},
+        'overdue': {'total': round(total_overdue, 2), 'qtd': qtd_overdue},
+        'hoje': {'total': round(total_hoje, 2), 'qtd': qtd_hoje},
+        'semana': {'total': round(total_semana, 2), 'qtd': qtd_semana},
+        'mes': {'total': round(total_mes, 2), 'qtd': qtd_mes}
+    })
+
+@app.route('/api/financeiro/fechamento-caixa', methods=['GET'])
+@alugueis_required
+def fechamento_caixa():
+    data_str = request.args.get('data', '').strip()
+    if data_str:
+        try:
+            target_date = datetime.strptime(data_str, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = get_london_date()
+    else:
+        target_date = get_london_date()
+        
+    inicio_dia = datetime.combine(target_date, datetime.min.time())
+    fim_dia = inicio_dia + timedelta(days=1)
+    
+    transacoes = FinancialTransaction.query.options(
+        joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= inicio_dia,
+        FinancialTransaction.data_pagamento < fim_dia
+    ).order_by(FinancialTransaction.data_pagamento.asc()).all()
+    
+    metodos_resumo = {
+        'Cash': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Card': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Bank Transfer': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Exchange': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Deposit': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Other': {'total': 0.0, 'qtd': 0, 'itens': []}
+    }
+    
+    total_dia = 0.0
+    
+    for t in transacoes:
+        v_total = float(t.valor)
+        total_dia += v_total
+        
+        detalhes = None
+        if t.detalhes_pagamento_json:
+            try:
+                detalhes = json.loads(t.detalhes_pagamento_json)
+            except Exception:
+                detalhes = None
+                
+        hora_fmt = t.data_pagamento.strftime('%H:%M') if t.data_pagamento else '--:--'
+        base_item = {
+            'id': t.id,
+            'id_contrato': t.id_contrato,
+            'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else 'Unknown',
+            'placa': t.contrato.placa if t.contrato else '-',
+            'tipo': obter_descricao_recibo_simples(t.tipo),
+            'hora': hora_fmt,
+            'nota': t.nota or '',
+            'registrado_por': t.registrado_por_nome or ''
+        }
+        
+        if detalhes and isinstance(detalhes, list) and len(detalhes) > 0:
+            for d in detalhes:
+                forma = (d.get('forma') or 'Other').strip()
+                v_parte = float(d.get('valor') or 0.0)
+                
+                key = 'Other'
+                forma_lower = forma.lower()
+                if 'cash' in forma_lower or 'dinheiro' in forma_lower:
+                    key = 'Cash'
+                elif 'card' in forma_lower or 'cartao' in forma_lower or 'cartão' in forma_lower:
+                    key = 'Card'
+                elif 'transfer' in forma_lower or 'bank' in forma_lower or 'banco' in forma_lower:
+                    key = 'Bank Transfer'
+                elif 'exchange' in forma_lower or 'trade' in forma_lower or 'troca' in forma_lower:
+                    key = 'Exchange'
+                elif 'deposit' in forma_lower or 'deposito' in forma_lower or 'depósito' in forma_lower:
+                    key = 'Deposit'
+                    
+                metodos_resumo[key]['total'] += v_parte
+                metodos_resumo[key]['qtd'] += 1
+                item_copy = dict(base_item)
+                item_copy['valor'] = v_parte
+                item_copy['forma_especifica'] = forma
+                metodos_resumo[key]['itens'].append(item_copy)
+        else:
+            forma = (t.forma_pagamento or 'Cash').strip()
+            key = 'Other'
+            forma_lower = forma.lower()
+            if 'cash' in forma_lower or 'dinheiro' in forma_lower:
+                key = 'Cash'
+            elif 'card' in forma_lower or 'cartao' in forma_lower or 'cartão' in forma_lower:
+                key = 'Card'
+            elif 'transfer' in forma_lower or 'bank' in forma_lower or 'banco' in forma_lower:
+                key = 'Bank Transfer'
+            elif 'exchange' in forma_lower or 'trade' in forma_lower or 'troca' in forma_lower:
+                key = 'Exchange'
+            elif 'deposit' in forma_lower or 'deposito' in forma_lower or 'depósito' in forma_lower:
+                key = 'Deposit'
+                
+            metodos_resumo[key]['total'] += v_total
+            metodos_resumo[key]['qtd'] += 1
+            item_copy = dict(base_item)
+            item_copy['valor'] = v_total
+            item_copy['forma_especifica'] = forma
+            metodos_resumo[key]['itens'].append(item_copy)
+
+    for k in metodos_resumo:
+        metodos_resumo[k]['total'] = round(metodos_resumo[k]['total'], 2)
+
+    return jsonify({
+        'data': target_date.strftime('%Y-%m-%d'),
+        'data_formatada': target_date.strftime('%d/%m/%Y'),
+        'total_arrecadado': round(total_dia, 2),
+        'total_transacoes': len(transacoes),
+        'metodos': metodos_resumo
+    })
+
+
+@app.route('/financeiro/fechamento-caixa/print', methods=['GET'])
+@alugueis_required
+def relatorio_fechamento_caixa_print():
+    data_str = request.args.get('data', '').strip()
+    if data_str:
+        try:
+            target_date = datetime.strptime(data_str, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = get_london_date()
+    else:
+        target_date = get_london_date()
+        
+    inicio_dia = datetime.combine(target_date, datetime.min.time())
+    fim_dia = inicio_dia + timedelta(days=1)
+    
+    transacoes = FinancialTransaction.query.options(
+        joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= inicio_dia,
+        FinancialTransaction.data_pagamento < fim_dia
+    ).order_by(FinancialTransaction.data_pagamento.asc()).all()
+    
+    metodos_resumo = {
+        'Cash': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Card': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Bank Transfer': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Exchange': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Deposit': {'total': 0.0, 'qtd': 0, 'itens': []},
+        'Other': {'total': 0.0, 'qtd': 0, 'itens': []}
+    }
+    
+    total_dia = 0.0
+    itens_todos = []
+    
+    for t in transacoes:
+        v_total = float(t.valor)
+        total_dia += v_total
+        
+        detalhes = None
+        if t.detalhes_pagamento_json:
+            try:
+                detalhes = json.loads(t.detalhes_pagamento_json)
+            except Exception:
+                detalhes = None
+                
+        hora_fmt = t.data_pagamento.strftime('%H:%M') if t.data_pagamento else '--:--'
+        base_item = {
+            'id': t.id,
+            'id_contrato': t.id_contrato,
+            'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else 'Unknown',
+            'placa': t.contrato.placa if t.contrato else '-',
+            'tipo': obter_descricao_recibo_simples(t.tipo),
+            'hora': hora_fmt,
+            'nota': t.nota or '',
+            'registrado_por': t.registrado_por_nome or ''
+        }
+        
+        if detalhes and isinstance(detalhes, list) and len(detalhes) > 0:
+            for d in detalhes:
+                forma = (d.get('forma') or 'Other').strip()
+                v_parte = float(d.get('valor') or 0.0)
+                
+                key = 'Other'
+                forma_lower = forma.lower()
+                if 'cash' in forma_lower or 'dinheiro' in forma_lower:
+                    key = 'Cash'
+                elif 'card' in forma_lower or 'cartao' in forma_lower or 'cartão' in forma_lower:
+                    key = 'Card'
+                elif 'transfer' in forma_lower or 'bank' in forma_lower or 'banco' in forma_lower:
+                    key = 'Bank Transfer'
+                elif 'exchange' in forma_lower or 'trade' in forma_lower or 'troca' in forma_lower:
+                    key = 'Exchange'
+                elif 'deposit' in forma_lower or 'deposito' in forma_lower or 'depósito' in forma_lower:
+                    key = 'Deposit'
+                    
+                metodos_resumo[key]['total'] += v_parte
+                metodos_resumo[key]['qtd'] += 1
+                item_copy = dict(base_item)
+                item_copy['valor'] = v_parte
+                item_copy['forma_especifica'] = forma
+                metodos_resumo[key]['itens'].append(item_copy)
+                itens_todos.append(item_copy)
+        else:
+            forma = (t.forma_pagamento or 'Cash').strip()
+            key = 'Other'
+            forma_lower = forma.lower()
+            if 'cash' in forma_lower or 'dinheiro' in forma_lower:
+                key = 'Cash'
+            elif 'card' in forma_lower or 'cartao' in forma_lower or 'cartão' in forma_lower:
+                key = 'Card'
+            elif 'transfer' in forma_lower or 'bank' in forma_lower or 'banco' in forma_lower:
+                key = 'Bank Transfer'
+            elif 'exchange' in forma_lower or 'trade' in forma_lower or 'troca' in forma_lower:
+                key = 'Exchange'
+            elif 'deposit' in forma_lower or 'deposito' in forma_lower or 'depósito' in forma_lower:
+                key = 'Deposit'
+                
+            metodos_resumo[key]['total'] += v_total
+            metodos_resumo[key]['qtd'] += 1
+            item_copy = dict(base_item)
+            item_copy['valor'] = v_total
+            item_copy['forma_especifica'] = forma
+            metodos_resumo[key]['itens'].append(item_copy)
+            itens_todos.append(item_copy)
+
+    for k in metodos_resumo:
+        metodos_resumo[k]['total'] = round(metodos_resumo[k]['total'], 2)
+
+    return render_template(
+        'relatorio_fechamento_caixa.html',
+        data_formatada=target_date.strftime('%d/%m/%Y'),
+        data_iso=target_date.strftime('%Y-%m-%d'),
+        data_geracao=get_london_now().strftime('%d/%m/%Y %H:%M'),
+        total_arrecadado=round(total_dia, 2),
+        total_transacoes=len(transacoes),
+        metodos=metodos_resumo,
+        itens=itens_todos,
+        operador=current_user.nome if (current_user and current_user.is_authenticated) else 'Duty Staff'
+    )
+
+
+@app.route('/api/financeiro/nova-cobranca', methods=['POST'])
+@alugueis_required
+def criar_cobranca_avulsa():
+    data = request.get_json() or {}
+    id_contrato = data.get('id_contrato')
+    tipo = (data.get('tipo') or '').strip()
+    valor_raw = data.get('valor')
+    data_venc_str = (data.get('data_vencimento') or '').strip()
+    nota = (data.get('nota') or '').strip() or None
+    
+    if not id_contrato or not tipo or not valor_raw or not data_venc_str:
+        return jsonify({'error': 'All fields (contract, type, amount, due date) are required.', 'erro': 'Campos obrigatórios ausentes.'}), 400
+        
+    contrato = db.session.get(Contract, id_contrato)
+    if not contrato:
+        return jsonify({'error': 'Contract not found.', 'erro': 'Contrato não encontrado.'}), 404
+        
+    try:
+        valor = round(float(valor_raw), 2)
+        if valor <= 0:
+            return jsonify({'error': 'Amount must be greater than zero.', 'erro': 'O valor deve ser maior que zero.'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid amount.', 'erro': 'Valor inválido.'}), 400
+        
+    try:
+        data_vencimento = datetime.strptime(data_venc_str, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({'error': 'Invalid due date format (YYYY-MM-DD).', 'erro': 'Formato de data inválido.'}), 400
+        
+    tipo_map = {
+        'fine': TransactionType.FINE.value,
+        'damage': TransactionType.DAMAGE.value,
+        'rent': TransactionType.RENT.value,
+        'deposit': TransactionType.DEPOSIT.value,
+        'admin_fee': 'Admin_Fee',
+        'extra': 'Accessory_Extra',
+        'other': 'Other'
+    }
+    tipo_final = tipo_map.get(tipo.lower(), tipo)
+    
+    nova = FinancialTransaction(
+        id_contrato=contrato.id,
+        tipo=tipo_final,
+        valor=valor,
+        data_vencimento=data_vencimento,
+        status=TransactionStatus.PENDING.value,
+        nota=nota
+    )
+    db.session.add(nova)
+    db.session.commit()
+    
+    operador = current_user.nome if (current_user and current_user.is_authenticated) else 'Staff'
+    registrar_log('CREATE_CHARGE', 'Transaction', nova.id, f"Cobrança avulsa de £{valor:.2f} ({tipo_final}) criada por {operador} para Contrato #{contrato.id}")
+    
+    return jsonify({
+        'message': 'Charge created successfully',
+        'mensagem': 'Cobrança criada com sucesso',
+        'id': nova.id
+    }), 201
+
+@app.route('/api/financeiro/exportar-csv', methods=['GET'])
+@alugueis_required
+def exportar_financeiro_csv():
+    import io
+    import csv
+    
+    search = request.args.get('search', '', type=str)
+    contrato_id = request.args.get('contrato_id', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
+    placa_filtro = request.args.get('placa', '', type=str).strip()
+    status_filtro = request.args.get('status', '', type=str)
+    tipo_filtro = request.args.get('tipo', '', type=str)
+    metodo_filtro = request.args.get('metodo', '', type=str).strip()
+    pendentes = request.args.get('pendentes') == 'true'
+    data_inicio = request.args.get('data_inicio', '', type=str).strip()
+    data_fim = request.args.get('data_fim', '', type=str).strip()
+    campo_data = request.args.get('campo_data', '', type=str).strip().lower()
+    if not campo_data:
+        if status_filtro and status_filtro.lower() in ['paid', 'pago']:
+            campo_data = 'pagamento'
+        else:
+            campo_data = 'vencimento'
+    elif campo_data == 'pagamento' and (status_filtro in ['overdue', 'vencidos', 'vencido', 'pending', 'pendente'] or pendentes):
+        campo_data = 'vencimento'
+    
+    query = FinancialTransaction.query.outerjoin(Contract, FinancialTransaction.id_contrato == Contract.id).outerjoin(Client, Contract.id_cliente == Client.id)
+    if contrato_id:
+        query = query.filter(FinancialTransaction.id_contrato == contrato_id)
+    if cliente_id:
+        query = query.filter(Contract.id_cliente == cliente_id)
+    if placa_filtro:
+        placa_clean = placa_filtro.replace(' ', '')
+        query = query.filter(db.or_(Contract.placa.ilike(placa_clean), Contract.placa.ilike(placa_filtro)))
+    if search:
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
+        query = query.filter(db.or_(
+            FinancialTransaction.id.cast(db.String).ilike(search_term),
+            FinancialTransaction.id_contrato.cast(db.String).ilike(search_term),
+            FinancialTransaction.tipo.ilike(search_term),
+            FinancialTransaction.status.ilike(search_term),
+            FinancialTransaction.forma_pagamento.ilike(search_term),
+            FinancialTransaction.nota.ilike(search_term),
+            FinancialTransaction.valor.cast(db.String).ilike(search_term),
+            Contract.placa.ilike(search_plate_term),
+            Contract.placa.ilike(search_term),
+            Client.nome.ilike(search_term)
+        ))
+        
+    if status_filtro:
+        if status_filtro.lower() in ['overdue', 'vencidos', 'vencido']:
+            inicio_hoje = get_london_now().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            query = query.filter(
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+                FinancialTransaction.data_vencimento < inicio_hoje
+            )
+        elif status_filtro.lower() in ['paid', 'pago']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']))
+        elif status_filtro.lower() in ['cancelled', 'cancelado']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.CANCELLED.value, 'Cancelled', 'Cancelado']))
+        elif status_filtro.lower() in ['pending', 'pendente']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
+        else:
+            query = query.filter(FinancialTransaction.status == status_filtro)
+    elif pendentes:
+        query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
+        
+    if tipo_filtro:
+        tipo_lower = tipo_filtro.lower()
+        if tipo_lower in ['sales_all', 'sales', 'vendas']:
+            query = query.filter(FinancialTransaction.tipo.in_([
+                TransactionType.SALE_FULL.value, TransactionType.SALE_DEPOSIT.value, TransactionType.SALE_INSTALLMENT.value,
+                'Sale_Full', 'Sale_Deposit', 'Sale_Installment', 'Venda_Vista', 'Venda_Entrada', 'Venda_Parcela'
+            ]))
+        elif tipo_lower in ['sale_full', 'venda_vista']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_FULL.value, 'Sale_Full', 'Venda_Vista']))
+        elif tipo_lower in ['sale_deposit', 'venda_entrada']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_DEPOSIT.value, 'Sale_Deposit', 'Venda_Entrada']))
+        elif tipo_lower in ['sale_installment', 'venda_parcela']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_INSTALLMENT.value, 'Sale_Installment', 'Venda_Parcela']))
+        elif tipo_lower in ['rent', 'aluguel']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']))
+        elif tipo_lower in ['deposit', 'deposito', 'depósito']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']))
+        elif tipo_lower in ['deposit_refund', 'devolucao_deposito']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']))
+        elif tipo_lower in ['fine', 'multa']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.FINE.value, 'Fine', 'Multa']))
+        elif tipo_lower in ['damage', 'dano']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DAMAGE.value, 'Damage', 'Dano']))
+        else:
+            query = query.filter(FinancialTransaction.tipo == tipo_filtro)
+
+    if metodo_filtro:
+        query = query.filter(FinancialTransaction.forma_pagamento.ilike(f"%{metodo_filtro}%"))
+
+    col_data = FinancialTransaction.data_pagamento if campo_data == 'pagamento' else FinancialTransaction.data_vencimento
+    if data_inicio:
+        try:
+            dt_ini = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(col_data >= dt_ini)
+        except ValueError:
+            pass
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(col_data < dt_fim)
+        except ValueError:
+            pass
+
+    transacoes = query.order_by(FinancialTransaction.data_vencimento.desc()).all()
+    
+    output = io.StringIO()
+    output.write('\ufeff')
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+    
+    writer.writerow([
+        'Transaction ID', 'Contract ID', 'Customer Name', 'Customer Phone', 'Motorbike Reg',
+        'Type', 'Description', 'Amount (£)', 'Due Date', 'Payment Date', 'Status',
+        'Payment Method', 'Payment Note / Reference', 'Registered By'
+    ])
+    
+    for t in transacoes:
+        cli_nome = t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else ''
+        cli_tel = t.contrato.cliente.telefone if (t.contrato and t.contrato.cliente) else ''
+        placa = t.contrato.placa if t.contrato else ''
+        dt_venc = t.data_vencimento.strftime('%d/%m/%Y') if t.data_vencimento else ''
+        dt_pag = t.data_pagamento.strftime('%d/%m/%Y %H:%M') if t.data_pagamento else ''
+        desc = obter_descricao_recibo_simples(t.tipo)
+        
+        writer.writerow([
+            t.id,
+            t.id_contrato,
+            cli_nome,
+            cli_tel,
+            placa,
+            t.tipo,
+            desc,
+            f"{float(t.valor):.2f}",
+            dt_venc,
+            dt_pag,
+            t.status,
+            t.forma_pagamento or '',
+            t.nota or '',
+            t.registrado_por_nome or ''
+        ])
+        
+    csv_bytes = output.getvalue().encode('utf-8')
+    filename = f"ffmotors_financial_{get_london_date().strftime('%Y%m%d')}.csv"
+    
+    return Response(
+        csv_bytes,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.route('/financeiro/relatorio-pdf', methods=['GET'])
+@alugueis_required
+def relatorio_financeiro_pdf():
+    search = request.args.get('search', '', type=str)
+    contrato_id = request.args.get('contrato_id', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
+    placa_filtro = request.args.get('placa', '', type=str).strip()
+    status_filtro = request.args.get('status', '', type=str)
+    tipo_filtro = request.args.get('tipo', '', type=str)
+    metodo_filtro = request.args.get('metodo', '', type=str).strip()
+    pendentes = request.args.get('pendentes') == 'true'
+    data_inicio = request.args.get('data_inicio', '', type=str).strip()
+    data_fim = request.args.get('data_fim', '', type=str).strip()
+    campo_data = request.args.get('campo_data', '', type=str).strip().lower()
+    if not campo_data:
+        if status_filtro and status_filtro.lower() in ['paid', 'pago']:
+            campo_data = 'pagamento'
+        else:
+            campo_data = 'vencimento'
+    elif campo_data == 'pagamento' and (status_filtro in ['overdue', 'vencidos', 'vencido', 'pending', 'pendente'] or pendentes):
+        campo_data = 'vencimento'
+    
+    query = FinancialTransaction.query.outerjoin(Contract, FinancialTransaction.id_contrato == Contract.id).outerjoin(Client, Contract.id_cliente == Client.id)
+    if contrato_id:
+        query = query.filter(FinancialTransaction.id_contrato == contrato_id)
+    if cliente_id:
+        query = query.filter(Contract.id_cliente == cliente_id)
+    if placa_filtro:
+        placa_clean = placa_filtro.replace(' ', '')
+        query = query.filter(db.or_(Contract.placa.ilike(placa_clean), Contract.placa.ilike(placa_filtro)))
+    if search:
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
+        query = query.filter(db.or_(
+            FinancialTransaction.id.cast(db.String).ilike(search_term),
+            FinancialTransaction.id_contrato.cast(db.String).ilike(search_term),
+            FinancialTransaction.tipo.ilike(search_term),
+            FinancialTransaction.status.ilike(search_term),
+            FinancialTransaction.forma_pagamento.ilike(search_term),
+            FinancialTransaction.nota.ilike(search_term),
+            FinancialTransaction.valor.cast(db.String).ilike(search_term),
+            Contract.placa.ilike(search_plate_term),
+            Contract.placa.ilike(search_term),
+            Client.nome.ilike(search_term)
+        ))
+        
+    inicio_hoje = get_london_now().replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    
+    if status_filtro:
+        if status_filtro.lower() in ['overdue', 'vencidos', 'vencido']:
+            query = query.filter(
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+                FinancialTransaction.data_vencimento < inicio_hoje
+            )
+        elif status_filtro.lower() in ['paid', 'pago']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']))
+        elif status_filtro.lower() in ['cancelled', 'cancelado']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.CANCELLED.value, 'Cancelled', 'Cancelado']))
+        elif status_filtro.lower() in ['pending', 'pendente']:
+            query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
+        else:
+            query = query.filter(FinancialTransaction.status == status_filtro)
+    elif pendentes:
+        query = query.filter(FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']))
+        
+    if tipo_filtro:
+        tipo_lower = tipo_filtro.lower()
+        if tipo_lower in ['sales_all', 'sales', 'vendas']:
+            query = query.filter(FinancialTransaction.tipo.in_([
+                TransactionType.SALE_FULL.value, TransactionType.SALE_DEPOSIT.value, TransactionType.SALE_INSTALLMENT.value,
+                'Sale_Full', 'Sale_Deposit', 'Sale_Installment', 'Venda_Vista', 'Venda_Entrada', 'Venda_Parcela'
+            ]))
+        elif tipo_lower in ['sale_full', 'venda_vista']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_FULL.value, 'Sale_Full', 'Venda_Vista']))
+        elif tipo_lower in ['sale_deposit', 'venda_entrada']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_DEPOSIT.value, 'Sale_Deposit', 'Venda_Entrada']))
+        elif tipo_lower in ['sale_installment', 'venda_parcela']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.SALE_INSTALLMENT.value, 'Sale_Installment', 'Venda_Parcela']))
+        elif tipo_lower in ['rent', 'aluguel']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']))
+        elif tipo_lower in ['deposit', 'deposito', 'depósito']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']))
+        elif tipo_lower in ['deposit_refund', 'devolucao_deposito']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']))
+        elif tipo_lower in ['fine', 'multa']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.FINE.value, 'Fine', 'Multa']))
+        elif tipo_lower in ['damage', 'dano']:
+            query = query.filter(FinancialTransaction.tipo.in_([TransactionType.DAMAGE.value, 'Damage', 'Dano']))
+        else:
+            query = query.filter(FinancialTransaction.tipo == tipo_filtro)
+
+    if metodo_filtro:
+        query = query.filter(FinancialTransaction.forma_pagamento.ilike(f"%{metodo_filtro}%"))
+
+    col_data = FinancialTransaction.data_pagamento if campo_data == 'pagamento' else FinancialTransaction.data_vencimento
+    if data_inicio:
+        try:
+            dt_ini = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(col_data >= dt_ini)
+        except ValueError:
+            pass
+    if data_fim:
+        try:
+            dt_fim = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(col_data < dt_fim)
+        except ValueError:
+            pass
+
+    if campo_data == 'pagamento':
+        transacoes_raw = query.order_by(FinancialTransaction.data_pagamento.desc()).all()
+    else:
+        transacoes_raw = query.order_by(FinancialTransaction.data_vencimento.asc()).all()
+    
+    totais = {
+        'total_count': len(transacoes_raw),
+        'total_valor': 0.0,
+        'total_pago': 0.0,
+        'total_pendente': 0.0,
+        'total_overdue': 0.0
+    }
+    
+    lista = []
+    for t in transacoes_raw:
+        val = float(t.valor)
+        totais['total_valor'] += val
+        
+        st_lower = (t.status or '').lower()
+        is_paid = st_lower in ['paid', 'pago']
+        is_pending = st_lower in ['pending', 'pendente']
+        is_overdue = is_pending and (t.data_vencimento and t.data_vencimento < inicio_hoje)
+        
+        if is_paid:
+            totais['total_pago'] += val
+        elif is_overdue:
+            totais['total_overdue'] += val
+            totais['total_pendente'] += val
+        elif is_pending:
+            totais['total_pendente'] += val
+            
+        lista.append({
+            'id': t.id,
+            'id_contrato': t.id_contrato,
+            'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else '',
+            'cliente_telefone': t.contrato.cliente.telefone if (t.contrato and t.contrato.cliente) else '',
+            'placa': t.contrato.placa if t.contrato else '',
+            'tipo': t.tipo,
+            'descricao': obter_descricao_recibo_simples(t.tipo),
+            'valor': val,
+            'data_vencimento_fmt': t.data_vencimento.strftime('%d/%m/%Y') if t.data_vencimento else '-',
+            'data_pagamento_fmt': t.data_pagamento.strftime('%d/%m/%Y %H:%M') if t.data_pagamento else None,
+            'status': t.status,
+            'forma_pagamento': t.forma_pagamento,
+            'nota': t.nota,
+            'id_transacao_origem': t.id_transacao_origem,
+            'is_overdue': is_overdue
+        })
+        
+    filtro_desc = []
+    if status_filtro: filtro_desc.append(f"Status: {status_filtro}")
+    elif pendentes: filtro_desc.append("Status: Pending")
+    if tipo_filtro: filtro_desc.append(f"Type: {tipo_filtro}")
+    if metodo_filtro: filtro_desc.append(f"Method: {metodo_filtro}")
+    nome_campo = "Payment Date" if campo_data == 'pagamento' else "Due Date"
+    if data_inicio or data_fim: filtro_desc.append(f"Date ({nome_campo}): {data_inicio or 'Any'} to {data_fim or 'Any'}")
+    if search: filtro_desc.append(f"Search: '{search}'")
+    filtro_label = " &bull; ".join(filtro_desc) if filtro_desc else "All Transactions"
+
+    return render_template(
+        'relatorio_financeiro.html',
+        transacoes=lista,
+        totais=totais,
+        filtro_ativo=filtro_label,
+        data_geracao=get_london_now().strftime('%d/%m/%Y %H:%M'),
+        operador=current_user.nome if (current_user and current_user.is_authenticated) else 'Staff'
+    )
+
 
 @app.route('/api/financeiro/pagar/<int:id>', methods=['POST', 'PUT'])
 @alugueis_required
@@ -4149,10 +5000,12 @@ def busca_rapida():
         contratos_sorted = sorted(m.contratos, key=lambda x: x.id, reverse=True) if m.contratos else []
         active_c = next((c for c in contratos_sorted if c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
         hirer_name = None
+        hirer_tel = None
         contract_id = None
         contract_type = None
         if active_c:
             hirer_name = (active_c.cliente.nome if active_c.cliente else active_c.cliente_nome) or 'N/A'
+            hirer_tel = (active_c.cliente.telefone if active_c.cliente else active_c.cliente_telefone) or ''
             contract_id = active_c.id
             contract_type = getattr(active_c, 'tipo_contrato', 'Rent') or 'Rent'
 
@@ -4166,6 +5019,7 @@ def busca_rapida():
             'contract_type': contract_type,
             'hirer_name': hirer_name,
             'cliente_atual': hirer_name,
+            'hirer_telefone': hirer_tel or '',
             'milhagem': int(m.milhagem_atual or 0)
         })
         seen_plates.add(m.placa)
@@ -4592,6 +5446,7 @@ def get_dashboard():
             c_id = c.id if c else None
             due_today_list.append({
                 'transacao_id': t.id,
+                'id': t.id,
                 'contrato_id': c_id,
                 'placa': placa,
                 'cliente_nome': cli_nome,
@@ -4599,7 +5454,9 @@ def get_dashboard():
                 'valor': float(t.valor),
                 'valor_semanal': float(t.valor),
                 'tipo': t.tipo,
-                'nota': t.nota or ''
+                'nota': t.nota or '',
+                'ultimo_lembrete': t.ultimo_lembrete.isoformat() if t.ultimo_lembrete else None,
+                'ultimo_lembrete_por': t.ultimo_lembrete_por or ''
             })
 
         due_today = {

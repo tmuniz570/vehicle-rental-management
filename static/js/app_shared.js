@@ -649,3 +649,58 @@ function createSplitPaymentManager({
     };
 }
 
+/**
+ * Universal WhatsApp Number Formatter for UK & International
+ * Formats any phone input into a valid E.164 string without '+' or leading zeros,
+ * ensuring seamless https://wa.me/<digits> deep-linking across the entire app.
+ */
+function formatWhatsAppNumber(phone) {
+    if (!phone) return '';
+    const raw = String(phone).trim();
+    if (!raw) return '';
+
+    // If starts with + (international format)
+    if (raw.startsWith('+')) {
+        let digits = raw.replace(/\D/g, '');
+        // UK fix: if typed as +44 07..., strip the extra zero after 44
+        if (digits.startsWith('440') && digits.length >= 12) {
+            digits = '44' + digits.substring(3);
+        }
+        return digits;
+    }
+
+    // If starts with 00 (international dialing prefix)
+    if (raw.startsWith('00')) {
+        let digits = raw.replace(/\D/g, '').substring(2);
+        if (digits.startsWith('440') && digits.length >= 12) {
+            digits = '44' + digits.substring(3);
+        }
+        return digits;
+    }
+
+    const digits = raw.replace(/\D/g, '');
+    if (!digits) return '';
+
+    // Standard UK mobile: 07xxx xxx xxx (or any UK number starting with 0)
+    if (digits.startsWith('0')) {
+        return '44' + digits.substring(1);
+    }
+
+    // UK 10 digits without leading 0: 7xxx xxx xxx
+    if (digits.startsWith('7') && digits.length === 10) {
+        return '44' + digits;
+    }
+
+    // Already prefixed with 44
+    if (digits.startsWith('44')) {
+        if (digits.startsWith('440') && digits.length >= 12) {
+            return '44' + digits.substring(3);
+        }
+        return digits;
+    }
+
+    return digits;
+}
+window.formatWhatsAppNumber = formatWhatsAppNumber;
+
+
