@@ -4,6 +4,13 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.18] — 2026-09-28 — *Asset Delivery Hardening & Access Control Optimization*
+
+### 🛡️ Otimização no Gerenciamento e Entrega de Mídias
+* **Controle de Acesso em Rotas de Upload**: Aplicação de verificação de sessão ativa (`@login_required`) na rota `/static/uploads/<path:filename>`.
+* **Políticas de Cache Privado**: Configurados cabeçalhos `Cache-Control: private, no-cache, no-store, must-revalidate` e `Pragma: no-cache` para arquivos de mídia da aplicação.
+* **Roteamento Nginx**: Otimização no proxy reverso assegurando que mídias passem pela validação do backend antes da entrega.
+
 ## [1.9.17] — 2026-09-28 — *Unified Universal WhatsApp Link Formatting Across Dashboard & Fleet*
 
 ### 💬 Normalização Universal de Links do WhatsApp

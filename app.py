@@ -353,6 +353,7 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/static/uploads/<path:filename>')
+@login_required
 def custom_static_uploads(filename):
     if not is_allowed_file(filename):
         return jsonify({'error': 'Access denied to this file type', 'erro': 'Acesso negado para este tipo de arquivo'}), 403
@@ -376,6 +377,8 @@ def custom_static_uploads(filename):
     response = send_from_directory(uploads_dir, filename, mimetype=mimetype, as_attachment=False)
     response.headers['Content-Disposition'] = f'inline; filename="{filename}"'
     response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Cache-Control'] = 'private, no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
     response.headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     return response
 
@@ -397,6 +400,8 @@ def add_inline_document_headers(response):
             response.headers['Content-Type'] = 'image/png'
         response.headers['Content-Disposition'] = 'inline'
         response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['Cache-Control'] = 'private, no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
         response.headers['Content-Security-Policy'] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     return response
 

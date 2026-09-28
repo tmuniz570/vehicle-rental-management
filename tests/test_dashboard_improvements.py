@@ -120,6 +120,24 @@ class TestDashboardImprovements(unittest.TestCase):
             self.assertIn('hirer_telefone', data_m['motos'][0])
             print("✓ Quick search motorbikes result includes hirer_telefone field")
 
+    def test_uploads_require_authentication(self):
+        """Verify uploaded documents enforce authentication and private cache headers."""
+        # 1. Unauthenticated request to /static/uploads/ must be redirected or rejected
+        unauth_client = app.test_client()
+        res_unauth = unauth_client.get('/static/uploads/demo_contract_scan.pdf')
+        self.assertIn(res_unauth.status_code, [302, 401], "Unauthenticated user must not access uploaded documents")
+        if res_unauth.status_code == 302:
+            self.assertIn('/login', res_unauth.headers.get('Location', ''), "Must redirect to login page")
+
+        # 2. Authenticated operator request must succeed with private cache headers
+        res_auth = self.client.get('/static/uploads/demo_contract_scan.pdf')
+        if res_auth.status_code == 200:
+            cache_ctrl = res_auth.headers.get('Cache-Control', '')
+            self.assertIn('private', cache_ctrl, "Must have private cache control")
+            self.assertIn('no-store', cache_ctrl, "Must have no-store cache control")
+            print("✓ Authenticated access to /static/uploads/ enforces private cache headers")
+
 if __name__ == '__main__':
     unittest.main()
+
 
