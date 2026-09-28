@@ -29,7 +29,21 @@ import pytz
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'ffmotors-birmingham-uk-secret-key-2026-production')
+
+# Configuração de ProxyFix: interpreta corretamente o IP real e HTTPS atrás do Nginx (Rate Limiting e Logs)
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+# Configuração de SECRET_KEY com fallback defensivo para desenvolvimento
+secret_key_env = os.environ.get('SECRET_KEY')
+if not secret_key_env:
+    if os.environ.get('FLASK_ENV') == 'production':
+        raise RuntimeError("FATAL: Variável de ambiente SECRET_KEY é obrigatória em ambiente de produção!")
+    secret_key_env = 'ffmotors-birmingham-uk-secret-key-2026-production'
+app.config['SECRET_KEY'] = secret_key_env
+
+# Limite máximo de tamanho de upload no Flask (padrão: 32MB) para prevenir ataques de DoS por esgotamento de recursos
+app.config['MAX_CONTENT_LENGTH'] = int(os.environ.get('MAX_CONTENT_LENGTH', 32 * 1024 * 1024))
 
 # Configuração do banco de dados (PostgreSQL em produção ou SQLite local)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -210,6 +224,29 @@ def registrar_log(acao, entidade, entidade_id, descricao):
         print(f"[AuditLog Error]: {e}")
 
 # --- CSRF Protection & Security Headers ---
+def check_cron_auth():
+    """Verifica se a chamada ao cron veio com token secreto ou de um administrador autenticado."""
+    secret_key = os.environ.get('CRON_SECRET_KEY', 'ffmotors-internal-cron-key-2026')
+    header_key = request.headers.get('X-Cron-Key') or request.args.get('cron_key')
+    if header_key and hmac.compare_digest(str(header_key), str(secret_key)):
+        return True
+    if current_user.is_authenticated and current_user.pode_admin():
+        return True
+    return False
+
+def is_safe_redirect_url(target):
+    """Garante que a URL de redirecionamento pertença à mesma aplicação e previne Open Redirect."""
+    if not target or not isinstance(target, str):
+        return False
+    # Bloquear protocol-relative URLs (//malicious.com) e backslashes (/\malicious.com)
+    if target.startswith('//') or target.startswith('/\\') or target.startswith('\\'):
+        return False
+    if target.startswith('/') and not target.startswith('//'):
+        from urllib.parse import urlparse
+        parsed = urlparse(target)
+        return parsed.netloc == '' and parsed.scheme == ''
+    return False
+
 def generate_csrf_token():
     if '_csrf_token' not in session:
         session['_csrf_token'] = secrets.token_hex(32)
@@ -229,8 +266,9 @@ def validate_csrf():
         if request.path.startswith('/static/') or request.endpoint == 'custom_static_uploads':
             return
             
-        # Isenção de CSRF para rotas de automação e chamadas com chave secreta de cron
-        if request.path.startswith('/api/jobs/') or request.path.startswith('/api/admin/limpar-cobrancas-duplicadas') or request.headers.get('X-Cron-Key') or request.args.get('cron_key'):
+        # Isenção de CSRF restrita exclusivamente às rotas dedicadas de cron/jobs
+        # (estas rotas validam sua autenticação via check_cron_auth() com chave de cron)
+        if request.path.startswith('/api/jobs/') or request.path.startswith('/api/admin/limpar-cobrancas-duplicadas'):
             return
             
         expected_token = session.get('_csrf_token')
@@ -330,7 +368,7 @@ def login():
             registrar_log('LOGIN_SUCCESS', 'User', user.id, f"Usuário {user.nome} fez login no sistema.")
             session['last_activity'] = time.time()
             next_page = request.args.get('next')
-            if not next_page or not next_page.startswith('/'):
+            if not next_page or not is_safe_redirect_url(next_page):
                 next_page = url_for('index')
             return redirect(next_page)
         else:
@@ -418,6 +456,13 @@ def handle_server_error(e):
         return jsonify({'error': 'Internal Server Error', 'message': 'An unexpected server error occurred'}), 500
     return render_template('500.html'), 500
 
+@app.errorhandler(413)
+def handle_large_file(e):
+    if request.path.startswith('/api/') or request.is_json:
+        return jsonify({'error': 'Payload Too Large', 'message': 'O arquivo enviado excede o limite máximo permitido de 32MB.'}), 413
+    flash('Arquivo muito grande. O limite máximo permitido para envio é 32MB.', 'danger')
+    return redirect(request.referrer or url_for('index')), 413
+
 @app.errorhandler(429)
 def handle_rate_limit(e):
     if request.path.startswith('/api/') or request.is_json:
@@ -432,6 +477,7 @@ def seed_default_admin():
     with app.app_context():
         try:
             if User.query.count() == 0:
+                default_password = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'Admin123!')
                 admin = User(
                     nome="Thiago Brandão",
                     email="tmuniz570@gmail.com",
@@ -441,7 +487,7 @@ def seed_default_admin():
                     perm_claims=True,
                     ativo=True
                 )
-                admin.set_password("Admin123!")
+                admin.set_password(default_password)
                 db.session.add(admin)
                 db.session.commit()
                 print("[Auth] Master Admin 'Thiago Brandão' (tmuniz570@gmail.com) criado com sucesso.")
@@ -608,7 +654,13 @@ def relatorio_fleet_pdf():
     if status_filter:
         sf_lower = status_filter.lower()
         if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
-            query = query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound']))
+            query = query.filter(
+                ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
+                db.or_(
+                    ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                    Motorcycle.contratos.any(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+                )
+            )
             filter_desc = "Active Fleet (In Operation)"
         elif sf_lower == 'sorn':
             query = query.filter(Motorcycle.tax_sorn == True)
@@ -622,7 +674,10 @@ def relatorio_fleet_pdf():
                 ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
                 db.or_(
                     db.and_(
-                        ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                        db.or_(
+                            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                            Motorcycle.contratos.any(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+                        ),
                         Motorcycle.tax_sorn == False,
                         Motorcycle.vencimento_tax <= trinta_dias
                     ),
@@ -1869,7 +1924,13 @@ def listar_motos():
     if status_filter:
         sf_lower = status_filter.lower()
         if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
-            query = query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound']))
+            query = query.filter(
+                ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
+                db.or_(
+                    ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                    Motorcycle.contratos.any(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+                )
+            )
         elif sf_lower == 'sorn':
             query = query.filter(Motorcycle.tax_sorn == True)
         elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
@@ -1880,7 +1941,10 @@ def listar_motos():
                 ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
                 db.or_(
                     db.and_(
-                        ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                        db.or_(
+                            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                            Motorcycle.contratos.any(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+                        ),
                         Motorcycle.tax_sorn == False,
                         Motorcycle.vencimento_tax <= trinta_dias
                     ),
@@ -1973,7 +2037,10 @@ def listar_motos():
         })
 
     # KPIs rápidos para o topo da tela
-    todas_motos_kpi = Motorcycle.query.options(selectinload(Motorcycle.v5c_arquivos)).all()
+    todas_motos_kpi = Motorcycle.query.options(
+        selectinload(Motorcycle.v5c_arquivos),
+        selectinload(Motorcycle.contratos)
+    ).all()
     kpi_total = len(todas_motos_kpi)
     kpi_operational = 0
     kpi_available = 0
@@ -1988,8 +2055,9 @@ def listar_motos():
         st = (mk.status or '').lower()
         is_p = (st == 'pound')
         is_s = (st in ['sold', 'vendida'])
+        has_active_contract = any(c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'] for c in (mk.contratos or []))
         
-        if not is_p and not is_s:
+        if not is_p and (not is_s or has_active_contract):
             kpi_operational += 1
 
         if st in ['available', 'disponível']:
@@ -2058,7 +2126,13 @@ def export_motos_csv():
     if status_filter:
         sf_lower = status_filter.lower()
         if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
-            query = query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound']))
+            query = query.filter(
+                ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
+                db.or_(
+                    ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                    Motorcycle.contratos.any(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+                )
+            )
         elif sf_lower == 'sorn':
             query = query.filter(Motorcycle.tax_sorn == True)
         elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
@@ -2069,7 +2143,10 @@ def export_motos_csv():
                 ~Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound']),
                 db.or_(
                     db.and_(
-                        ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                        db.or_(
+                            ~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida']),
+                            Motorcycle.contratos.any(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']))
+                        ),
                         Motorcycle.tax_sorn == False,
                         Motorcycle.vencimento_tax <= trinta_dias
                     ),
@@ -2443,6 +2520,67 @@ def remover_tracker_moto(placa, tracker_id):
     
     return jsonify({'message': 'Tracker removed successfully', 'mensagem': 'Tracker removido com sucesso'}), 200
 
+def sync_sale_contract_status(contrato_id_or_obj, auto_commit=False):
+    """
+    Sincroniza dinamicamente o status de contratos de venda (Sale_Full / Sale_Installment):
+    - Se houver qualquer cobrança com status Pendente: reabre o contrato para 'Active' se estava 'Completed'.
+    - Se todas as cobranças estiverem quitadas (zero pendentes e pelo menos uma paga): conclui para 'Completed'.
+    - Respeita contratos com status 'Cancelled'.
+    Retorna True se houve alteração no status do contrato.
+    """
+    if not contrato_id_or_obj:
+        return False
+        
+    contrato = db.session.get(Contract, contrato_id_or_obj) if isinstance(contrato_id_or_obj, int) else contrato_id_or_obj
+    if not contrato:
+        return False
+        
+    tipo = getattr(contrato, 'tipo_contrato', '') or ''
+    is_venda = tipo in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']
+    if not is_venda:
+        return False
+        
+    if contrato.status in [ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado']:
+        return False
+        
+    transacoes = FinancialTransaction.query.filter_by(id_contrato=contrato.id).all()
+    transacoes_cobrancas = [t for t in transacoes if t.tipo not in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']]
+    
+    if not transacoes_cobrancas:
+        return False
+        
+    tem_pendente = any(t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente'] for t in transacoes_cobrancas)
+    todas_pagas = all(t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago'] for t in transacoes_cobrancas)
+    
+    alterou = False
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    
+    if tem_pendente:
+        if contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
+            contrato.status = ContractStatus.ATIVO.value
+            registrar_log(
+                'CONTRACT_REOPENED', 
+                'Contract', 
+                contrato.id, 
+                f"Contrato de venda #{contrato.id} ({contrato.tipo_contrato}) reaberto para Active devido a cobrança(s) pendente(s) (Operador: {operador_atual})."
+            )
+            alterou = True
+    elif todas_pagas:
+        if contrato.status != ContractStatus.COMPLETED.value:
+            contrato.status = ContractStatus.COMPLETED.value
+            registrar_log(
+                'CONTRACT_COMPLETED', 
+                'Contract', 
+                contrato.id, 
+                f"Contrato de venda #{contrato.id} ({contrato.tipo_contrato}) concluído com sucesso após quitação integral de todas as cobranças (Operador: {operador_atual})."
+            )
+            alterou = True
+            
+    if alterou and auto_commit:
+        db.session.commit()
+        
+    return alterou
+
 @app.route('/api/contratos', methods=['POST'])
 @alugueis_required
 def criar_contrato():
@@ -2798,7 +2936,9 @@ def assinar_contrato(id):
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
 
     dados = request.get_json() or {}
-    tipo_assinatura = dados.get('tipo', 'inicial') # 'inicial' ou 'devolucao'
+    tipo_assinatura = str(dados.get('tipo', 'inicial')).strip().lower()
+    if tipo_assinatura not in ['inicial', 'devolucao']:
+        tipo_assinatura = 'inicial'
     assinatura_base64 = dados.get('assinatura') # Data URL 'data:image/png;base64,...'
 
     if not assinatura_base64 or not assinatura_base64.startswith('data:image/'):
@@ -2812,7 +2952,10 @@ def assinar_contrato(id):
         agora = get_london_now()
         timestamp = agora.strftime("%Y%m%d_%H%M%S")
         filename = f"sig_{tipo_assinatura}_{id}_{timestamp}.png"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        upload_folder_abs = os.path.abspath(app.config['UPLOAD_FOLDER'])
+        filepath = os.path.abspath(os.path.join(upload_folder_abs, filename))
+        if not filepath.startswith(upload_folder_abs + os.sep):
+            return jsonify({'error': 'Invalid file target path', 'erro': 'Caminho de gravação inválido'}), 400
         
         with open(filepath, 'wb') as f:
             f.write(data)
@@ -3291,14 +3434,9 @@ def detalhe_contrato(id):
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
     checagem_seguro_devida = (dias_desde_checagem >= 15) if not (is_venda or is_purchase) else False
     
-    # Auto-conclusão para contratos de venda quando todas as transações estiverem quitadas
-    if is_venda and c.status in [ContractStatus.ATIVO.value, 'Active', 'Ativo']:
-        tem_pendente = any(t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente'] for t in transacoes)
-        tem_paga = any(t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago'] for t in transacoes)
-        if tem_paga and not tem_pendente:
-            c.status = ContractStatus.COMPLETED.value
-            db.session.commit()
-            registrar_log('CONTRACT_COMPLETED', 'Contract', c.id, f"Contrato de venda #{c.id} ({c.tipo_contrato}) concluído com sucesso após quitação integral.")
+    # Sincronização dinâmica de contratos de venda (conclui se tudo pago, reabre se há pendência)
+    if is_venda:
+        sync_sale_contract_status(c, auto_commit=True)
 
     is_completed = (c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado', ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
     
@@ -3489,6 +3627,7 @@ def criar_cobranca(id):
         status=TransactionStatus.PENDING.value
     )
     db.session.add(nova_cobranca)
+    sync_sale_contract_status(c)
     db.session.commit()
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
@@ -3941,16 +4080,9 @@ def pagar_transacoes_lote():
         if t.contrato:
             contratos_afetados.add(t.contrato)
             
-    # Auto-conclusão para contratos de venda que tiveram todas as pendências quitadas
+    # Sincronização do status de contratos de venda afetados
     for c in contratos_afetados:
-        if c.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
-            pendentes = FinancialTransaction.query.filter(
-                FinancialTransaction.id_contrato == c.id,
-                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
-            ).count()
-            if pendentes == 0 and c.status != ContractStatus.COMPLETED.value:
-                c.status = ContractStatus.COMPLETED.value
-                registrar_log('CONTRACT_COMPLETED', 'Contract', c.id, f"Contrato de venda #{c.id} ({c.tipo_contrato}) concluído com sucesso após quitação integral em lote.")
+        sync_sale_contract_status(c)
                 
     db.session.commit()
     registrar_log('BATCH_PAYMENT', 'Transaction', f"{qtd_pagas} items", f"Baixa em lote de {qtd_pagas} cobranças (£{total_pago:.2f}) via {forma} por {operador}")
@@ -4325,6 +4457,7 @@ def criar_cobranca_avulsa():
         nota=nota
     )
     db.session.add(nova)
+    sync_sale_contract_status(contrato)
     db.session.commit()
     
     operador = current_user.nome if (current_user and current_user.is_authenticated) else 'Staff'
@@ -4782,17 +4915,9 @@ def pagar_transacao(id):
             f"Baixa de £{valor_pago:.2f} ({t.tipo}) confirmada via {forma_pagamento_consolidada} por {operador_atual} no Contrato #{t.id_contrato}.{nota_log}"
         )
 
-        # Auto-conclusão para contratos de venda quando todas as transações forem quitadas
-        if t.contrato and t.contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
-            contrato_venda = t.contrato
-            transacoes_pendentes = FinancialTransaction.query.filter(
-                FinancialTransaction.id_contrato == contrato_venda.id,
-                FinancialTransaction.id != t.id,
-                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente'])
-            ).count()
-            if transacoes_pendentes == 0 and contrato_venda.status != ContractStatus.COMPLETED.value:
-                contrato_venda.status = ContractStatus.COMPLETED.value
-                registrar_log('CONTRACT_COMPLETED', 'Contract', contrato_venda.id, f"Contrato de venda #{contrato_venda.id} ({contrato_venda.tipo_contrato}) concluído com sucesso após quitação integral.")
+        # Sincronização do status para contratos de venda
+        if t.contrato:
+            sync_sale_contract_status(t.contrato)
 
     db.session.commit()
 
@@ -4849,11 +4974,9 @@ def reverter_pagamento(id):
     t.nota = None
     t.registrado_por_nome = None
 
-    # Se o contrato era de venda e estava Completed, reabre para Active
-    if t.contrato and t.contrato.tipo_contrato in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment']:
-        if t.contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
-            t.contrato.status = ContractStatus.ATIVO.value
-            registrar_log('CONTRACT_REOPENED', 'Contract', t.contrato.id, f"Contrato de venda #{t.contrato.id} reaberto para Active devido a estorno do pagamento #{t.id}.")
+    # Sincronização do status para contratos de venda (reabre para Active se houver pendência)
+    if t.contrato:
+        sync_sale_contract_status(t.contrato)
 
     db.session.commit()
     
@@ -4962,14 +5085,17 @@ def excluir_transacao(id):
     if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
         return jsonify({'error': 'Cannot delete an already paid transaction', 'erro': 'Não é possível excluir uma transação já paga'}), 400
         
+    id_contrato = t.id_contrato
     db.session.delete(t)
+    if id_contrato:
+        sync_sale_contract_status(id_contrato)
     db.session.commit()
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     registrar_log('TRANSACTION_DELETE', 'Transaction', id, f"Transação #{id} excluída por {operador_atual}")
     return jsonify({'message': 'Transaction deleted successfully', 'mensagem': 'Transação excluída com sucesso'}), 200
 
 @app.route('/api/busca-rapida', methods=['GET'])
-@login_required
+@alugueis_required
 def busca_rapida():
     termo = request.args.get('q', '', type=str).strip()
     termo_limpo = termo.replace(' ', '').replace('#', '')
@@ -5178,6 +5304,8 @@ def get_dashboard():
             c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
             if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
                 motos_financed += 1
+            elif c and c.tipo_contrato in [ContractType.SALE_FULL.value, 'Sale_Full']:
+                motos_financed += 1
             else:
                 motos_sold_outright += 1
 
@@ -5188,6 +5316,9 @@ def get_dashboard():
                 motos_financed += 1
             else:
                 motos_rental += 1
+
+        # Total Fleet = frota ativa operacional no nome da loja (disponíveis + alugadas + parceladas/vendas com contrato ativo + manutenção; exclui apenas vendidas com contrato completado e pound)
+        total_motos = motos_disponiveis + motos_rental + motos_financed + motos_manutencao
 
         total_clientes = Client.query.count()
         
@@ -5311,6 +5442,7 @@ def get_dashboard():
         tax_mot_expired = 0
         tax_mot_expiring_soon = 0
         
+        placas_contratos_ativos = {ca.placa for ca in contratos_ativos_objs}
         for m in todas_motos:
             is_sold = (m.status in [MotoStatus.SOLD.value, 'Sold', 'Vendida'])
             is_pound = (m.status in [MotoStatus.POUND.value, 'Pound'])
@@ -5323,9 +5455,10 @@ def get_dashboard():
             has_mot_w = False
             is_m_expired = False
             
-            # Road Tax: checado apenas para frota ativa (motos vendidas e motos registradas como SORN não pagam Road Tax)
+            # Road Tax: checado apenas para frota ativa no nome da loja (apenas motos vendidas com contrato completado e motos SORN são isentas)
             is_sorn = bool(getattr(m, 'tax_sorn', False))
-            if not is_sold and not is_sorn and m.vencimento_tax:
+            is_truly_sold = is_sold and (m.placa not in placas_contratos_ativos)
+            if not is_truly_sold and not is_sorn and m.vencimento_tax:
                 diff_t = (m.vencimento_tax - hoje_date).days
                 if diff_t < 0:
                     has_tax_w = True
@@ -5676,16 +5809,6 @@ def _gerar_cobrancas_semanais_logic():
                 transacoes_geradas += 1
                 
         return transacoes_geradas
-
-def check_cron_auth():
-    """Verifica se a chamada ao cron veio com token secreto ou de um administrador autenticado."""
-    secret_key = os.environ.get('CRON_SECRET_KEY', 'ffmotors-internal-cron-key-2026')
-    header_key = request.headers.get('X-Cron-Key') or request.args.get('cron_key')
-    if header_key and hmac.compare_digest(str(header_key), str(secret_key)):
-        return True
-    if current_user.is_authenticated and current_user.pode_admin():
-        return True
-    return False
 
 @app.route('/api/jobs/gerar-cobrancas-semanais', methods=['POST'])
 def gerar_cobrancas_semanais():

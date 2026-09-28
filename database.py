@@ -675,18 +675,21 @@ def init_db(app):
 
 # --- Garbage Collector (File Cleanup) ---
 def delete_file_if_exists(filepath):
-    if not filepath: return
+    if not filepath:
+        return
     filename = os.path.basename(filepath)
-    uploads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-    
-    for base in [uploads_dir, os.path.join(os.getcwd(), 'static', 'uploads'), os.getcwd()]:
-        full_path = os.path.join(base, filename)
-        if os.path.exists(full_path) and os.path.isfile(full_path):
-            try:
-                os.remove(full_path)
-                break
-            except Exception as e:
-                print(f"Error removing file {full_path}: {e}")
+    if not filename or filename in ('.', '..'):
+        return
+    uploads_dir = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    full_path = os.path.abspath(os.path.join(uploads_dir, filename))
+    # Ensure full_path is strictly within uploads_dir (path traversal prevention)
+    if not full_path.startswith(os.path.abspath(uploads_dir) + os.sep):
+        return
+    if os.path.exists(full_path) and os.path.isfile(full_path):
+        try:
+            os.remove(full_path)
+        except Exception as e:
+            print(f"Error removing file {full_path}: {e}")
 
 @event.listens_for(Client, 'after_delete')
 def receive_after_delete_client(mapper, connection, target):

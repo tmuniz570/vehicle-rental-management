@@ -4,6 +4,31 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.19] — 2026-09-28 — *Dynamic Sale Contract Lifecycle & Operational Fleet Alignment*
+
+### 🔄 Ciclo de Vida Dinâmico de Contratos de Venda (`app.py` & `sync_sale_contract_status`)
+* **Auto-conclusão para `Completed`**: Contratos de venda (`Sale_Full` e `Sale_Installment`) transitam automaticamente para `Completed` assim que todas as suas cobranças/parcelas forem quitadas (`Paid`), registrando auditoria `CONTRACT_COMPLETED`.
+* **Reabertura Dinâmica para `Active`**: Caso qualquer pagamento seja revertido/estornado para `Pending`, ou caso uma nova cobrança pendente seja adicionada (manual ou avulsa), o contrato reabre instantaneamente para `Active` (`ContractStatus.ATIVO.value`), registrando auditoria `CONTRACT_REOPENED`.
+* **Retorno Automático a `Completed`**: Ao quitar todas as pendências novamente (ou ao excluir cobranças pendentes avulsas), o contrato retorna de forma transparente para `Completed`.
+* **Sincronização nos Pontos de Ação**: Integrado a 7 fluxos do sistema: visualização de detalhes, inclusão de cobrança, cobrança avulsa, pagamento unitário, estorno de pagamento, quitação em lote e exclusão de transação.
+
+### 🛵 Realinhamento da Frota Operacional & Active Deals on Road
+* **Inclusão de Vendas Parceladas Ativas no Total Fleet (`total_motos`)**: Motos sob contratos parcelados ativos pertencem legalmente à empresa e estão em circulação no nome da loja. O cálculo da frota ativa operacional agora consolida:
+  $$\text{Total Fleet} = \text{Disponíveis} + \text{Alugadas} + \text{Parceladas Ativas (Financed)} + \text{Oficina}$$
+* **Ajuste da Taxa de Utilização (`⚡ % Active Deals on Road`)**:
+  - Eliminação da distorção que ultrapassava 100%:
+  $$\text{Utilização} = \frac{\text{Rentals} + \text{Financed}}{\text{Total Fleet Operacional}} \times 100\%$$
+  - Apenas motocicletas com contrato completado/quitado (`motos_sold_outright`) e apreendidas (`Pound`) são consideradas fora da frota operacional.
+* **Tabela de Frotas (`/motos` & `static/js/motos.js`)**:
+  - O filtro padrão **`⚡ Active Fleet (In Operation)`** passa a exibir motos vendidas parceladas que possuem contratos ativos.
+  - Exibição do selo **`Financed #ID ↗`** em roxo no status, acompanhado do nome do comprador/locatário e atalho para conversa direta no WhatsApp.
+  - Selo **`Sold #ID ↗`** em tom neutro reservado exclusivamente para vendas concluídas/quitadas fora da frota.
+* **Monitoramento Contínuo de Road Tax & MOT**: Veículos sob contratos ativos no nome da loja permanecem sob acompanhamento rigoroso de Road Tax e MOT, com isenção de Road Tax aplicada somente após a quitação e transferência definitiva do V5C.
+
+### 🛡️ Defesa em Profundidade & Estabilidade
+* **Suíte de Testes Automatizados**: Criação dos testes dedicados `tests/test_sale_lifecycle_sync.py` e `tests/test_security_hardening.py`.
+* **Validação Contínua**: 25 testes unitários e de integração executados com 100% de aprovação.
+
 ## [1.9.18] — 2026-09-28 — *Asset Delivery Hardening & Access Control Optimization*
 
 ### 🛡️ Otimização no Gerenciamento e Entrega de Mídias

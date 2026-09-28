@@ -244,11 +244,11 @@ def test_sales_system():
         assert cid_inst not in alert_ids, "Sale contract must NEVER trigger askMID insurance alerts on dashboard"
         # Verify total_motos in dashboard excludes sold bikes
         assert dash_data.get('motos_vendidas', 0) >= 2, "Sold bikes must be tracked in motos_vendidas"
-        # Total fleet must equal sum of active fleet only (available + rented + maintenance)
-        assert dash_data['total_motos'] == (dash_data['motos_disponiveis'] + dash_data['motos_alugadas'] + dash_data['motos_manutencao']), "Total fleet must strictly exclude sold motorbikes"
+        # Total fleet must equal sum of active fleet in operation (available + rented + active financed + maintenance)
+        assert dash_data['total_motos'] == (dash_data['motos_disponiveis'] + dash_data['motos_alugadas'] + dash_data.get('motos_financed', 0) + dash_data['motos_manutencao']), "Total fleet must include active financed bikes in shop's name"
         # Sold bikes with expiring/expired MOT must trigger MOT alert for customer outreach & workshop upsell
         assert dash_data['mot_warnings'] >= 1, "Sold bikes with due MOT must trigger MOT warning"
-        print(f"-> Dashboard verified: Total Fleet ({dash_data['total_motos']}) = Available ({dash_data['motos_disponiveis']}) + Rented ({dash_data['motos_alugadas']}) + Maintenance ({dash_data['motos_manutencao']}). Sold bikes ({dash_data['motos_vendidas']}) strictly excluded.")
+        print(f"-> Dashboard verified: Total Fleet ({dash_data['total_motos']}) = Available ({dash_data['motos_disponiveis']}) + Rented ({dash_data['motos_alugadas']}) + Financed ({dash_data.get('motos_financed', 0)}) + Maintenance ({dash_data['motos_manutencao']}).")
         print(f"-> Verified: Sold bike MOT alert active ({dash_data['mot_warnings']} MOT alerts). Shop can proactively call buyer for pre-MOT check and workshop services.")
         print("-> Confirmed: Sold bikes are completely exempt from 15-day askMID insurance monitoring and dashboard alerts.")
         print("-> API /api/contratos/<id> returned all sale fields and detail aliases correctly.")

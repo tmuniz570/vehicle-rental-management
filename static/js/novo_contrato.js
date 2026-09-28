@@ -23,7 +23,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         selectCliente.innerHTML = '<option value="">-- Select Customer --</option>';
         clientes.forEach(c => {
-            selectCliente.innerHTML += `<option value="${c.id}">${c.nome} (ID: ${c.id})</option>`;
+            const opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = `${c.nome} (ID: ${c.id})`;
+            selectCliente.appendChild(opt);
         });
 
         function populateSelectMotos(currentType) {
@@ -44,7 +47,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const statusTag = (currentType === 'Purchase' && st !== 'available' && st !== 'disponível')
                         ? ` [${(m.status || '').toUpperCase()}]`
                         : '';
-                    selectMoto.innerHTML += `<option value="${m.placa}" data-mileage="${milhas}" data-cor="${cor}">${m.placa} - ${m.modelo}${statusTag} (${milhas} mi)</option>`;
+                    const opt = document.createElement('option');
+                    opt.value = m.placa;
+                    opt.dataset.mileage = milhas;
+                    opt.dataset.cor = cor;
+                    opt.textContent = `${m.placa} - ${m.modelo}${statusTag} (${milhas} mi)`;
+                    selectMoto.appendChild(opt);
                 }
             });
             if (currentVal) {

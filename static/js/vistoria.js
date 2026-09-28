@@ -57,12 +57,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     if (contratoInfoFixed) {
+                        const safeEscape = (typeof escapeHtml === 'function') ? escapeHtml : (str => String(str || '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[s])));
                         const st = (c.status || '').toLowerCase();
                         const badgeClass = (st === 'active' || st === 'ativo') ? 'badge-success' : 'badge-warning';
+                        const placaEsc = safeEscape(c.placa || '-');
+                        const clienteEsc = safeEscape(c.cliente || c.cliente_nome || '-');
+                        const statusEsc = safeEscape(c.status || '');
                         contratoInfoFixed.innerHTML = `
                             <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                                <span>Contract #${idUrl} &bull; <strong style="color: #60a5fa;">${c.placa || '-'}</strong> (${c.cliente || c.cliente_nome || '-'})</span>
-                                <span class="badge ${badgeClass}">${c.status || ''}</span>
+                                <span>Contract #${encodeURIComponent(idUrl)} &bull; <strong style="color: #60a5fa;">${placaEsc}</strong> (${clienteEsc})</span>
+                                <span class="badge ${badgeClass}">${statusEsc}</span>
                             </div>
                         `;
                     }

@@ -175,21 +175,38 @@ async function carregarMotos() {
                     statusHtml = '<span class="badge badge-info">Rented</span>';
                 }
             } else if (isSold) {
-                if (m.last_contract) {
-                    const c = m.last_contract;
+                const c = m.active_contract || m.last_contract;
+                const isFinancedActive = !!m.active_contract;
+                if (c) {
+                    const badgeText = isFinancedActive ? `Financed #${c.id} ↗` : `Sold #${c.id} ↗`;
+                    const badgeTitle = isFinancedActive ? `View Active Financed Contract #${c.id}` : `View Completed Sale Contract #${c.id}`;
+                    let waBtn = '';
+                    if (isFinancedActive && c.cliente_telefone) {
+                        const phoneClean = (typeof formatWhatsAppNumber === 'function')
+                            ? formatWhatsAppNumber(c.cliente_telefone)
+                            : (() => {
+                                let w = c.cliente_telefone.replace(/\D/g, '');
+                                if (w.startsWith('0')) w = '44' + w.substring(1);
+                                return w;
+                            })();
+                        waBtn = phoneClean ? `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>` : '';
+                    }
                     statusHtml = `
                         <div>
-                            <a href="/contratos/${c.id}" class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4); text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;" title="View Sale Contract #${c.id}">
-                                Sold #${c.id} ↗
+                            <a href="/contratos/${c.id}" class="badge" style="background:${isFinancedActive ? 'rgba(168,85,247,0.2)' : 'rgba(100,116,139,0.2)'}; color:${isFinancedActive ? '#c084fc' : '#94a3b8'}; border:1px solid ${isFinancedActive ? 'rgba(168,85,247,0.4)' : 'rgba(100,116,139,0.4)'}; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;" title="${badgeTitle}">
+                                ${badgeText}
                             </a>
                             ${c.cliente_nome ? `
-                            <div style="font-size:0.75rem; margin-top:4px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="Buyer: ${escapeHtml(c.cliente_nome)}">
-                                👤 ${escapeHtml(c.cliente_nome)}
+                            <div style="font-size:0.75rem; margin-top:4px; display:flex; align-items:center; color:#cbd5e1;">
+                                <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="${isFinancedActive ? 'Hirer / Buyer' : 'Buyer'}: ${escapeHtml(c.cliente_nome)}">
+                                    👤 ${escapeHtml(c.cliente_nome)}
+                                </span>
+                                ${waBtn}
                             </div>` : ''}
                         </div>
                     `;
                 } else {
-                    statusHtml = '<span class="badge" style="background:rgba(168,85,247,0.2); color:#c084fc; border:1px solid rgba(168,85,247,0.4);">Sold</span>';
+                    statusHtml = '<span class="badge" style="background:rgba(100,116,139,0.2); color:#94a3b8; border:1px solid rgba(100,116,139,0.4);">Sold</span>';
                 }
             } else if (st === 'available' || st === 'disponível') {
                 if (m.last_contract) {
