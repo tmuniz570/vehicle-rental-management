@@ -74,11 +74,12 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Storage Invoicing (14 Days):** Instant calculation of storage duration `(Days × £15/day)` upon bike release, dedicated printable and branded Storage Invoices, and 14-day insurer payment due dates.
 * **Server-Side Pagination, Sorting & Date Period Filters:** Fast pagination (20 items/page), multi-column sorting, and multi-field date range filtering (Accident, Approval, Storage In, Release, Invoice Sent, Created).
 
-### 📋 5. Contract Agreements & Lifecycle (Rentals & Vehicle Sales)
-* **Dual Contract Modes (Rentals & Vehicle Sales):**
+### 📋 5. Contract Agreements & Lifecycle (Rentals, Sales & Purchases)
+* **Tri-Mode Contract Management (Rentals, Sales & Purchases):**
   - **Rental Agreements (`Rent`):** Provisions Week 1 collection rent and Week 2 recurring rent scheduled for the client's chosen weekday payment cycle, with security deposit holding.
   - **Full Vehicle Sales (`Sale_Full`):** Outright vehicle sale provisioned with pending transaction and immediate transition of motorcycle status to `Sold`. Automatically completes (`Completed`) upon total payment quittance.
   - **Instalment Vehicle Sales (`Sale_Installment`):** Financed purchase provisioned with segregated down payment (`Sale_Deposit`), administrative fee, itemized accessories, and scheduled instalment payment dates (`Sale_Installment`). Automatically completes (`Completed`) once down payment and all scheduled instalments are paid in full (£0.00 outstanding).
+  - **Used Vehicle Purchases (`Purchase`):** Dealership acquisition agreement from customers (part-exchange / trade-in, direct purchase, debt settlement). Zero receivable charges generated (Rule A1). Strictly requires both seller signature and vehicle Logbook (V5C) attachment to reach `Completed` status, with dedicated V5C pending alert banners and dashboard cards. Reopens automatically to `Active` if V5C documents are deleted. Fully exempt from check-out inspections and customer insurance requirements.
 * **Sales Contract Lifecycle & Reopening:**
   - Automatic status transition to `Completed` when all sales transactions are settled.
   - Automatic reversal and reopening back to `Active` with audit trail tracking if a completed sale payment is cancelled or reverted.
@@ -126,7 +127,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Reversal with Auto-Merge:** Reverting a partial payment automatically re-merges child balance transactions back into the parent, maintaining immaculate ledger accuracy.
 * **Overdue Report:** Dedicated centralized page (`/relatorios/vencidos`) aggregating all late payments across the fleet, direct customer contact links, and inline settlement actions. Charges due today remain pending for the entire day and strictly transition to overdue at 00:00:00 of the following day if unpaid.
 * **Receipt Printing & Payment Notes:** Optional payment note and reference field captured upon marking charges as paid (e.g. part-exchange bike details, bank transfer reference, discount authorizations). Notes appear on printable payment receipts, transaction ledgers, and audit logs.
-* **Automated Recurring Billing:** Integrated background scheduler (`APScheduler`) generating recurring rental invoices at **01:00 AM Europe/London** on designated weekly payment days.
+* **Automated Recurring Billing & Weekly Resilience Engine:** Background scheduler (`APScheduler`) executing at **01:00 AM Europe/London** using contract-specific active due days (`dia_pagamento_semanal`). Provisions charges for `due day + 7` so upcoming invoices are always visible in advance. Resilient catch-up engine eliminates missed-cycle vulnerabilities with duplicate-proof provision checks, 1-hour misfire grace time, and WSGI daemon startup recovery.
 
 ### 📱 8. UI, Mobile-First & PWA Experience
 * **Collapsible Slim Sidebar (Desktop):** Flexible desktop sidebar toggle button (`#sidebarToggleBtn`) with `Shift + S` shortcut. Operators can collapse the sidebar into a slim icon bar (`74px`) displaying centered vector SVG icons, dynamic FF logo monogram, and floating glassmorphism tooltips, maximizing horizontal data table real estate. State persists across pages via `localStorage` with zero-flicker preloading.
