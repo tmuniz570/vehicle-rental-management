@@ -57,13 +57,15 @@ if _acquire_scheduler_lock():
         print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Rotinas diárias à 01:00 de Londres, misfire_grace=3600s).")
 
         # Auto-recuperação no startup: se as rotinas de hoje ainda não tiverem sido executadas
-        # (ex: deploy após 01:00 AM ou restart do serviço), executa em thread assíncrona.
+        # (ex: deploy após 01:00 AM ou restart do serviço), executa em thread assíncrona
+        # no worker eleito com lock de scheduler via force=True para garantir sincronia imediata.
         import threading
         def _check_and_run_startup_jobs():
             try:
                 import time
                 time.sleep(3)
-                run_daily_jobs()
+                print("[WSGI Startup] Executando rotinas diárias de catch-up no boot/deploy...")
+                run_daily_jobs(force=True)
             except Exception as e_start:
                 print(f"[WSGI Startup Job Error]: {e_start}")
 

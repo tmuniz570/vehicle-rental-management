@@ -5814,7 +5814,9 @@ def listar_alertas():
     contratos_quarentena = Contract.query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])).all()
     for c in contratos_quarentena:
         if c.data_devolucao:
-            dias_passados = (hoje - c.data_devolucao).days
+            hoje_date = hoje.date() if isinstance(hoje, datetime) else hoje
+            devolucao_date = c.data_devolucao.date() if isinstance(c.data_devolucao, datetime) else c.data_devolucao
+            dias_passados = (hoje_date - devolucao_date).days
             if dias_passados >= 14:
                 cliente = db.session.get(Client, c.id_cliente)
                 nome = cliente.nome if cliente else f"ID {c.id_cliente}"
@@ -6107,7 +6109,7 @@ def api_limpar_cobrancas_duplicadas():
         "dados": resultado
     }), 200
 
-def run_daily_jobs():
+def run_daily_jobs(force=False):
     with app.app_context():
         london_date_str = get_london_date().strftime('%Y-%m-%d')
         job_name = "daily_rent_and_deposit_jobs"
@@ -6131,27 +6133,36 @@ def run_daily_jobs():
                     db.session.rollback()
 
             # 2. UPDATE CONDICIONAL ATÔMICO:
-            # Exatamente UM processo concorrente receberá rows_updated == 1.
+            # Se force=False: Exatamente UM processo concorrente receberá rows_updated == 1.
             # Todos os demais processos concorrentes receberão 0 e serão abortados.
-            rows_updated = JobExecutionLock.query.filter(
-                JobExecutionLock.job_name == job_name,
-                JobExecutionLock.last_run_date != london_date_str
-            ).update({
-                'last_run_date': london_date_str,
-                'last_run_at': get_local_now(),
-                'executed_by': worker_id
-            })
-            db.session.commit()
+            # Se force=True (ex: deploy ou catch-up explícito): atualiza timestamp e prossegue.
+            if not force:
+                rows_updated = JobExecutionLock.query.filter(
+                    JobExecutionLock.job_name == job_name,
+                    JobExecutionLock.last_run_date != london_date_str
+                ).update({
+                    'last_run_date': london_date_str,
+                    'last_run_at': get_local_now(),
+                    'executed_by': worker_id
+                })
+                db.session.commit()
 
-            if rows_updated == 0:
-                print(f"[Cron Lock] Daily jobs '{job_name}' já foram executados ou adquiridos por outro worker para a data {london_date_str}. Abortando execução duplicada.")
-                return
+                if rows_updated == 0:
+                    print(f"[Cron Lock] Daily jobs '{job_name}' já foram executados ou adquiridos por outro worker para a data {london_date_str}. Abortando execução duplicada.")
+                    return
+            else:
+                JobExecutionLock.query.filter_by(job_name=job_name).update({
+                    'last_run_date': london_date_str,
+                    'last_run_at': get_local_now(),
+                    'executed_by': f"{worker_id}-forced"
+                })
+                db.session.commit()
         except Exception as e:
             db.session.rollback()
             print(f"[Cron Lock] Erro ao tentar adquirir lock atômico de execução diária para {london_date_str}: {e}")
             return
 
-        print(f"[Cron] Iniciando rotinas diárias para {london_date_str} (Europe/London 01:00 AM) no {worker_id}...")
+        print(f"[Cron] Iniciando rotinas diárias para {london_date_str} (Europe/London 01:00 AM) no {worker_id} (force={force})...")
         t_cobrancas = _gerar_cobrancas_semanais_logic()
         t_quarentenas = _processar_quarentenas_logic()
         print(f"[Cron] Concluído. {t_cobrancas} cobranças geradas, {t_quarentenas} quarentenas processadas.")

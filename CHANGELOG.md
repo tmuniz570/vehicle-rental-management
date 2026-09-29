@@ -29,10 +29,13 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
   - Caso o agendador tenha deixado de rodar em um dia específico (por exemplo, reinício de servidor, suspensão ou queda de worker na segunda-feira), no momento da execução subsequente o sistema detecta as faturas faltantes dos ciclos anteriores e as provisiona imediatamente sem duplicar as existentes.
 * **Auto-Sincronização ao Alterar Dia de Vencimento (`PUT /api/contratos/<id>/dia-pagamento`)**:
   - Ao alterar o dia de cobrança de um contrato ativo, o endpoint dispara de imediato uma verificação pelo motor gerador para alinhar o cronograma futuro ao novo dia da semana em tempo real.
-* **Fortificação do APScheduler no Gunicorn (`wsgi.py`)**:
+* **Fortificação do APScheduler no Gunicorn & Catch-up no Boot (`wsgi.py` & `run_daily_jobs`)**:
   - `open(lock_path, 'a+')` com fallback automático para `/tmp/.ffmotors_scheduler.lock` contra restrições de permissão de diretório.
   - Adicionado `misfire_grace_time=3600` (1 hora) prevenindo descarte de execução por desvios de relógio ou workers ocupados.
-  - Adicionada thread daemon de inicialização no WSGI (`_check_and_run_startup_jobs`): se o serviço reiniciar após a 01:00 AM sem que a rotina do dia tenha executado, dispara a execução imediatamente sem esperar pela madrugada seguinte.
+  - Adicionada thread daemon de inicialização no WSGI (`_check_and_run_startup_jobs`): no boot/deploy do serviço, executa as rotinas diárias com `force=True` no worker eleito com lock de scheduler, garantindo catch-up imediato de qualquer fatura pendente (ex: faturas de segunda-feira) mesmo que a trava diária tenha sido registrada por workers anteriores.
+  - Parâmetro `force=False` adicionado em `run_daily_jobs(force=False)` permitindo execução forçada e segura sem risco de duplicação graças à idempotência inerente do motor.
+* **Correção de Timezone Naive/Aware em `/api/alertas` (`listar_alertas`)**:
+  - Corrigido erro `TypeError: can't subtract offset-naive and offset-aware datetimes` ao calcular `(hoje - c.data_devolucao).days` no alerta de devolução de caução (`deposit_hold_due`), utilizando conversão explícita para `.date()` em ambos os objetos.
 * **Auditoria Formal de Rotinas Diárias (`AuditLog`)**:
   - Registro compulsório do evento `JOB_DAILY_ROUTINE` em `logs_auditoria` com a quantidade de cobranças geradas e quarentenas processadas a cada disparo diário.
 
