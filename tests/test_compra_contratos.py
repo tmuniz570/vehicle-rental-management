@@ -8,7 +8,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BASE_DIR)
 
 from app import app
-from database import db, Motorcycle, Client, Contract, FinancialTransaction, User, ContractType, MotoStatus, ContractStatus
+from database import db, Motorcycle, Client, Contract, FinancialTransaction, User, ContractType, MotoStatus, ContractStatus, MotorcycleV5C
 
 def test_purchase_system():
     print("=== STARTING VEHICLE PURCHASE CONTRACTS TEST ===")
@@ -16,6 +16,9 @@ def test_purchase_system():
     app.config['WTF_CSRF_ENABLED'] = False
     
     with app.app_context():
+        # Ensure fresh state for test plates
+        MotorcycleV5C.query.filter(MotorcycleV5C.placa.in_(["TEST_BUY1", "TEST_BUY2", "TEST_BUY3"])).delete()
+        db.session.commit()
         client = app.test_client()
         
         # 0. Setup admin user
@@ -264,20 +267,61 @@ def test_purchase_system():
         print("✓ Contract details HTML contains #card_sig_devolucao, #card_financial_statement and updated cachebuster")
 
         # ====================================================================
-        # TEST 4: Digital Signature & Auto-Completion
+        # TEST 4: Digital Signature & V5C Completion Lifecycle
         # ====================================================================
-        print("\n[TEST 4] Testing digital signature auto-completion for Purchase contract...")
+        print("\n[TEST 4] Testing digital signature & V5C Logbook completion lifecycle for Purchase contract...")
         dummy_sig = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
         res_sig = client.post(f'/api/contratos/{contract_id1}/assinar', 
                              data=json.dumps({'tipo': 'inicial', 'assinatura': dummy_sig}),
                              content_type='application/json')
         assert res_sig.status_code == 200, f"Expected 200, got {res_sig.status_code}: {res_sig.data.decode()}"
         
-        c1_after = Contract.query.get(contract_id1)
-        assert c1_after.status == ContractStatus.COMPLETED.value, f"Expected Completed status after signature, got {c1_after.status}"
-        assert c1_after.assinatura_cliente_inicial is not None
-        assert c1_after.data_assinatura_inicial is not None
-        print(f"✓ Purchase contract status automatically transitioned to '{c1_after.status}' upon signature")
+        c1_after_sig = Contract.query.get(contract_id1)
+        # Without V5C attached, the contract MUST remain Active and flag needs_v5c
+        assert c1_after_sig.status == ContractStatus.ACTIVE.value, f"Expected Active status without V5C, got {c1_after_sig.status}"
+        assert c1_after_sig.assinatura_cliente_inicial is not None
+        assert c1_after_sig.data_assinatura_inicial is not None
+        print("✓ Purchase contract signed but correctly remains 'Active' awaiting V5C Logbook")
+
+        # Verify details API reflects needs_v5c = True
+        res_det_pre = client.get(f'/api/contratos/{contract_id1}')
+        assert res_det_pre.status_code == 200
+        det_pre = json.loads(res_det_pre.data.decode())
+        assert det_pre['v5c_count'] == 0
+        assert det_pre['tem_v5c'] is False
+        assert det_pre['needs_v5c'] is True
+        print("✓ Contract details API flags needs_v5c = True and v5c_count = 0")
+
+        # Now attach V5C Logbook to TEST_BUY1
+        dummy_v5c = (io.BytesIO(b'%PDF-1.4 test v5c logbook doc'), 'V5C_TEST_BUY1.pdf')
+        res_v5c = client.post('/api/motos/TEST_BUY1/v5c', data={
+            'v5c_arquivos': dummy_v5c
+        }, content_type='multipart/form-data')
+        assert res_v5c.status_code == 201, f"Expected 201 Created V5C, got {res_v5c.status_code}: {res_v5c.data.decode()}"
+        v5c_id = json.loads(res_v5c.data.decode())['v5c_arquivos'][0]['id']
+        print(f"✓ Attached V5C Logbook ID #{v5c_id} to motorcycle TEST_BUY1")
+
+        # Contract must now be automatically Completed!
+        c1_completed = Contract.query.get(contract_id1)
+        assert c1_completed.status == ContractStatus.COMPLETED.value, f"Expected Completed status after V5C attached, got {c1_completed.status}"
+        print("✓ Purchase contract automatically transitioned to 'Completed' upon V5C attachment")
+
+        # Deleting V5C must automatically reopen the contract to Active!
+        res_del_v5c = client.delete(f'/api/motos/TEST_BUY1/v5c/{v5c_id}')
+        assert res_del_v5c.status_code == 200
+        c1_reopened = Contract.query.get(contract_id1)
+        assert c1_reopened.status == ContractStatus.ACTIVE.value, f"Expected Active status after V5C removed, got {c1_reopened.status}"
+        print("✓ Purchase contract dynamically reopened to 'Active' when V5C was deleted")
+
+        # Re-attach V5C to finalize again
+        dummy_v5c2 = (io.BytesIO(b'%PDF-1.4 test v5c logbook doc 2'), 'V5C_TEST_BUY1_FINAL.pdf')
+        res_v5c2 = client.post('/api/motos/TEST_BUY1/v5c', data={
+            'v5c_arquivos': dummy_v5c2
+        }, content_type='multipart/form-data')
+        assert res_v5c2.status_code == 201
+        c1_final = Contract.query.get(contract_id1)
+        assert c1_final.status == ContractStatus.COMPLETED.value, f"Expected Completed status after V5C re-attached, got {c1_final.status}"
+        print("✓ Purchase contract re-finalized to 'Completed' upon re-attaching V5C")
 
         # ====================================================================
         # TEST 5: API Details and Exemption Checks
@@ -290,9 +334,26 @@ def test_purchase_system():
         assert det_json['tipo_contrato'] == 'Purchase'
         assert det_json['is_pre_release_pending'] is False, "Purchase contracts must NOT require pre-release check!"
         assert det_json['checagem_seguro_devida'] is False, "Purchase contracts must NOT require askMID check!"
+        assert det_json['tem_v5c'] is True
+        assert det_json['needs_v5c'] is False
         assert float(det_json['valor_compra_veiculo']) == 1850.00
         assert det_json['metodo_pagamento_compra'] == 'Bank Transfer'
-        print("✓ Contract details API returns purchase terms and confirms askMID/pre-release exemptions")
+        print("✓ Contract details API confirms askMID & pre-release exemptions and completed V5C state")
+
+        # Check-out inspection exemption in listing
+        res_pending_release = client.get('/api/contratos?status=pending_release')
+        assert res_pending_release.status_code == 200
+        pending_release_ids = [it['id'] for it in json.loads(res_pending_release.data.decode()).get('itens', [])]
+        assert contract_id1 not in pending_release_ids
+        assert contract_id2 not in pending_release_ids
+        print("✓ Confirmed: Purchase contracts NEVER appear under pending_release (check-out inspection exemption)")
+
+        # Unsigned contract contract_id2 (no V5C) appears under pending_v5c filter
+        res_pending_v5c = client.get('/api/contratos?status=pending_v5c')
+        assert res_pending_v5c.status_code == 200
+        pending_v5c_ids = [it['id'] for it in json.loads(res_pending_v5c.data.decode()).get('itens', [])]
+        assert contract_id2 in pending_v5c_ids
+        print(f"✓ Confirmed: Purchase contract #{contract_id2} without V5C appears under status=pending_v5c: {pending_v5c_ids}")
 
         # ====================================================================
         # TEST 6: Contracts Listing Filter

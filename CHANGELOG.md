@@ -4,6 +4,38 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.20] — 2026-09-29 — *Weekly Rent Billing Resilience, Resilient Catch-Up Engine & Purchase Agreement V5C Lifecycle*
+
+### 🤝 Ciclo de Vida de Contratos de Compra (`Purchase`) & V5C Logbook
+* **Finalização Condicionada ao V5C (`sync_purchase_contract_status`)**:
+  - Contratos de compra de veículo usado (`Purchase`) apenas transitam para `Completed` quando estiverem assinados digitalmente pelo vendedor E possuírem o documento de Logbook (V5C) anexado à motocicleta (`MotorcycleV5C`).
+  - Enquanto o V5C não for anexado, o contrato permanece com status `Active` e exibe alerta visual de pendência.
+* **Reabertura Dinâmica se V5C for Removido**:
+  - Se todos os arquivos de V5C de uma moto comprada forem excluídos, o contrato de compra reabre automaticamente para `Active` com registro de auditoria `CONTRACT_REOPENED`.
+  - Ao re-anexar o documento de V5C da moto, o contrato retorna automaticamente para `Completed` com registro `CONTRACT_COMPLETED`.
+* **Isenção Total de Vistoria de Check-out e askMID para Compras**:
+  - Como a compra é uma entrada de veículo no estoque da oficina (e não uma saída para locação/venda), contratos de compra não exigem nem exibem alertas para vistoria de check-out (`InspectionType.CHECK_OUT`), seguro do cliente ou verificação quinzenal do askMID.
+* **Alertas e Filtros no Frontend & Dashboard**:
+  - **Banner de Alerta na Tela de Detalhes (`detalhe_contrato.html` / `detalhe_contrato.js`)**: Alerta dedicado em ciano destacando `LOGBOOK (V5C) REQUIRED: Purchase Agreement Incomplete` com botão de ação direta para upload do V5C.
+  - **Card no Dashboard (`templates/index.html` & `/api/dashboard`)**: Bloco de conformidade exibindo contratos de compra que aguardam entrega do documento V5C pelo vendedor.
+  - **Badge e Filtro na Lista de Contratos (`contratos.html` / `contratos.js`)**: Badge `📑 Needs V5C` e opção de filtro rápido `📑 Purchase: Pending V5C Logbook` (`status=pending_v5c`).
+
+### ⚡ Motor Resiliente de Faturamento Semanal (`_gerar_cobrancas_semanais_logic`)
+* **Geração Semanal Contínua (`Dia da Semana + 7`)**:
+  - Para cada contrato de aluguel ativo (`Rent` + `Active`), utiliza a coluna ativa `Contract.dia_pagamento_semanal` (que reflete qualquer dia da semana original ou alterado pelo operador de 0=Segunda a 6=Domingo).
+  - No dia da semana do vencimento, a rotina assegura a geração da cobrança da semana subsequente (`dia da semana + 7`), garantindo que **sempre que o cliente estiver com uma semana vencendo, a fatura da próxima já estará provisionada e visível**.
+* **Auto-Recuperação e Eliminação de Vulnerabilidade "Single-Shot" (Auto-Catch-Up)**:
+  - Elimina a dependência frágil de execução em segundo exato: a rotina agora inspeciona todos os contratos de aluguel ativos e verifica se a fatura do ciclo atual e do próximo ciclo (`+7`) já existem.
+  - Caso o agendador tenha deixado de rodar em um dia específico (por exemplo, reinício de servidor, suspensão ou queda de worker na segunda-feira), no momento da execução subsequente o sistema detecta as faturas faltantes dos ciclos anteriores e as provisiona imediatamente sem duplicar as existentes.
+* **Auto-Sincronização ao Alterar Dia de Vencimento (`PUT /api/contratos/<id>/dia-pagamento`)**:
+  - Ao alterar o dia de cobrança de um contrato ativo, o endpoint dispara de imediato uma verificação pelo motor gerador para alinhar o cronograma futuro ao novo dia da semana em tempo real.
+* **Fortificação do APScheduler no Gunicorn (`wsgi.py`)**:
+  - `open(lock_path, 'a+')` com fallback automático para `/tmp/.ffmotors_scheduler.lock` contra restrições de permissão de diretório.
+  - Adicionado `misfire_grace_time=3600` (1 hora) prevenindo descarte de execução por desvios de relógio ou workers ocupados.
+  - Adicionada thread daemon de inicialização no WSGI (`_check_and_run_startup_jobs`): se o serviço reiniciar após a 01:00 AM sem que a rotina do dia tenha executado, dispara a execução imediatamente sem esperar pela madrugada seguinte.
+* **Auditoria Formal de Rotinas Diárias (`AuditLog`)**:
+  - Registro compulsório do evento `JOB_DAILY_ROUTINE` em `logs_auditoria` com a quantidade de cobranças geradas e quarentenas processadas a cada disparo diário.
+
 ## [1.9.19] — 2026-09-28 — *Dynamic Sale Contract Lifecycle & Operational Fleet Alignment*
 
 ### 🔄 Ciclo de Vida Dinâmico de Contratos de Venda (`app.py` & `sync_sale_contract_status`)
@@ -18,8 +50,7 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
 * **Ajuste da Taxa de Utilização (`⚡ % Active Deals on Road`)**:
   - Eliminação da distorção que ultrapassava 100%:
   $$\text{Utilização} = \frac{\text{Rentals} + \text{Financed}}{\text{Total Fleet Operacional}} \times 100\%$$
-  - Apenas motocicletas com contrato completado/quitado (`motos_sold_outright`) e apreendidas (`Pound`) são consideradas fora da frota operacional.
-* **Tabela de Frotas (`/motos` & `static/js/motos.js`)**:
+  - Apenas motocicletas com contrato completado/quitado (`motos_sold_outright`) e apreendidas (`Pound`) são consideradas fora da frota operacional.* **Tabela de Frotas (`/motos` & `static/js/motos.js`)**:
   - O filtro padrão **`⚡ Active Fleet (In Operation)`** passa a exibir motos vendidas parceladas que possuem contratos ativos.
   - Exibição do selo **`Financed #ID ↗`** em roxo no status, acompanhado do nome do comprador/locatário e atalho para conversa direta no WhatsApp.
   - Selo **`Sold #ID ↗`** em tom neutro reservado exclusivamente para vendas concluídas/quitadas fora da frota.

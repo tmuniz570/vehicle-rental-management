@@ -1453,6 +1453,39 @@
                 </div>`;
             }
 
+            // Check for Purchase Contracts Pending V5C Logbook
+            if (dashData && dashData.compras_pendentes_v5c_count > 0) {
+                const comprasPend = dashData.compras_pendentes_v5c || [];
+                let itemsComprasHtml = '';
+                comprasPend.forEach(cp => {
+                    itemsComprasHtml += `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
+                            <span>📑 Contract #${cp.id} (<strong style="font-family:monospace; color:var(--text-primary);">${escapeHtml(cp.placa)}</strong> - ${escapeHtml(cp.cliente)}) • <span style="color:#22d3ee; font-weight:600;">Awaiting Logbook (V5C)</span></span>
+                            <a href="/contratos/${cp.id}" style="color:#22d3ee; text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Attach V5C &rarr;</a>
+                        </div>
+                    `;
+                });
+
+                html += `
+                <div style="background: rgba(6, 182, 212, 0.12); border-left: 4px solid #06b6d4; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <h4 style="margin: 0 0 5px 0; color: #22d3ee; font-size: 0.95rem;">📑 Purchase Agreements Pending V5C Logbook (${dashData.compras_pendentes_v5c_count})</h4>
+                        <span class="badge" style="background: rgba(6, 182, 212, 0.25); color: #22d3ee; font-size: 0.75rem; border: 1px solid rgba(6, 182, 212, 0.4);">Awaiting Logbook</span>
+                    </div>
+                    <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
+                        Purchased vehicles with signed agreements that cannot be finalized until the seller provides the vehicle V5C logbook document.
+                    </p>
+                    <div style="margin-top: 6px;">
+                        ${itemsComprasHtml}
+                    </div>
+                    <div style="margin-top: 8px;">
+                        <a href="/contratos?status=pending_v5c" style="color: #22d3ee; text-decoration: none; font-size: 0.85rem; font-weight: 600;">
+                            View all purchase contracts pending V5C &rarr;
+                        </a>
+                    </div>
+                </div>`;
+            }
+
             // 7. Check for Missing V5C Logbook Alerts
             if (dashData && dashData.motos_sem_v5c_count > 0) {
                 const motosSemV5C = dashData.motos_sem_v5c || [];

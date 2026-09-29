@@ -647,10 +647,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         const hasInsuranceDoc = Boolean(data.url_seguro);
         const isPreReleasePending = !isPurchaseContrato && isActiveContract && (!hasCheckoutInsp || !hasInsuranceDoc);
 
-        // Dynamic Pre-Delivery Compliance Alert Banner (Vehicle cannot leave premises without Check-out Inspection and Insurance)
+        // Dynamic Pre-Delivery Compliance Alert Banner (Vehicle cannot leave premises without Check-out Inspection and Insurance) & Purchase V5C Required Alert
         const preBanner = document.getElementById('prerelease_alert_banner');
         if (preBanner) {
-            if (isPreReleasePending) {
+            if (isPurchaseContrato && isActiveContract && (Number(data.v5c_count || 0) === 0)) {
+                preBanner.style.display = 'block';
+                preBanner.innerHTML = `
+                    <div style="background: rgba(6, 182, 212, 0.12); border: 1.5px solid rgba(6, 182, 212, 0.5); border-left: 6px solid #06b6d4; border-radius: 12px; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 14px;">
+                            <span style="font-size: 2rem;">📑</span>
+                            <div>
+                                <strong style="color: #22d3ee; font-size: 1rem; display: block; letter-spacing: 0.02em;">
+                                    LOGBOOK (V5C) REQUIRED: Purchase Agreement Incomplete
+                                </strong>
+                                <span style="color: var(--text-primary); font-size: 0.88rem; line-height: 1.4; display: block; margin-top: 2px;">
+                                    This purchase contract for vehicle <strong>(${escapeHtml(data.placa)})</strong> cannot be finalized until the vehicle Logbook (V5C) document is attached.
+                                </span>
+                            </div>
+                        </div>
+                        <div>
+                            <button type="button" id="btnBannerUploadV5C" class="btn-primary" style="background: #06b6d4; color: #000; font-weight: 700; font-size: 0.82rem; padding: 7px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: none; white-space: nowrap;">
+                                <span>📄</span> Upload V5C Logbook
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                const btnBannerV5C = document.getElementById('btnBannerUploadV5C');
+                if (btnBannerV5C) {
+                    btnBannerV5C.onclick = () => {
+                        const btnV5C = document.getElementById('btnShortcutV5C');
+                        if (btnV5C) {
+                            btnV5C.click();
+                        } else if (typeof window.abrirModalV5C === 'function') {
+                            window.abrirModalV5C();
+                        }
+                    };
+                }
+            } else if (isPreReleasePending) {
                 preBanner.style.display = 'block';
                 const missingList = [];
                 if (!hasCheckoutInsp) missingList.push('Initial Check-out Inspection Photos');
@@ -1855,7 +1889,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const vistContainer = document.getElementById('vistoriasList');
         vistContainer.innerHTML = '';
         
-        if (!hasCheckoutInsp && isActiveContract) {
+        if (!hasCheckoutInsp && isActiveContract && !isPurchaseContrato) {
             const checkoutPrompt = document.createElement('div');
             checkoutPrompt.style.cssText = "background: rgba(245, 158, 11, 0.12); border: 1px dashed rgba(245, 158, 11, 0.45); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;";
             checkoutPrompt.innerHTML = `

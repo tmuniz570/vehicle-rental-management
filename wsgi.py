@@ -22,23 +22,52 @@ def _acquire_scheduler_lock():
     try:
         import fcntl
         lock_path = os.path.join(basedir, '.scheduler.lock')
-        _scheduler_lock_fd = open(lock_path, 'w')
+        try:
+            _scheduler_lock_fd = open(lock_path, 'a+')
+        except (PermissionError, IOError):
+            lock_path = '/tmp/.ffmotors_scheduler.lock'
+            _scheduler_lock_fd = open(lock_path, 'a+')
+
         fcntl.flock(_scheduler_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return True
     except ImportError:
         # Ambiente Windows / Waitress mono-processo
         return True
-    except (BlockingIOError, IOError):
+    except BlockingIOError:
         print(f"[WSGI] Worker PID {os.getpid()} ignorou APScheduler: já ativo em outro worker.")
+        return False
+    except Exception as e:
+        print(f"[WSGI] Aviso do lock do agendador: {e}")
         return False
 
 # Inicia o agendador de tarefas diárias se este for o worker eleito
 if _acquire_scheduler_lock():
     try:
         scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
-        scheduler.add_job(func=run_daily_jobs, trigger="cron", hour=1, minute=0)
+        scheduler.add_job(
+            func=run_daily_jobs,
+            trigger="cron",
+            hour=1,
+            minute=0,
+            id="daily_rent_and_deposit_jobs",
+            replace_existing=True,
+            misfire_grace_time=3600
+        )
         scheduler.start()
-        print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Rotinas diárias à 01:00 de Londres).")
+        print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Rotinas diárias à 01:00 de Londres, misfire_grace=3600s).")
+
+        # Auto-recuperação no startup: se as rotinas de hoje ainda não tiverem sido executadas
+        # (ex: deploy após 01:00 AM ou restart do serviço), executa em thread assíncrona.
+        import threading
+        def _check_and_run_startup_jobs():
+            try:
+                import time
+                time.sleep(3)
+                run_daily_jobs()
+            except Exception as e_start:
+                print(f"[WSGI Startup Job Error]: {e_start}")
+
+        threading.Thread(target=_check_and_run_startup_jobs, daemon=True).start()
     except Exception as e:
         print(f"[WSGI] Aviso do agendador: {e}")
 

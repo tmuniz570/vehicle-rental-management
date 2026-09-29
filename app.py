@@ -2371,6 +2371,14 @@ def upload_v5c_moto(placa):
     db.session.commit()
     registrar_log('MOTO_V5C_UPLOADED', 'Motorcycle', moto.placa, f"{len(salvos)} arquivo(s) de V5C anexados à moto {moto.placa} por {operador_atual}")
     
+    # Sincroniza status de contratos de compra da moto (finaliza se estiver assinado e agora possui V5C)
+    contratos_compra = Contract.query.filter(
+        Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+        db.or_(Contract.placa == moto.placa, Contract.moto_placa == moto.placa)
+    ).all()
+    for cc in contratos_compra:
+        sync_purchase_contract_status(cc, auto_commit=True)
+    
     return jsonify({
         'message': f'{len(salvos)} V5C file(s) attached successfully',
         'mensagem': f'{len(salvos)} arquivo(s) de V5C anexados com sucesso',
@@ -2406,6 +2414,14 @@ def remover_v5c_moto(placa, v5c_id):
     db.session.delete(v5c)
     db.session.commit()
     registrar_log('MOTO_V5C_DELETED', 'Motorcycle', placa_clean, f"Documento V5C ({nome_orig}) da moto {placa_clean} excluído por {operador_atual}")
+    
+    # Sincroniza status de contratos de compra da moto (reabre para Active se não possui mais V5C)
+    contratos_compra = Contract.query.filter(
+        Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+        db.or_(Contract.placa == placa_clean, Contract.moto_placa == placa_clean)
+    ).all()
+    for cc in contratos_compra:
+        sync_purchase_contract_status(cc, auto_commit=True)
     
     return jsonify({'message': 'V5C document deleted successfully', 'mensagem': 'Documento V5C excluído com sucesso'}), 200
 
@@ -2573,6 +2589,68 @@ def sync_sale_contract_status(contrato_id_or_obj, auto_commit=False):
                 'Contract', 
                 contrato.id, 
                 f"Contrato de venda #{contrato.id} ({contrato.tipo_contrato}) concluído com sucesso após quitação integral de todas as cobranças (Operador: {operador_atual})."
+            )
+            alterou = True
+            
+    if alterou and auto_commit:
+        db.session.commit()
+        
+    return alterou
+
+def sync_purchase_contract_status(contrato_id_or_obj, auto_commit=False):
+    """
+    Sincroniza dinamicamente o status de contratos de compra (Purchase):
+    - Um contrato de compra finaliza ('Completed') quando:
+      1. Está assinado pelo vendedor (assinatura_cliente_inicial presente).
+      2. O documento de Logbook (V5C) do veículo está anexado no sistema (MotorcycleV5C).
+    - Enquanto não possuir o Logbook (V5C) anexado, permanece 'Active' exibindo alerta.
+    - Se todos os V5Cs da moto forem excluídos, reabre o contrato para 'Active'.
+    - Respeita contratos com status 'Cancelled'.
+    Retorna True se houve alteração no status do contrato.
+    """
+    if not contrato_id_or_obj:
+        return False
+        
+    contrato = db.session.get(Contract, contrato_id_or_obj) if isinstance(contrato_id_or_obj, int) else contrato_id_or_obj
+    if not contrato:
+        return False
+        
+    tipo = getattr(contrato, 'tipo_contrato', '') or ''
+    is_purchase = tipo in [ContractType.PURCHASE.value, 'Purchase', 'Compra']
+    if not is_purchase:
+        return False
+        
+    if contrato.status in [ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado']:
+        return False
+        
+    placa_alvo = (contrato.moto_placa or contrato.placa or '').strip().upper()
+    v5c_count = MotorcycleV5C.query.filter_by(placa=placa_alvo).count() if placa_alvo else 0
+    tem_v5c = (v5c_count > 0)
+    tem_assinatura = bool(contrato.assinatura_cliente_inicial)
+    
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    alterou = False
+    
+    if tem_assinatura and tem_v5c:
+        if contrato.status != ContractStatus.COMPLETED.value:
+            contrato.status = ContractStatus.COMPLETED.value
+            registrar_log(
+                'CONTRACT_COMPLETED',
+                'Contract',
+                contrato.id,
+                f"Contrato de compra #{contrato.id} ({placa_alvo}) concluído com sucesso após anexo do Logbook (V5C) e assinatura do vendedor (Operador: {operador_atual})."
+            )
+            alterou = True
+    else:
+        # Se falta V5C ou assinatura e o contrato estava como Completed, reabre para Active
+        if contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
+            contrato.status = ContractStatus.ACTIVE.value
+            motivo = "ausência do documento de Logbook (V5C)" if not tem_v5c else "ausência de assinatura do vendedor"
+            registrar_log(
+                'CONTRACT_REOPENED',
+                'Contract',
+                contrato.id,
+                f"Contrato de compra #{contrato.id} ({placa_alvo}) reaberto para Active por {motivo} (Operador: {operador_atual})."
             )
             alterou = True
             
@@ -2975,8 +3053,7 @@ def assinar_contrato(id):
             contrato.data_assinatura_inicial = agora_london_naive
             registrar_log('CONTRACT_SIGNED_START', 'Contract', contrato.id, f"Contrato #{contrato.id} assinado digitalmente na retirada por {contrato.cliente.nome if contrato.cliente else 'Cliente'} (Operador: {operador})")
             if contrato.tipo_contrato in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
-                contrato.status = ContractStatus.COMPLETED.value
-                registrar_log('CONTRACT_COMPLETED', 'Contract', contrato.id, f"Contrato de compra #{contrato.id} assinado pelo vendedor e concluído com sucesso.")
+                sync_purchase_contract_status(contrato)
 
         db.session.commit()
 
@@ -3237,6 +3314,12 @@ def alterar_dia_pagamento_contrato(id):
 
     db.session.commit()
 
+    # Auto-sincronização imediata: se o novo dia de vencimento já exigir cobrança da próxima semana, provisiona de imediato
+    try:
+        _gerar_cobrancas_semanais_logic()
+    except Exception as e_gen:
+        print(f"[Dia Pagamento Auto-Sync Error]: {e_gen}")
+
     return jsonify({
         'message': f"Weekly payment due day updated to {dias_nomes_en[novo_dia]}",
         'mensagem': f"Dia de vencimento semanal alterado com sucesso para {dias_nomes_en[novo_dia]} ({dias_nomes_pt[novo_dia]})",
@@ -3282,14 +3365,25 @@ def listar_contratos():
     status_filter = request.args.get('status', '', type=str)
     if status_filter:
         if status_filter.lower() in ['pending_release', 'pendente_liberacao', 'pre-delivery']:
-            # Active contracts with no insurance or no check-out inspection
+            # Active contracts with no insurance or no check-out inspection (excluding Purchase contracts)
             checkout_subq = db.session.query(Inspection.id).filter(
                 Inspection.id_contrato == Contract.id,
                 Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
             ).exists()
             query = query.filter(
                 Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+                ~Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
                 db.or_(Contract.url_seguro == None, ~checkout_subq)
+            )
+        elif status_filter.lower() in ['pending_v5c', 'needs_v5c']:
+            # Active purchase contracts missing V5C logbook
+            v5c_subq = db.session.query(MotorcycleV5C.id).filter(
+                MotorcycleV5C.placa == Contract.placa
+            ).exists()
+            query = query.filter(
+                Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+                Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+                ~v5c_subq
             )
         elif status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
             query = query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']))
@@ -3339,6 +3433,12 @@ def listar_contratos():
         tem_seguro = bool(c.url_seguro)
         is_active = (c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
         pendente_liberacao = is_active and not is_purchase and (not tem_checkout or not tem_seguro)
+        
+        placa_limpa = (c.moto_placa or c.placa or '').strip().upper()
+        v5c_count = len(c.moto.v5c_arquivos) if (c.moto and hasattr(c.moto, 'v5c_arquivos') and c.moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=placa_limpa).count() if (is_purchase and placa_limpa) else 0)
+        tem_v5c = (v5c_count > 0)
+        needs_v5c = bool(is_purchase and is_active and not tem_v5c)
+
         itens.append({
             'id': c.id, 
             'id_cliente': c.id_cliente, 
@@ -3362,7 +3462,10 @@ def listar_contratos():
             'url_seguro': c.url_seguro,
             'tem_vistoria_checkout': tem_checkout,
             'tem_seguro': tem_seguro,
-            'pendente_liberacao': pendente_liberacao
+            'pendente_liberacao': pendente_liberacao,
+            'tem_v5c': tem_v5c,
+            'needs_v5c': needs_v5c,
+            'v5c_count': v5c_count
         })
     
     return jsonify({
@@ -3434,9 +3537,11 @@ def detalhe_contrato(id):
     dias_para_proxima = max(0, 15 - dias_desde_checagem)
     checagem_seguro_devida = (dias_desde_checagem >= 15) if not (is_venda or is_purchase) else False
     
-    # Sincronização dinâmica de contratos de venda (conclui se tudo pago, reabre se há pendência)
+    # Sincronização dinâmica de contratos de venda e compra
     if is_venda:
         sync_sale_contract_status(c, auto_commit=True)
+    elif is_purchase:
+        sync_purchase_contract_status(c, auto_commit=True)
 
     is_completed = (c.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado', ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
     
@@ -3511,8 +3616,9 @@ def detalhe_contrato(id):
         'milhagem_atual_moto': int(moto.milhagem_atual or 0) if moto else 0,
         'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
         'milhagem_final': c.milhagem_final,
-        'milhas_rodadas': (c.milhagem_final - (c.milhagem_inicial or 0)) if (c.milhagem_final is not None and c.milhagem_inicial is not None) else None,
-        'v5c_count': len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else 0,
+        'v5c_count': len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=(c.moto_placa or c.placa or '').strip().upper()).count() if (c.moto_placa or c.placa) else 0),
+        'tem_v5c': (len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=(c.moto_placa or c.placa or '').strip().upper()).count() if (c.moto_placa or c.placa) else 0)) > 0,
+        'needs_v5c': bool(is_purchase and c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'] and ((len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=(c.moto_placa or c.placa or '').strip().upper()).count() if (c.moto_placa or c.placa) else 0)) == 0)),
         'trackers_count': len(moto.trackers) if (moto and hasattr(moto, 'trackers') and moto.trackers) else 0,
         'trackers_summary': [{
             'id': t.id,
@@ -5548,6 +5654,24 @@ def get_dashboard():
                     'pendencias_txt': " & ".join(pendencias)
                 })
 
+        # Compliance de Compras: Contratos de Compra pendentes de Logbook (V5C)
+        compras_pendentes_v5c = []
+        for ca in contratos_ativos_objs:
+            tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
+            if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+                placa_limpa = (ca.moto_placa or ca.placa or '').strip().upper()
+                tem_v5c = (MotorcycleV5C.query.filter_by(placa=placa_limpa).first() is not None) if placa_limpa else False
+                if not tem_v5c:
+                    cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
+                    compras_pendentes_v5c.append({
+                        'id': ca.id,
+                        'placa': placa_limpa,
+                        'cliente': cli_nome,
+                        'valor_compra': float(ca.valor_compra_veiculo or 0.0),
+                        'data_retirada': ca.data_retirada.strftime('%d/%m/%Y') if ca.data_retirada else None
+                    })
+        compras_pendentes_v5c_count = len(compras_pendentes_v5c)
+
         # Compliance: Motos sem Documento V5C (Logbook)
         # Monitora todas as motos da empresa (inclusive vendidas, que necessitam do V5C arquivado para transferência e auditoria)
         motos_sem_v5c_objs = db.session.query(Motorcycle).options(
@@ -5630,6 +5754,8 @@ def get_dashboard():
             'contratos_seguro_alerta': contratos_seguro_alerta,
             'pendentes_liberacao_count': len(contratos_pendentes_liberacao),
             'contratos_pendentes_liberacao': contratos_pendentes_liberacao,
+            'compras_pendentes_v5c_count': compras_pendentes_v5c_count,
+            'compras_pendentes_v5c': compras_pendentes_v5c,
             'contratos_ativos': contratos_ativos,
             'total_clientes': total_clientes,
             'receita_pendente': receita_pendente,
@@ -5765,49 +5891,74 @@ _BILLING_MUTEX = threading.Lock()
 
 def _gerar_cobrancas_semanais_logic():
     """
-    Gera as cobranças de aluguel semanais para contratos ativos cujo dia de pagamento seja hoje.
-    Protegido por mutex de thread e commit imediato por contrato para evitar qualquer duplicidade.
+    Gera as cobranças de aluguel semanais para todos os contratos de aluguel ativos.
+    Regra de Negócio FF Motors:
+    - Cada contrato possui seu dia da semana na coluna Contract.dia_pagamento_semanal (0=Segunda, ..., 6=Domingo).
+    - No dia da semana do contrato, gera sempre a cobrança do vencimento para o dia da semana + 7.
+      Assim, sempre que o cliente estiver com uma semana vencendo, a fatura da próxima já está gerada e visível.
+    - Se por qualquer motivo o sistema não tiver executado no dia exato (ex: reinicialização do servidor ou queda de worker),
+      o gerador faz a auto-recuperação (catch-up): verifica se a fatura do próximo ciclo (ou da semana atual)
+      está faltando e gera automaticamente, prevenindo qualquer buraco no faturamento.
+    - Idempotência absoluta: verifica antes se já existe lançamento de Rent para aquela data (pago ou pendente).
+    - Commit e mutex por contrato para isolamento total contra concorrência.
     """
     with _BILLING_MUTEX:
         # London / UK timezone
         tz = pytz.timezone('Europe/London')
-        hoje = datetime.now(tz)
-        dia_semana_atual = hoje.weekday() # 0 = Monday, 6 = Sunday
-        
-        hoje_utc = get_local_now()
+        hoje_london = datetime.now(tz)
+        hoje_date = hoje_london.date()
+        dia_semana_hoje = hoje_date.weekday() # 0 = Monday, ..., 6 = Sunday
         
         contratos_ativos = Contract.query.filter(
             Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
-            Contract.dia_pagamento_semanal == dia_semana_atual,
             db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None, Contract.tipo_contrato == 'Rent')
         ).all()
         
         transacoes_geradas = 0
-        proximo_vencimento = (hoje_utc + timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
-        inicio_dia_prox = proximo_vencimento.replace(hour=0, minute=0, second=0, microsecond=0)
-        fim_dia_prox = inicio_dia_prox + timedelta(days=1)
         
         for contrato in contratos_ativos:
-            # Garante que não exista nenhuma cobrança de Rent para este contrato neste vencimento (Paga ou Pendente)
-            cobranca_existente = FinancialTransaction.query.filter(
-                FinancialTransaction.id_contrato == contrato.id,
-                FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']),
-                FinancialTransaction.data_vencimento >= inicio_dia_prox,
-                FinancialTransaction.data_vencimento < fim_dia_prox
-            ).first()
-            
-            if not cobranca_existente:
-                nova_cobranca = FinancialTransaction(
-                    id_contrato=contrato.id,
-                    tipo=TransactionType.RENT.value,
-                    data_vencimento=proximo_vencimento,
-                    valor=contrato.valor_aluguel_semanal,
-                    status=TransactionStatus.PENDING.value
-                )
-                db.session.add(nova_cobranca)
-                db.session.commit() # Commit imediato por contrato para visibilidade transacional concorrente
-                transacoes_geradas += 1
+            valor_aluguel = float(contrato.valor_aluguel_semanal or 0.0)
+            if valor_aluguel <= 0:
+                continue
                 
+            # Obtém o dia da semana ativo configurado no contrato (0=Segunda a 6=Domingo)
+            dia_contrato = contrato.dia_pagamento_semanal
+            if dia_contrato is None or dia_contrato < 0 or dia_contrato > 6:
+                dia_contrato = contrato.data_retirada.weekday() if getattr(contrato, 'data_retirada', None) else 0
+                
+            dias_desde_ultimo = (dia_semana_hoje - dia_contrato) % 7
+            ultimo_vencimento_date = hoje_date - timedelta(days=dias_desde_ultimo)
+            proximo_vencimento_date = ultimo_vencimento_date + timedelta(days=7)
+            
+            vencimentos_alvo = []
+            data_inicio_contrato = getattr(contrato, 'data_retirada', None)
+            if not data_inicio_contrato or data_inicio_contrato.date() <= ultimo_vencimento_date:
+                vencimentos_alvo.append(ultimo_vencimento_date)
+            vencimentos_alvo.append(proximo_vencimento_date)
+            
+            for v_date in vencimentos_alvo:
+                inicio_dia = datetime(v_date.year, v_date.month, v_date.day, 0, 0, 0)
+                fim_dia = inicio_dia + timedelta(days=1)
+                
+                cobranca_existente = FinancialTransaction.query.filter(
+                    FinancialTransaction.id_contrato == contrato.id,
+                    FinancialTransaction.tipo.in_([TransactionType.RENT.value, 'Rent', 'Aluguel']),
+                    FinancialTransaction.data_vencimento >= inicio_dia,
+                    FinancialTransaction.data_vencimento < fim_dia
+                ).first()
+                
+                if not cobranca_existente:
+                    nova_cobranca = FinancialTransaction(
+                        id_contrato=contrato.id,
+                        tipo=TransactionType.RENT.value,
+                        data_vencimento=inicio_dia,
+                        valor=valor_aluguel,
+                        status=TransactionStatus.PENDING.value
+                    )
+                    db.session.add(nova_cobranca)
+                    db.session.commit() # Commit imediato por contrato para visibilidade transacional concorrente
+                    transacoes_geradas += 1
+                    
         return transacoes_geradas
 
 @app.route('/api/jobs/gerar-cobrancas-semanais', methods=['POST'])
@@ -6004,6 +6155,16 @@ def run_daily_jobs():
         t_cobrancas = _gerar_cobrancas_semanais_logic()
         t_quarentenas = _processar_quarentenas_logic()
         print(f"[Cron] Concluído. {t_cobrancas} cobranças geradas, {t_quarentenas} quarentenas processadas.")
+        
+        try:
+            registrar_log(
+                'JOB_DAILY_ROUTINE',
+                'System',
+                None,
+                f"Rotinas diárias automáticas executadas ({london_date_str}). {t_cobrancas} cobrança(s) de aluguel gerada(s), {t_quarentenas} quarentena(s) processada(s)."
+            )
+        except Exception as e_log:
+            print(f"[Cron Log Error]: {e_log}")
 
 if __name__ == '__main__':
     uploads_dir = os.path.join(basedir, 'static', 'uploads')
@@ -6012,7 +6173,15 @@ if __name__ == '__main__':
     # Start APScheduler with Europe/London timezone at 01:00 AM (guarded for Flask reloader)
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
         scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
-        scheduler.add_job(func=run_daily_jobs, trigger="cron", hour=1, minute=0)
+        scheduler.add_job(
+            func=run_daily_jobs,
+            trigger="cron",
+            hour=1,
+            minute=0,
+            id="daily_rent_and_deposit_jobs",
+            replace_existing=True,
+            misfire_grace_time=3600
+        )
         scheduler.start()
     
     debug_mode = os.environ.get('FLASK_DEBUG', 'true').lower() in ('true', '1')

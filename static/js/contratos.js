@@ -83,7 +83,7 @@ async function carregarContratos() {
                 statusBadge = `<span class="badge">${escapeHtml(c.status)}</span>`;
             }
 
-            // Pre-delivery compliance reminder (Missing checkout inspection and/or insurance)
+            // Pre-delivery compliance reminder (Missing checkout inspection and/or insurance) & Purchase V5C reminder
             let pendingWarningBadge = '';
             if (c.pendente_liberacao) {
                 let tags = [];
@@ -91,6 +91,8 @@ async function carregarContratos() {
                 if (!c.tem_seguro) tags.push('Ins');
                 const tagStr = tags.length > 0 ? tags.join(' + ') : 'Pending';
                 pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Motorbike cannot be released until check-out photos and insurance certificate are registered">⚠️ Needs ${escapeHtml(tagStr)}</span></div>`;
+            } else if (c.needs_v5c) {
+                pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(6, 182, 212, 0.18); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement pending vehicle Logbook (V5C) attachment">📑 Needs V5C</span></div>`;
             }
             
             const nomeCliente = escapeHtml(c.cliente_nome || '-');
@@ -144,6 +146,8 @@ document.addEventListener('DOMContentLoaded', () => {
             filterStatus.value = 'Deposit_Hold';
         } else if (paramStatus.toLowerCase() === 'pending_release' || paramStatus.toLowerCase() === 'pre-delivery' || paramStatus.toLowerCase() === 'pendente_liberacao') {
             filterStatus.value = 'pending_release';
+        } else if (paramStatus.toLowerCase() === 'pending_v5c' || paramStatus.toLowerCase() === 'needs_v5c') {
+            filterStatus.value = 'pending_v5c';
         } else if (paramStatus.toLowerCase() === 'active') {
             filterStatus.value = 'Active';
         } else if (paramStatus.toLowerCase() === 'completed') {
