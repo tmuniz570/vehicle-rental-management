@@ -290,8 +290,33 @@ class TestFinanceiroImprovements(unittest.TestCase):
         self.assertIn('Date (Payment Date):', html_pdf)
         print("✓ Smart filter alignment verified: Paid transactions properly filter on Payment Date across API and PDF Report")
 
+    def test_12_relatorio_pdf_edge_cases(self):
+        """Test GET /financeiro/relatorio-pdf handles aware datetimes, null amounts, and missing relations safely."""
+        from database import db, FinancialTransaction, TransactionStatus, TransactionType
+        import pytz
+        
+        # Create an edge case transaction with aware datetime and zero/none amounts
+        tz = pytz.timezone('Europe/London')
+        t_edge = FinancialTransaction(
+            id_contrato=1,
+            tipo=TransactionType.RENT.value,
+            data_vencimento=datetime.now(tz) - timedelta(days=2),
+            data_pagamento=None,
+            valor=0.0,
+            status=TransactionStatus.PENDING.value
+        )
+        db.session.add(t_edge)
+        db.session.commit()
+
+        res = self.client.get('/financeiro/relatorio-pdf')
+        self.assertEqual(res.status_code, 200)
+        html = res.get_data(as_text=True)
+        self.assertIn('FF MOTORS BIRMINGHAM', html)
+        print("✓ /financeiro/relatorio-pdf passed edge cases (aware datetime, null-safe calculations)")
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
 

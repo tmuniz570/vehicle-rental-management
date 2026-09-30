@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Overdue Payments Report | FF Motors Birmingham</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -23,6 +24,11 @@
         }
         .header-title { text-align: left; }
         .header-meta { text-align: right; font-size: 0.9rem; color: #555; }
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -48,6 +54,22 @@
             font-size: 1rem;
             margin-bottom: 1rem;
         }
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem 0.75rem;
+            }
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+            .header-meta {
+                text-align: left;
+            }
+            table {
+                min-width: 580px;
+            }
+        }
         @media print {
             .no-print { display: none !important; }
             body { padding: 0; }
@@ -70,6 +92,7 @@
         </div>
     </div>
 
+    <div class="table-responsive">
     <table>
         <thead>
             <tr>
@@ -102,6 +125,7 @@
             </tr>
         </tbody>
     </table>
+    </div>
 
     <div style="margin-top: 3rem; text-align: center; color: #777; font-size: 0.85rem;">
         FF Motors Fleet Management &bull; Birmingham UK &bull; Confidential

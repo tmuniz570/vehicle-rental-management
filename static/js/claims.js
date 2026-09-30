@@ -477,7 +477,7 @@ function fecharModalEditClaim() {
 
 function imprimirInvoiceStorageModal() {
     if (claimSelecionadoId) {
-        window.open(`/claims/invoice/${claimSelecionadoId}`, '_blank');
+        window.location.href = `/claims/invoice/${claimSelecionadoId}`;
     }
 }
 

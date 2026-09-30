@@ -451,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (statusFiltro) queryParams.set('status', statusFiltro);
             if (v5cFiltro) queryParams.set('v5c', v5cFiltro);
-            window.open(`/motos/relatorio-pdf?${queryParams.toString()}`, '_blank');
+            window.location.href = `/motos/relatorio-pdf?${queryParams.toString()}`;
         });
     }
 

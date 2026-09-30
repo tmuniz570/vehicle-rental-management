@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Financial Report | FF Motors Birmingham</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -53,6 +54,41 @@
         }
         .btn-back:hover {
             background: #475569;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem 0.75rem;
+            }
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .header-meta {
+                text-align: left !important;
+            }
+            .no-print {
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+            .btn-action {
+                padding: 0.75rem 1.1rem;
+                font-size: 0.95rem;
+            }
+            .summary-bar {
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 0.75rem !important;
+            }
+            table {
+                min-width: 750px;
+            }
         }
 
         .header {
@@ -237,33 +273,34 @@
         <div class="header-meta">
             <div><strong>Generated:</strong> {{ data_geracao }} (London Time)</div>
             <div><strong>Staff Operator:</strong> {{ operador }}</div>
-            <div class="filter-badge">Filter: {{ filtro_ativo }}</div>
+            <div class="filter-badge">Filter: {{ filtro_ativo|safe }}</div>
         </div>
     </div>
 
     <div class="summary-bar">
         <div class="summary-item">
             <span class="summary-label">Total Transactions</span>
-            <span class="summary-value">{{ totais.total_count }}</span>
+            <span class="summary-value">{{ totais.total_count or 0 }}</span>
         </div>
         <div class="summary-item">
             <span class="summary-label">Total Amount</span>
-            <span class="summary-value">£{{ "%.2f"|format(totais.total_valor) }}</span>
+            <span class="summary-value">£{{ "%.2f"|format(totais.total_valor or 0.0) }}</span>
         </div>
         <div class="summary-item">
             <span class="summary-label" style="color: #15803d;">Collected (Paid)</span>
-            <span class="summary-value" style="color: #15803d;">£{{ "%.2f"|format(totais.total_pago) }}</span>
+            <span class="summary-value" style="color: #15803d;">£{{ "%.2f"|format(totais.total_pago or 0.0) }}</span>
         </div>
         <div class="summary-item">
             <span class="summary-label" style="color: #b45309;">Pending</span>
-            <span class="summary-value" style="color: #b45309;">£{{ "%.2f"|format(totais.total_pendente) }}</span>
+            <span class="summary-value" style="color: #b45309;">£{{ "%.2f"|format(totais.total_pendente or 0.0) }}</span>
         </div>
         <div class="summary-item">
             <span class="summary-label" style="color: #b91c1c;">Overdue</span>
-            <span class="summary-value" style="color: #b91c1c;">£{{ "%.2f"|format(totais.total_overdue) }}</span>
+            <span class="summary-value" style="color: #b91c1c;">£{{ "%.2f"|format(totais.total_overdue or 0.0) }}</span>
         </div>
     </div>
 
+    <div class="table-responsive">
     <table>
         <thead>
             <tr>
@@ -303,7 +340,7 @@
                     {% endif %}
                 </td>
                 <td style="text-align: right; font-weight: 700; font-size: 8.5pt;">
-                    £{{ "%.2f"|format(t.valor) }}
+                    £{{ "%.2f"|format(t.valor or 0.0) }}
                 </td>
                 <td>
                     {{ t.data_vencimento_fmt }}
@@ -345,6 +382,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 
     <div class="footer">
         <div>FF Motors Ltd &bull; Fleet Rental & Vehicle Sales Financial Record &bull; Confidential</div>

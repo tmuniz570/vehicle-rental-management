@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Closing Sheet &bull; {{ data_formatada }} | FF Motors Birmingham</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -54,6 +55,43 @@
         }
         .btn-back:hover {
             background: #475569;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem 0.75rem;
+            }
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .header-meta {
+                text-align: left !important;
+            }
+            .no-print {
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+            .no-print input[type="date"] {
+                font-size: 16px !important;
+                min-height: 42px;
+            }
+            .btn-action {
+                padding: 0.75rem 1.1rem;
+                font-size: 0.95rem;
+            }
+            .kpi-grid, .breakdown-grid, .balancing-grid {
+                grid-template-columns: 1fr !important;
+            }
+            table {
+                min-width: 720px;
+            }
         }
 
         .header {
@@ -447,6 +485,7 @@
         <span style="font-size: 7.5pt; font-weight: normal; color: #64748b;">Sorted chronologically by payment time</span>
     </div>
 
+    <div class="table-responsive">
     <table>
         <thead>
             <tr>
@@ -521,6 +560,7 @@
             </tr>
         </tfoot>
     </table>
+    </div>
 
     <!-- Formal Sign-Off Section -->
     <div class="signoff-box">

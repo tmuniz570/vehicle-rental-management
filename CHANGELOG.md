@@ -4,6 +4,37 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.21] — 2026-09-30 — *Financial Statement PDF Report Production Hardening*
+
+### 📱 Navegação de Relatórios na Mesma Aba & Usabilidade Mobile para iPhone (iOS Safari)
+* **Abertura de Relatórios na Mesma Guia (`window.location.href`)**:
+  - Relatório da Frota (`/motos/relatorio-pdf`) e Fatura de Storage (`/claims/invoice/<id>`) alterados de `window.open(..., '_blank')` para `window.location.href`, garantindo navegação contínua na mesma janela.
+  - Atualizados os botões de retorno de todos os relatórios para links explícitos (`&larr; Back to Fleet`, `&larr; Back to Finance`), eliminando dependência frágil de `window.close()`.
+* **Eliminação Definitiva do Auto-Zoom do iOS Safari**:
+  - Implementada regra global para `@media (max-width: 768px)` com `font-size: 16px !important;` em todos os elementos `input`, `select` e `textarea`. No iOS Safari, qualquer campo com fonte inferior a 16px provoca zoom indesejado ao tocar, desorganizando a tela.
+* **Viewport e Scroll Nativo nos Relatórios Imprimíveis**:
+  - Adicionado `<meta name="viewport" content="width=device-width, initial-scale=1.0">` em [templates/relatorio_fleet.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_fleet.html), [templates/relatorio_financeiro.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_financeiro.html), [templates/relatorio_fechamento_caixa.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_fechamento_caixa.html) e [templates/relatorio_vencidos.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/relatorio_vencidos.html), impedindo que o Safari renderize a página emulando 980px de desktop.
+  - Tabelas de relatórios envolvidas em contêineres `.table-responsive` com `-webkit-overflow-scrolling: touch;`, permitindo rolagem horizontal suave no polegar.
+* **Ergonomia de Toque e Modais com Dynamic Viewport (`100dvh`)**:
+  - Modais ajustados com `max-height: calc(100dvh - 2rem)` e padding adaptado para as zonas seguras (`env(safe-area-inset-top)` / `env(safe-area-inset-bottom)`), evitando que a barra de navegação do iPhone corte botões de confirmação.
+  - Form inputs e botões móveis com altura mínima de toque de 44px conforme diretrizes da Apple (HIG) e `touch-action: manipulation` para remover atraso de 300ms no clique.
+* **Formulário de Novo Contrato Parcelado no iPhone (iOS Ergonomics)**:
+  - **Proporção da Linha de Acessórios & Extras**: O campo de descrição agora expande ocupando todo o espaço restante (`minmax(0, 1fr)`), enquanto o campo de valor foi calibrado para 78px com setas de incremento ocultas (sem stepper buttons), exibindo confortavelmente 4 ou mais dígitos (ex: `£ 2500` ou `£ 9999`) sem truncamento. O valor inicial inicia limpo com placeholder `£ 0`, eliminando o incômodo de precisar apagar o zero inicial ao digitar.
+  - **Ajuste Responsivo da Barra de Auto Split**: O botão "⚡ Auto Split" (`#btnGenerateSchedule`) e os seletores de quantidade/intervalo de parcelas foram reestruturados com classes responsivas (`.schedule-builder-header`, `.schedule-split-controls`), quebrando linhas graciosamente no iPhone sem transbordar horizontalmente fora da página.
+  - **Admin Fee Desobstruído**: Removido o `value="0.00"` fixo do campo de Admin Fee em [templates/novo_contrato.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/novo_contrato.html), substituído por placeholder `0.00`. O campo agora inicia vazio e limpo para digitação direta, assumindo `0.00` de forma transparente caso não seja preenchido.
+
+### 🛠️ Correção Crítica no Relatório Financeiro PDF (`/financeiro/relatorio-pdf`)
+* **Eliminação de Erro 500 por Comparação de Timezone / Date Naive vs Aware (`TypeError`)**:
+  - Em produção (PostgreSQL), comparações diretas de `t.data_vencimento < inicio_hoje` no Python causavam `TypeError: can't compare datetime.datetime to datetime.date` ou `TypeError: can't compare offset-naive and offset-aware datetimes` quando os registros retornavam com timezone ou formato date.
+  - Normalização universal implementada convertendo com segurança `t.data_vencimento` para `datetime.date` no fuso de Londres (`Europe/London`) e comparando estritamente com `get_london_date()`.
+* **Otimização de Performance N+1 (`contains_eager`)**:
+  - A rota agora aplica `.options(contains_eager(FinancialTransaction.contrato).contains_eager(Contract.cliente))` na query com `outerjoin`, eliminando centenas de queries repetidas em lazy-load para cada linha e prevenindo exaustão de conexões ou timeout do Gunicorn/Nginx.
+* **Blindagem contra Valores Nulos (Null-Safety)**:
+  - Tratamento defensivo de montantes `float(t.valor or 0.0)` e formatação segura de somatórios no template Jinja2 (`relatorio_financeiro.html`) com `totais.total_valor or 0.0`, prevenindo `TypeError: must be real number, not NoneType`.
+  - Fallback gracioso para dados congelados de cliente no contrato (`cliente_nome`, `cliente_telefone`) caso o registro relacional tenha sido modificado.
+* **Diagnóstico e Rastreabilidade (`handle_server_error`)**:
+  - Adicionado `traceback.print_exc()` no errorhandler global 500 do Flask e log detalhado de exceção na rota, assegurando visibilidade imediata em logs de serviço do Linux (`journalctl -u ffmotors`).
+
 ## [1.9.20] — 2026-09-29 — *Weekly Rent Billing Resilience, Resilient Catch-Up Engine & Purchase Agreement V5C Lifecycle*
 
 ### 🤝 Ciclo de Vida de Contratos de Compra (`Purchase`) & V5C Logbook

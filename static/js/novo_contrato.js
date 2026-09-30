@@ -408,16 +408,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         extrasItems.forEach((item, index) => {
             const row = document.createElement('div');
-            row.style.cssText = 'display: grid; grid-template-columns: 1fr 120px 36px; gap: 8px; align-items: center; background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border-color);';
+            row.style.cssText = 'display: grid; grid-template-columns: minmax(0, 1fr) 78px 28px; gap: 6px; align-items: center; background: rgba(255,255,255,0.02); padding: 5px 8px; border-radius: 8px; border: 1px solid var(--border-color);';
+            const priceVal = (item.price && parseFloat(item.price) > 0) ? parseFloat(item.price) : '';
             row.innerHTML = `
-                <div>
-                    <input type="text" class="extra-desc-input" data-idx="${index}" value="${escapeHtml(item.desc || '')}" placeholder="Description (e.g. Easyblok)" style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.85rem;">
+                <div style="min-width: 0;">
+                    <input type="text" class="extra-desc-input" data-idx="${index}" value="${escapeHtml(item.desc || '')}" placeholder="Description (e.g. Easyblok)" style="width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.88rem;">
                 </div>
-                <div>
-                    <input type="number" step="0.01" class="extra-price-input" data-idx="${index}" value="${parseFloat(item.price || 0)}" placeholder="Price (£)" style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.85rem;">
+                <div style="min-width: 0;">
+                    <input type="number" step="0.01" class="extra-price-input" data-idx="${index}" value="${priceVal}" placeholder="£ 0" style="width: 100%; box-sizing: border-box; padding: 6px 6px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); color: var(--text-primary); font-size: 0.88rem; font-weight: 600; text-align: right;">
                 </div>
-                <div style="text-align: center;">
-                    <button type="button" class="btn-remove-extra" data-idx="${index}" title="Remove Extra" style="background: transparent; border: none; color: #ef4444; font-size: 1.25rem; cursor: pointer; padding: 2px 6px; line-height: 1;">&times;</button>
+                <div style="display: flex; justify-content: center; align-items: center;">
+                    <button type="button" class="btn-remove-extra" data-idx="${index}" title="Remove Extra" style="background: transparent; border: none; color: #ef4444; font-size: 1.35rem; cursor: pointer; padding: 0; line-height: 1; display: flex; align-items: center; justify-content: center; width: 28px; height: 32px;">&times;</button>
                 </div>
             `;
             extrasContainer.appendChild(row);

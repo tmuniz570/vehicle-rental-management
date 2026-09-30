@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fleet Status Report | FF Motors Birmingham</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -53,6 +54,36 @@
         }
         .btn-back:hover {
             background: #475569;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1rem 0.75rem;
+            }
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .header-meta {
+                text-align: left !important;
+            }
+            .no-print {
+                flex-wrap: wrap;
+                gap: 0.75rem;
+            }
+            .btn-action {
+                padding: 0.75rem 1.1rem;
+                font-size: 0.95rem;
+            }
+            table {
+                min-width: 650px;
+            }
         }
 
         .header {
@@ -177,7 +208,7 @@
 </head>
 <body>
     <div class="no-print">
-        <button onclick="window.close(); if(history.length > 1) history.back();" class="btn-action btn-back">&larr; Back to Fleet</button>
+        <a href="/motos" class="btn-action btn-back">&larr; Back to Fleet</a>
         <button class="btn-action" onclick="window.print()">🖨️ Print / Save as PDF</button>
     </div>
 
@@ -201,6 +232,7 @@
         <div style="color: #64748b;">Official Fleet Management Record</div>
     </div>
 
+    <div class="table-responsive">
     <table>
         <thead>
             <tr>
@@ -256,6 +288,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 
     <div class="footer">
         <span>FF Motors Fleet Management &bull; Confidential & Internal Operational Document</span>
