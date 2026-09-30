@@ -4,6 +4,105 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.24] — 2026-09-30 — *Contract Details Screen Ergonomics, Financial Progress & Contextual Intelligence*
+
+### 💎 Experiência, Inteligência de Contexto & Finanças na Tela de Detalhes do Contrato (`/contratos/<id>`)
+* **Mini-Barra de Resumo Financeiro & Progresso de Quitação (%) (`#fin_summary_panel`)**:
+  - Painel de síntese financeira no topo do Extrato Financeiro com 3 métricas principais:
+    - **Contract Total / Total Contratado**: Valor total da venda para contratos de venda (`Sale_Full` e `Sale_Installment`) ou total de cobranças faturadas para locações (`Rent`).
+    - **Total Paid / Total Pago**: Somatório em verde de todas as cobranças já quitadas pelo cliente.
+    - **Balance / Saldo Restante**: Saldo pendente em cor secundária neutra, atualizado em tempo real.
+  - **Barra de Progresso de Quitação (%)**:
+    - Para vendas parceladas (`Sale_Installment`): Exibe o percentual concluído (ex: `4 of 12 paid (33%)`), valor e data de vencimento da próxima parcela e badge destacado `SETTLED` ao concluir a quitação.
+    - Para vendas à vista (`Sale_Full`): Indicador de compensação integral do pagamento (`CLEARED`).
+    - Para locações (`Rent`): Exibe o saldo da caução retida (`Deposit Held`) e seu status de liberação.
+* **Limpeza Contextual Inteligente por Modelo de Contrato**:
+  - **Vendas (`Sale_Full` & `Sale_Installment`)**: Oculta automaticamente a caixa de caução de locação (`#box_deposito_info`) e mantém ocultas a assinatura de devolução e a rotina quinzenal do askMID.
+  - **Compras / Aquisições (`Purchase`)**: Oculta completamente a seção de seguro de cliente (`#box_seguro_section`) e o atalho de extrato financeiro, mantendo o foco operacional na posse do documento V5C (Logbook) e no status do destino da frota.
+  - **Aluguéis (`Rent`)**: Mantém integralmente todas as rotinas de locação ativas (caução retida/restituída, assinatura de devolução, monitoramento askMID de 15 em 15 dias e alteração de dia de vencimento semanal).
+* **Atalho Direto para WhatsApp em Nova Guia & Remoção de Duplicidade**:
+  - Removido o botão duplicado do rodapé do card de cliente (`#info_cliente_links`), mantendo um único atalho direto e limpo ao lado do número de telefone.
+  - O botão de WhatsApp agora abre em nova guia (`target="_blank" rel="noopener noreferrer"`).
+  - **Revisão Integral de Mensagens Prontas de WhatsApp**: Removida qualquer menção ao número de contrato (que o cliente desconhece). Todas as mensagens em Detalhes, Contratos, Financeiro, Dashboard e Frotas agora identificam o contexto pela **placa do veículo** e nome do cliente (ex: `regarding vehicle XX10YYY`).
+* **Pílulas de Navegação Rápida por Seção (`.contract-nav-pills`)**:
+  - Sub-header com atalhos de rolagem suave (*smooth scroll*) para navegação rápida: `👤 Overview`, `📄 Agreement & Signatures`, `💳 Financial Statement` e `📷 Inspections`.
+* **API Backend Enriquecida (`/api/contratos/<id>`)**:
+  - Retorno JSON enriquecido com `total_pago`, `total_pendente` e `total_faturado` calculados diretamente das transações com proteção de tipos de dados.
+* **Validação Geral e Suíte de Testes**:
+  - Todos os 34 testes automatizados do sistema executados e 100% aprovados, sem regressões.
+
+## [1.9.23] — 2026-09-30 — *Contracts Hub Executive KPIs, Operational Filters & Productivity Boost*
+
+### 🚀 Visão Executiva & Produtividade na Gestão de Contratos (`/contratos`)
+* **Cards de Métricas / KPIs Interativos no Topo (`#contractsKpisGrid`)**:
+  - **Active Rentals** (Aluguéis Ativos): Contratos de locação semanais vigentes.
+  - **Active Sales** (Vendas Ativas): Contratos de venda parcelada (*Rent-to-Buy*) e à vista em andamento.
+  - **Pre-Delivery Alert** (Alerta Pré-Entrega): Contratos ativos aguardando vistoria de check-out ou certificado de seguro antes da liberação da moto.
+  - **Deposit Holds** (Cauções Retidas / Quarentena): Contratos encerrados aguardando conciliação ou devolução de caução.
+  - **Missing V5C** (Aquisições Pendentes de V5C): Contratos de compra de veículos aguardando anexação do documento de propriedade (Logbook).
+  - *Filtragem em 1 Clique*: Clicar em qualquer card de KPI filtra instantaneamente a tabela e destaca visualmente o card selecionado.
+* **Atalho Direto para WhatsApp (💬)**:
+  - Adicionado botão de WhatsApp direto na coluna do cliente para cada contrato.
+  - Normaliza telefones ingleses (ex: `07...` para formato internacional `+44...`) e pré-configura mensagem com o nome do cliente e número do contrato, agilizando cobranças e comunicações do pátio.
+* **Identificação Completa do Veículo (Placa + Modelo + Cor)**:
+  - A coluna do veículo agora exibe a placa estilizada e, logo abaixo, a marca/modelo e cor da moto (ex: `Honda PCX 125 • White`), evitando que os operadores tenham que memorizar qual moto pertence a qual placa.
+* **Cálculo em Tempo Real do Saldo Não Pago (`total_pendente` & `total_pago`)**:
+  - Corrigido o comportamento anterior onde a coluna de valor exibia um saldo devedor congelado do momento da assinatura (`c.saldo_devedor`).
+  - O sistema agora agrega dinamicamente todas as transações financeiras em aberto do contrato (`FinancialTransaction`), exibindo o valor real não pago (`Unpaid: £...`) que diminui instantaneamente a cada pagamento registrado, ou exibe `✓ Fully Paid` / `✓ Up to date` quando todas as pendências estiverem quitadas.
+* **Indicador de Assinatura do Contrato**:
+  - Selo visual rápido destacando se o contrato já foi assinado digitalmente pelo cliente (`✓ Signed`) ou se continua pendente de assinatura (`⏳ Unsigned`).
+* **Filtros Avançados & Produtividade**:
+  - **Filtro por Dia de Vencimento Semanal (`#filterDia`)**: Permite filtrar contratos por dia da semana (Segunda a Domingo) para organização das cobranças semanais.
+  - **Filtro por Período de Retirada (`#filterDataInicio` e `#filterDataFim`)**: Busca contratos dentro de um intervalo de datas específico.
+  - **Seletor de Densidade por Página (`#filterLimit`)**: Opções de 20, 50 ou 100 itens por página.
+  - **Botão Limpar Filtros (`✕ Clear`)**: Reseta todos os filtros e a busca para o estado padrão com 1 clique.
+* **Ações Rápidas por Linha**:
+  - Botão de visualização detalhada (`View`).
+  - Atalho direto para abertura/impressão do termo contratual assinado em PDF (`🖨️`).
+  - Atalho direto para consulta das vistorias de entrada e saída associadas ao contrato (`🔍`).
+* **Cobertura de Testes Automatizados (`tests/test_contratos_improvements.py`)**:
+  - Testes unitários validando a integridade dos cálculos de KPI, novos filtros (`dia_pagamento`, intervalo de datas) e enriquecimento de dados da API. Suíte geral expandida para 34 testes automatizados 100% aprovados.
+
+## [1.9.22] — 2026-09-30 — *Audit Trail Enrichment & Granular Operational Logging*
+
+### 🛡️ Rastreabilidade Completa & Auditoria Enriquecida (`AuditLog`)
+* **Captura de IP Real em Ambientes de Proxy Reverso**:
+  - Atualizada a função central `registrar_log` para priorizar o cabeçalho `X-Forwarded-For` (enviado pelo Nginx em produção), assegurando que o IP de origem real dos clientes e operadores seja armazenado, e não apenas o IP de loopback do proxy local (`127.0.0.1`).
+* **Logs Diferenciais em Modificações de Frota (`MOTO_UPDATE`)**:
+  - Na rota `PUT /api/motos/<placa>`, adicionado rastreamento diferencial preciso registrando no log exatamente quais campos mudaram: cor, milhagem anterior vs nova, data de MOT anterior vs nova, data de Road Tax anterior vs nova, e ativação/desativação de SORN. Se apenas o status operacional da moto for alterado, preserva a ação canônica `MOTO_STATUS_CHANGE`.
+* **Logs Enriquecidos de Clientes (`CREATE_CLIENT` & `CLIENT_UPDATE`)**:
+  - `CREATE_CLIENT`: Registra nome, telefone e quais arquivos de comprovação foram anexados (CNH frente/verso, CBT, comprovante de residência).
+  - `CLIENT_UPDATE`: Log diferencial registrando alterações de nome, telefone, email, endereço e novos arquivos anexados.
+* **Preservação de Contexto em Exclusão de Cobranças (`TRANSACTION_DELETE`)**:
+  - A exclusão física de transações financeiras em `DELETE /api/financeiro/<id>` agora pré-captura todos os metadados antes do expurgo (valor em £, tipo de débito, data de vencimento, ID do contrato, placa do veículo, nome do cliente e nota/justificativa cadastrada), garantindo auditoria forense mesmo após a remoção do registro da tabela.
+* **Auditoria de Lembretes WhatsApp (`PAYMENT_REMINDER`)**:
+  - Adicionado registro formal de auditoria em `POST /api/financeiro/<id>/lembrete`, documentando qual operador disparou o lembrete de cobrança via WhatsApp, o valor da cobrança, data de vencimento, cliente e contrato.
+* **Auditoria de Fechamento de Caixa Diário (`CASH_CLOSING_PRINTED`)**:
+  - A geração e impressão da folha executiva de fechamento de caixa (`/financeiro/fechamento-caixa/print`) agora gera log de auditoria registrando a data do fechamento, o montante total arrecadado e o operador emissor.
+* **Auditoria de Transições Críticas de Sinistros (`CLAIM_UPDATE`)**:
+  - Enriquecido o log de atualização de Claims em `PUT /api/claims/<id>` para registrar liberações de pátio (com dias de permanência e valor total de storage), envios de invoice para seguradoras parceiras, e recebimentos de comissão de indicação e taxas de custódia.
+* **Enriquecimento de Quarentena e Seguro (`QUARANTINE_END` & `INSURANCE_UPLOADED`)**:
+  - Finalizações de quarentena agora explicitam placa, cliente e status de recibo de devolução.
+  - Atualizações de seguro gravam a placa do veículo e cliente beneficiado.
+* **Correção e Otimização da Ordenação Server-Side (`auditTable`)**:
+  - Eliminado o problema de ordenação onde a tabela ordenava apenas 20 linhas locais no DOM via JavaScript e ignorava a coluna de ações.
+  - Corrigido [static/js/app_shared.js](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/static/js/app_shared.js) para permitir ordenação em colunas marcadas explicitamente com `data-sort-field` mesmo que o título contenha "Action".
+  - Implementada ordenação server-side real conectada ao banco de dados com chave secundária estável (`AuditLog.id.desc()`) para evitar salto de linhas na paginação. Indicadores visuais (`▲`/`▼`) sincronizados dinamicamente via `setTableSortIndicator`.
+* **Filtros Avançados & Presets Rápidos de Data**:
+  - Adicionadas pílulas de período rápido em 1 clique: `All Time`, `Today`, `Yesterday`, `Last 7 Days` e `This Month`.
+  - Adicionado seletor de intervalo `From` e `To` permitindo buscar qualquer período específico de auditoria.
+  - Filtro dedicado por Operador / Staff (`#auditUserFilter`) populado dinamicamente com os usuários do sistema e processos automáticos (`System`).
+  - Filtro por Módulo / Entidade (`#auditModuleFilter`: Contratos, Frota, Clientes, Claims, Financeiro, Usuários).
+  - Seletor de densidade de itens por página (`25`, `50`, `100`, `250`).
+* **Cards de Indicadores de Auditoria (Audit KPI Cards)**:
+  - Adicionados 4 cards no topo da aba de auditoria: `Events Today`, `Active Staff Today`, `Financial Ops Today` e `Security / System`.
+* **Modal de Detalhes da Atividade (`#modalAuditDetail`)**:
+  - Ao clicar em qualquer linha da tabela ou no botão `👁️`, um modal executivo exibe o ID do evento, data/hora exata no fuso de Londres, operador, ação, entidade alvo, IP de origem e o texto completo/diff das alterações sem truncamento.
+* **Exportação para CSV (`/api/auditoria/exportar-csv`)**:
+  - Adicionado botão `📥 Export CSV` permitindo o download direto da trilha de auditoria filtrada em formato CSV com UTF-8 BOM, pronto para abertura imediata no Microsoft Excel.
+* **Cobertura de Testes Automatizados (`tests/test_audit_log_enrichment.py`)**:
+  - Implementada suíte de testes unitários dedicada validando isolamento, CSRF, criação de logs, ordenação asc/desc no banco, filtros por período e ação, e exportação CSV. Total da suíte ampliado para 33 testes automatizados aprovados (0 erros, 0 regressões).
+
 ## [1.9.21] — 2026-09-30 — *Financial Statement PDF Report Production Hardening*
 
 ### 📱 Navegação de Relatórios na Mesma Aba & Usabilidade Mobile para iPhone (iOS Safari)

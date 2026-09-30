@@ -3,39 +3,110 @@
 {% block title %}Contracts{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Contracts</h1>
-    <a href="/contratos/novo" class="btn-primary" style="width: auto; display: inline-flex;">+ New Contract</a>
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 1.85rem;">Contracts</h1>
+        <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Agreement records, weekly rental billing, compliance and digital signatures</p>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <a href="/contratos/novo" class="btn-primary" style="width: auto; display: inline-flex; align-items: center; gap: 6px;">
+            + New Contract
+        </a>
+    </div>
 </div>
 
-<div style="margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
-    <input type="text" id="searchInput" placeholder="Search by ID, reg plate, customer, type, status..." style="flex: 1; min-width: 200px; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+<!-- Contracts KPI Summary Strip (Click to Filter) -->
+<div class="contracts-kpis-grid" id="contractsKpisGrid">
+    <div class="kpi-card" data-filter-tipo="Rent" data-filter-status="Active" id="kpiCard_rentals" title="Click to filter Active Rentals">
+        <div class="kpi-title"><span>Active Rentals</span> <span>🛵</span></div>
+        <div class="kpi-value" style="color: #38bdf8;" id="kpiVal_rentals">-</div>
+        <div class="kpi-sub">Weekly rent agreements</div>
+    </div>
+    <div class="kpi-card" data-filter-tipo="Sale" data-filter-status="Active" id="kpiCard_sales" title="Click to filter Active Sales">
+        <div class="kpi-title"><span>Active Sales</span> <span>💰</span></div>
+        <div class="kpi-value" style="color: #4ade80;" id="kpiVal_sales">-</div>
+        <div class="kpi-sub">Full & Installment sales</div>
+    </div>
+    <div class="kpi-card" data-filter-tipo="" data-filter-status="pending_release" id="kpiCard_pending_release" title="Click to filter Pre-Delivery alerts">
+        <div class="kpi-title"><span>Pre-Delivery Alert</span> <span>⚠️</span></div>
+        <div class="kpi-value" style="color: #fbbf24;" id="kpiVal_pending_release">-</div>
+        <div class="kpi-sub">Needs Insp / Insurance</div>
+    </div>
+    <div class="kpi-card" data-filter-tipo="" data-filter-status="Deposit_Hold" id="kpiCard_deposit_holds" title="Click to filter Deposit Holds in quarantine">
+        <div class="kpi-title"><span>Deposit Holds</span> <span>🔒</span></div>
+        <div class="kpi-value" style="color: #f97316;" id="kpiVal_deposit_holds">-</div>
+        <div class="kpi-sub">Quarantine / Reconciliation</div>
+    </div>
+    <div class="kpi-card" data-filter-tipo="Purchase" data-filter-status="pending_v5c" id="kpiCard_pending_v5c" title="Click to filter Purchases pending V5C logbook">
+        <div class="kpi-title"><span>Missing V5C</span> <span>📑</span></div>
+        <div class="kpi-value" style="color: #22d3ee;" id="kpiVal_pending_v5c">-</div>
+        <div class="kpi-sub">Purchases awaiting logbook</div>
+    </div>
+</div>
+
+<!-- Advanced Search & Filter Toolbar -->
+<div style="margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+    <input type="text" id="searchInput" placeholder="Search by ID, reg plate, bike model, customer, phone..." style="flex: 2; min-width: 240px; padding: 0.8rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.9rem;">
     
-    <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem 0.75rem; border-radius: 12px; border: 1px solid var(--border-color);">
+    <div class="filter-pill-group">
         <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Type:</span>
-        <select id="filterTipo" style="padding: 0.5rem 0.75rem; border-radius: 8px; border: none; background: transparent; color: var(--text-primary); font-weight: 500; cursor: pointer; outline: none;">
-            <option value="" selected style="background: #1e293b; color: white;">All Types</option>
-            <option value="Rent" style="background: #1e293b; color: white;">🛵 Rental Only</option>
-            <option value="Sale" style="background: #1e293b; color: white;">💰 Sales (All)</option>
-            <option value="Sale_Full" style="background: #1e293b; color: white;">Sale: Full</option>
-            <option value="Sale_Installment" style="background: #1e293b; color: white;">Sale: Installment</option>
-            <option value="Purchase" style="background: #1e293b; color: #22d3ee;">🤝 Vehicle Purchase</option>
+        <select id="filterTipo" class="filter-select">
+            <option value="" selected>All Types</option>
+            <option value="Rent">🛵 Rental Only</option>
+            <option value="Sale">💰 Sales (All)</option>
+            <option value="Sale_Full">Sale: Full</option>
+            <option value="Sale_Installment">Sale: Installment</option>
+            <option value="Purchase" style="color: #22d3ee;">🤝 Vehicle Purchase</option>
         </select>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem 0.75rem; border-radius: 12px; border: 1px solid var(--border-color);">
+    <div class="filter-pill-group">
         <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Status:</span>
-        <select id="filterStatus" style="padding: 0.5rem 0.75rem; border-radius: 8px; border: none; background: transparent; color: var(--text-primary); font-weight: 500; cursor: pointer; outline: none;">
-            <option value="open" selected style="background: #1e293b; color: white;">Open / In Progress (Non-finalized)</option>
-            <option value="pending_release" style="background: #1e293b; color: #fbbf24; font-weight: 700;">⚠️ Pre-Delivery Pending (Needs Insp / Ins)</option>
-            <option value="pending_v5c" style="background: #1e293b; color: #22d3ee; font-weight: 700;">📑 Purchase: Pending V5C Logbook</option>
-            <option value="all" style="background: #1e293b; color: white;">All Statuses</option>
-            <option value="Active" style="background: #1e293b; color: white;">Active</option>
-            <option value="Deposit_Hold" style="background: #1e293b; color: white;">Deposit Holds Only</option>
-            <option value="Completed" style="background: #1e293b; color: white;">Completed Only</option>
-            <option value="Cancelled" style="background: #1e293b; color: white;">Cancelled Only</option>
+        <select id="filterStatus" class="filter-select">
+            <option value="open" selected>Open / In Progress</option>
+            <option value="pending_release" style="color: #fbbf24; font-weight: 700;">⚠️ Pre-Delivery Pending (Needs Insp/Ins)</option>
+            <option value="pending_v5c" style="color: #22d3ee; font-weight: 700;">📑 Purchase: Pending V5C Logbook</option>
+            <option value="all">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Deposit_Hold">Deposit Holds Only</option>
+            <option value="Completed">Completed Only</option>
+            <option value="Cancelled">Cancelled Only</option>
         </select>
     </div>
+
+    <div class="filter-pill-group">
+        <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Due Day:</span>
+        <select id="filterDia" class="filter-select">
+            <option value="" selected>All Days</option>
+            <option value="0">Monday</option>
+            <option value="1">Tuesday</option>
+            <option value="2">Wednesday</option>
+            <option value="3">Thursday</option>
+            <option value="4">Friday</option>
+            <option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+        </select>
+    </div>
+
+    <div class="filter-pill-group" style="gap: 0.4rem;">
+        <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Period:</span>
+        <input type="date" id="filterDataInicio" class="filter-date-input" title="Collection Start Date">
+        <span style="color: var(--text-secondary); font-size: 0.8rem;">to</span>
+        <input type="date" id="filterDataFim" class="filter-date-input" title="Collection End Date">
+    </div>
+
+    <div class="filter-pill-group">
+        <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Per page:</span>
+        <select id="filterLimit" class="filter-select" style="min-width: 60px;">
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+    </div>
+
+    <button id="btnClearFilters" class="btn-secondary" style="padding: 0.65rem 1rem; border-radius: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem;" title="Reset all filters">
+        ✕ Clear
+    </button>
 </div>
 
 <div class="table-container">
@@ -45,12 +116,12 @@
                 <th data-sort-field="id" style="width: 70px;">ID</th>
                 <th data-sort-field="tipo">Type</th>
                 <th data-sort-field="cliente">Customer</th>
-                <th data-sort-field="placa">Reg Plate</th>
-                <th data-sort-field="data_retirada">Date</th>
+                <th data-sort-field="placa">Vehicle / Reg Plate</th>
+                <th data-sort-field="data_retirada">Collection</th>
                 <th data-sort-field="dia_pagamento_semanal">Due / Terms</th>
                 <th data-sort-field="valor_aluguel_semanal">Amount</th>
-                <th data-sort-field="status">Status</th>
-                <th>Actions</th>
+                <th data-sort-field="status">Status & Agreement</th>
+                <th style="min-width: 140px;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -63,8 +134,131 @@
     <button id="btnPrevPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">&laquo; Previous</button>
     <span id="paginationInfo" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
     <button id="btnNextPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">Next &raquo;</button>
-</div>{% endblock %}
+</div>
+
+<style>
+    .contracts-kpis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+        background: var(--card-bg, rgba(30, 41, 59, 0.7));
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+        border-radius: 12px;
+        padding: 0.9rem 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        user-select: none;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .kpi-card.active {
+        border-color: var(--accent, #f97316);
+        background: rgba(249, 115, 22, 0.08);
+        box-shadow: 0 0 0 1px var(--accent, #f97316);
+    }
+    .kpi-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary, #94a3b8);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .kpi-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary, #f8fafc);
+        line-height: 1.2;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: var(--text-secondary, #94a3b8);
+    }
+    .filter-pill-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--card-bg);
+        padding: 0.35rem 0.75rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+    .filter-select {
+        padding: 0.5rem 0.5rem;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        font-weight: 500;
+        cursor: pointer;
+        outline: none;
+        font-size: 0.85rem;
+    }
+    .filter-select option {
+        background: #1e293b;
+        color: #f8fafc;
+    }
+    .filter-date-input {
+        padding: 0.4rem 0.5rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.2);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        outline: none;
+    }
+    .btn-wa-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.35);
+        color: #4ade80;
+        text-decoration: none;
+        font-size: 0.85rem;
+        transition: all 0.15s ease;
+    }
+    .btn-wa-link:hover {
+        background: #22c55e;
+        color: #ffffff;
+        transform: scale(1.1);
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+    }
+    .action-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 5px 8px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: #cbd5e1;
+        text-decoration: none;
+        font-size: 0.8rem;
+        transition: all 0.15s ease;
+    }
+    .action-icon-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+</style>
+{% endblock %}
 
 {% block scripts %}
-<script src="/static/js/contratos.js?v=7"></script>
+<script src="/static/js/contratos.js?v=13"></script>
 {% endblock %}

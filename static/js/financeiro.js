@@ -274,13 +274,14 @@ async function carregarFinanceiro() {
                     })();
                 
                 // WhatsApp friendly message
-                const waMsg = encodeURIComponent(`Hi ${t.cliente || 'there'}, this is FF Motors Birmingham. Just a friendly reminder regarding your pending ${t.descricao || 'rental'} payment of ${valorFmt} (Contract #${t.id_contrato}, Bike: ${t.placa || 'fleet'}). If you have already made this payment, please disregard this note. Thank you!`);
+                const bikeRef = (t.placa && t.placa !== '-') ? `for vehicle ${t.placa}` : 'with FF Motors';
+                const waMsg = encodeURIComponent(`Hi ${t.cliente || 'there'}, this is FF Motors Birmingham. Just a friendly reminder regarding your pending ${t.descricao || 'rental'} payment of ${valorFmt} ${bikeRef}. If you have already made this payment, please disregard this note. Thank you!`);
                 const waLink = waTel ? `https://wa.me/${waTel}?text=${waMsg}` : '#';
 
                 celulaCliente += `
                     <div style="display: flex; align-items: center; gap: 4px; margin-top: 1px; flex-wrap: nowrap; line-height: 1; font-size: 0.7rem;">
                         <span style="color: var(--text-secondary); white-space: nowrap;">${escapeHtml(t.cliente_telefone)}</span>
-                        ${(isPending || isVencido) ? `<a href="${waLink}" target="_blank" rel="noopener" class="btn-wa-reminder" data-id="${t.id}" style="text-decoration:none; font-size:0.68rem; background:rgba(37,211,102,0.15); border:1px solid rgba(37,211,102,0.35); color:#25d366; border-radius:3px; padding:0 3px; display:inline-flex; align-items:center; cursor:pointer;" title="Send WhatsApp payment reminder">💬</a>` : ''}
+                        ${(isPending || isVencido) ? `<a href="${waLink}" target="_blank" rel="noopener noreferrer" class="btn-wa-reminder" data-id="${t.id}" style="text-decoration:none; font-size:0.68rem; background:rgba(37,211,102,0.15); border:1px solid rgba(37,211,102,0.35); color:#25d366; border-radius:3px; padding:0 3px; display:inline-flex; align-items:center; cursor:pointer;" title="Send WhatsApp payment reminder">💬</a>` : ''}
                         <span id="reminder-container-${t.id}">${formatarLembreteEstetico(t.ultimo_lembrete, t.ultimo_lembrete_por)}</span>
                     </div>
                 `;

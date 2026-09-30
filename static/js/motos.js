@@ -156,7 +156,8 @@ async function carregarMotos() {
                                 if (w.startsWith('0')) w = '44' + w.substring(1);
                                 return w;
                             })();
-                        waBtn = phoneClean ? `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>` : '';
+                        const waMsg = encodeURIComponent(`Hello ${c.cliente_nome || ''}, this is FF Motors regarding motorbike ${m.placa || ''}: `);
+                        waBtn = phoneClean ? `<a href="https://wa.me/${phoneClean}?text=${waMsg}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>` : '';
                     }
                     statusHtml = `
                         <div>
@@ -189,7 +190,8 @@ async function carregarMotos() {
                                 if (w.startsWith('0')) w = '44' + w.substring(1);
                                 return w;
                             })();
-                        waBtn = phoneClean ? `<a href="https://wa.me/${phoneClean}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>` : '';
+                        const waMsg = encodeURIComponent(`Hello ${c.cliente_nome || ''}, this is FF Motors regarding motorbike ${m.placa || ''}: `);
+                        waBtn = phoneClean ? `<a href="https://wa.me/${phoneClean}?text=${waMsg}" target="_blank" rel="noopener noreferrer" title="WhatsApp ${escapeHtml(c.cliente_telefone)}" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" onclick="event.stopPropagation();">💬</a>` : '';
                     }
                     statusHtml = `
                         <div>

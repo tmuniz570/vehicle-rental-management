@@ -207,7 +207,13 @@ def registrar_log(acao, entidade, entidade_id, descricao):
     try:
         user_id = current_user.id if getattr(current_user, 'is_authenticated', False) else None
         user_nome = current_user.nome if getattr(current_user, 'is_authenticated', False) else "System"
-        ip = request.remote_addr if request else None
+        ip = None
+        if request:
+            forwarded = request.headers.get('X-Forwarded-For')
+            if forwarded:
+                ip = forwarded.split(',')[0].strip()
+            else:
+                ip = request.remote_addr
         log = AuditLog(
             id_usuario=user_id,
             usuario_nome=user_nome,
@@ -1235,6 +1241,13 @@ def atualizar_claim(id):
 
     data = request.get_json() or {}
 
+    status_antigo = claim.status
+    status_ind_antigo = claim.status_indicacao
+    status_stor_antigo = claim.status_storage
+    status_pag_stor_antigo = claim.status_pagamento_storage
+    data_lib_antiga = claim.data_liberacao_storage
+    data_inv_antiga = claim.data_envio_invoice
+
     def parse_date(val):
         if val is None: return None
         val_str = str(val).strip()
@@ -1342,7 +1355,21 @@ def atualizar_claim(id):
 
     db.session.commit()
     operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('CLAIM_UPDATE', 'Claim', claim.id, f"Claim #{claim.claim_number} ({claim.empresa_parceira}) atualizado por {operador}")
+
+    alteracoes = []
+    if claim.status != status_antigo:
+        alteracoes.append(f"Status do processo: '{status_antigo}' -> '{claim.status}'")
+    if claim.data_liberacao_storage and claim.data_liberacao_storage != data_lib_antiga:
+        alteracoes.append(f"Veículo liberado do pátio em {claim.data_liberacao_storage.strftime('%d/%m/%Y')} ({claim.dias_storage} diárias, £{claim.valor_total_storage:.2f})")
+    if claim.data_envio_invoice and claim.data_envio_invoice != data_inv_antiga:
+        alteracoes.append(f"Invoice enviado em {claim.data_envio_invoice.strftime('%d/%m/%Y')}")
+    if claim.status_indicacao == 'Pago' and status_ind_antigo != 'Pago':
+        alteracoes.append(f"Comissão de indicação (£{claim.valor_indicacao:.2f}) recebida/paga")
+    if claim.status_pagamento_storage == 'Pago' and status_pag_stor_antigo != 'Pago':
+        alteracoes.append(f"Storage (£{claim.valor_total_storage:.2f}) recebido/pago")
+
+    detalhes_log = f"Claim #{claim.claim_number} ({claim.empresa_parceira}): {'; '.join(alteracoes)} por {operador}" if alteracoes else f"Claim #{claim.claim_number} ({claim.empresa_parceira}) atualizado por {operador}"
+    registrar_log('CLAIM_UPDATE', 'Claim', claim.id, detalhes_log)
 
     return jsonify({'success': True, 'message': 'Claim atualizado com sucesso!'}), 200
 
@@ -1581,7 +1608,11 @@ def listar_auditoria():
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
     acao = request.args.get('acao', '', type=str)
-    data_filtro = request.args.get('data', '', type=str)
+    usuario_filtro = request.args.get('usuario', '', type=str).strip()
+    entidade_filtro = request.args.get('entidade', '', type=str).strip()
+    data_inicio = request.args.get('data_inicio', '', type=str).strip()
+    data_fim = request.args.get('data_fim', '', type=str).strip()
+    data_filtro = request.args.get('data', '', type=str).strip()
     sort_by = request.args.get('sort_by', 'data_hora', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
@@ -1600,8 +1631,31 @@ def listar_auditoria():
         ))
     if acao:
         query = query.filter(AuditLog.acao == acao)
+    if usuario_filtro:
+        query = query.filter(AuditLog.usuario_nome == usuario_filtro)
+    if entidade_filtro:
+        query = query.filter(AuditLog.entidade.ilike(f"%{entidade_filtro}%"))
         
-    if data_filtro:
+    if data_inicio and data_fim:
+        try:
+            dt_i = datetime.strptime(data_inicio, "%Y-%m-%d")
+            dt_f = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(AuditLog.data_hora >= dt_i, AuditLog.data_hora < dt_f)
+        except ValueError:
+            pass
+    elif data_inicio:
+        try:
+            dt_i = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(AuditLog.data_hora >= dt_i)
+        except ValueError:
+            pass
+    elif data_fim:
+        try:
+            dt_f = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(AuditLog.data_hora < dt_f)
+        except ValueError:
+            pass
+    elif data_filtro:
         try:
             dt_inicio = datetime.strptime(data_filtro, "%Y-%m-%d")
             dt_fim = dt_inicio + timedelta(days=1)
@@ -1613,18 +1667,27 @@ def listar_auditoria():
         'data_hora': AuditLog.data_hora,
         'data': AuditLog.data_hora,
         'date': AuditLog.data_hora,
+        'timestamp': AuditLog.data_hora,
         'usuario_nome': AuditLog.usuario_nome,
         'usuario': AuditLog.usuario_nome,
         'user': AuditLog.usuario_nome,
+        'staff': AuditLog.usuario_nome,
+        'operator': AuditLog.usuario_nome,
         'acao': AuditLog.acao,
         'action': AuditLog.acao,
         'entidade': AuditLog.entidade,
+        'target': AuditLog.entidade,
         'entidade_id': AuditLog.entidade_id,
-        'descricao': AuditLog.descricao
+        'descricao': AuditLog.descricao,
+        'description': AuditLog.descricao,
+        'activity': AuditLog.descricao,
+        'ip_origem': AuditLog.ip_origem,
+        'ip': AuditLog.ip_origem
     }
     target_col = sort_map.get(sort_by, AuditLog.data_hora)
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
-    paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
+    # Secondary order on id to ensure deterministic row order across pages
+    paginated = query.order_by(order_func, AuditLog.id.desc()).paginate(page=page, per_page=limit, error_out=False)
     
     itens = [{
         'id': a.id,
@@ -1637,12 +1700,150 @@ def listar_auditoria():
         'ip_origem': a.ip_origem
     } for a in paginated.items]
     
+    # Calculate live audit stats for today
+    hoje = get_london_date()
+    dt_hoje_inicio = datetime.combine(hoje, datetime.min.time())
+    base_hoje = AuditLog.query.filter(AuditLog.data_hora >= dt_hoje_inicio)
+    total_hoje = base_hoje.count()
+    operadores_hoje = db.session.query(db.func.count(db.distinct(AuditLog.usuario_nome))).filter(AuditLog.data_hora >= dt_hoje_inicio).scalar() or 0
+    financeiro_hoje = base_hoje.filter(db.or_(
+        AuditLog.acao.ilike('%PAYMENT%'),
+        AuditLog.acao.ilike('%CHARGE%'),
+        AuditLog.acao.ilike('%TRANSACTION%'),
+        AuditLog.acao.ilike('%CASH%')
+    )).count()
+    seguranca_hoje = base_hoje.filter(db.or_(
+        AuditLog.acao.ilike('%LOGIN%'),
+        AuditLog.acao.ilike('%USER%'),
+        AuditLog.acao.ilike('%PASSWORD%'),
+        AuditLog.acao.ilike('%SECURITY%')
+    )).count()
+    
     return jsonify({
         'itens': itens,
         'total': paginated.total,
         'paginas': paginated.pages,
-        'pagina_atual': paginated.page
+        'pagina_atual': paginated.page,
+        'stats': {
+            'hoje': total_hoje,
+            'operadores_hoje': operadores_hoje,
+            'financeiro_hoje': financeiro_hoje,
+            'seguranca_hoje': seguranca_hoje
+        }
     })
+
+@app.route('/api/auditoria/exportar-csv', methods=['GET'])
+@admin_required
+def exportar_auditoria_csv():
+    import io
+    import csv
+    
+    search = request.args.get('search', '', type=str)
+    acao = request.args.get('acao', '', type=str)
+    usuario_filtro = request.args.get('usuario', '', type=str).strip()
+    entidade_filtro = request.args.get('entidade', '', type=str).strip()
+    data_inicio = request.args.get('data_inicio', '', type=str).strip()
+    data_fim = request.args.get('data_fim', '', type=str).strip()
+    data_filtro = request.args.get('data', '', type=str).strip()
+    sort_by = request.args.get('sort_by', 'data_hora', type=str).strip().lower()
+    sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
+    
+    query = AuditLog.query
+    if search:
+        search_clean = search.strip().replace(' ', '')
+        search_term = f"%{search.strip()}%"
+        search_plate_term = f"%{search_clean}%"
+        query = query.filter(db.or_(
+            AuditLog.usuario_nome.ilike(search_term),
+            AuditLog.descricao.ilike(search_term),
+            AuditLog.descricao.ilike(search_plate_term),
+            AuditLog.entidade.ilike(search_term),
+            AuditLog.entidade_id.ilike(search_term),
+            AuditLog.entidade_id.ilike(search_plate_term)
+        ))
+    if acao:
+        query = query.filter(AuditLog.acao == acao)
+    if usuario_filtro:
+        query = query.filter(AuditLog.usuario_nome == usuario_filtro)
+    if entidade_filtro:
+        query = query.filter(AuditLog.entidade.ilike(f"%{entidade_filtro}%"))
+        
+    if data_inicio and data_fim:
+        try:
+            dt_i = datetime.strptime(data_inicio, "%Y-%m-%d")
+            dt_f = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(AuditLog.data_hora >= dt_i, AuditLog.data_hora < dt_f)
+        except ValueError:
+            pass
+    elif data_inicio:
+        try:
+            dt_i = datetime.strptime(data_inicio, "%Y-%m-%d")
+            query = query.filter(AuditLog.data_hora >= dt_i)
+        except ValueError:
+            pass
+    elif data_fim:
+        try:
+            dt_f = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+            query = query.filter(AuditLog.data_hora < dt_f)
+        except ValueError:
+            pass
+    elif data_filtro:
+        try:
+            dt_inicio = datetime.strptime(data_filtro, "%Y-%m-%d")
+            dt_fim = dt_inicio + timedelta(days=1)
+            query = query.filter(AuditLog.data_hora >= dt_inicio, AuditLog.data_hora < dt_fim)
+        except ValueError:
+            pass
+            
+    sort_map = {
+        'data_hora': AuditLog.data_hora,
+        'data': AuditLog.data_hora,
+        'date': AuditLog.data_hora,
+        'timestamp': AuditLog.data_hora,
+        'usuario_nome': AuditLog.usuario_nome,
+        'usuario': AuditLog.usuario_nome,
+        'user': AuditLog.usuario_nome,
+        'operator': AuditLog.usuario_nome,
+        'staff': AuditLog.usuario_nome,
+        'acao': AuditLog.acao,
+        'action': AuditLog.acao,
+        'entidade': AuditLog.entidade,
+        'target': AuditLog.entidade,
+        'entidade_id': AuditLog.entidade_id,
+        'descricao': AuditLog.descricao,
+        'ip_origem': AuditLog.ip_origem,
+        'ip': AuditLog.ip_origem
+    }
+    target_col = sort_map.get(sort_by, AuditLog.data_hora)
+    order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
+    registros = query.order_by(order_func, AuditLog.id.desc()).limit(2500).all()
+    
+    output = io.StringIO()
+    output.write('\ufeff')  # UTF-8 BOM
+    writer = csv.writer(output, quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(['Event ID', 'Date & Time (London)', 'Staff / Operator', 'Action Key', 'Activity Description', 'Target Entity', 'Target ID', 'IP Address'])
+    
+    for r in registros:
+        dt_fmt = r.data_hora.strftime('%d/%m/%Y %H:%M:%S') if r.data_hora else ''
+        writer.writerow([
+            r.id,
+            dt_fmt,
+            r.usuario_nome or 'System',
+            r.acao or '',
+            r.descricao or '',
+            r.entidade or '',
+            r.entidade_id or '',
+            r.ip_origem or ''
+        ])
+        
+    csv_bytes = output.getvalue().encode('utf-8')
+    filename = f"ffmotors_audit_trail_{get_london_date().strftime('%Y%m%d')}.csv"
+    
+    return Response(
+        csv_bytes,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # --- CRUD ROUTES ---
 
@@ -1721,7 +1922,13 @@ def criar_cliente():
     db.session.commit()
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('CREATE_CLIENT', 'Client', novo_cliente.id, f"Cliente {novo_cliente.nome} cadastrado por {operador_atual}")
+    docs_anexados = []
+    if url_hab: docs_anexados.append('CNH/Licence')
+    if url_hab_verso: docs_anexados.append('Verso CNH')
+    if url_cbt: docs_anexados.append('CBT')
+    if url_comp_end: docs_anexados.append('Comprovante Residência')
+    docs_info = f" (Documentos anexados: {', '.join(docs_anexados)})" if docs_anexados else ""
+    registrar_log('CREATE_CLIENT', 'Client', novo_cliente.id, f"Cliente {novo_cliente.nome} (Tel: {novo_cliente.telefone}) cadastrado por {operador_atual}{docs_info}")
 
     return jsonify({'message': 'Customer registered successfully', 'mensagem': 'Cliente cadastrado com sucesso', 'id': novo_cliente.id}), 201
 
@@ -1839,6 +2046,15 @@ def atualizar_cliente(id):
     if not cliente:
         return jsonify({'error': 'Customer not found', 'erro': 'Cliente não encontrado'}), 404
         
+    nome_antigo = cliente.nome
+    tel_antigo = cliente.telefone
+    email_antigo = cliente.email
+    end_antigo = cliente.endereco
+    hab_antiga = cliente.url_habilitacao
+    hab_verso_antiga = cliente.url_habilitacao_verso
+    cbt_antigo = cliente.url_cbt
+    comp_end_antigo = cliente.url_comprovante_endereco
+
     if request.is_json:
         dados = request.get_json() or {}
         if 'nome' in dados: cliente.nome = dados['nome'].strip() if dados['nome'] else cliente.nome
@@ -1900,7 +2116,27 @@ def atualizar_cliente(id):
     
     db.session.commit()
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('CLIENT_UPDATE', 'Client', cliente.id, f"Cliente {cliente.nome} atualizado por {operador_atual}")
+
+    alteracoes = []
+    if cliente.nome != nome_antigo:
+        alteracoes.append(f"Nome alterado para '{cliente.nome}'")
+    if cliente.telefone != tel_antigo:
+        alteracoes.append(f"Telefone alterado de '{tel_antigo or 'N/A'}' para '{cliente.telefone}'")
+    if (cliente.email or '').lower() != (email_antigo or '').lower():
+        alteracoes.append(f"Email alterado para '{cliente.email or 'Nenhum'}'")
+    if cliente.endereco != end_antigo:
+        alteracoes.append("Endereço atualizado")
+    if cliente.url_habilitacao != hab_antiga:
+        alteracoes.append("Nova CNH/Licence anexada")
+    if cliente.url_habilitacao_verso != hab_verso_antiga:
+        alteracoes.append("Novo Verso da CNH anexado")
+    if cliente.url_cbt != cbt_antigo:
+        alteracoes.append("Novo certificado CBT anexado")
+    if cliente.url_comprovante_endereco != comp_end_antigo:
+        alteracoes.append("Novo comprovante de residência anexado")
+
+    detalhes_log = f"Cliente {cliente.nome}: {', '.join(alteracoes)} por {operador_atual}" if alteracoes else f"Cliente {cliente.nome} atualizado por {operador_atual}"
+    registrar_log('CLIENT_UPDATE', 'Client', cliente.id, detalhes_log)
 
     return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'}), 200
 
@@ -2236,45 +2472,85 @@ def atualizar_moto(placa):
     if not moto:
         return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
         
-    dados = request.get_json()
+    dados = request.get_json() or {}
     status_antigo = moto.status
-    if 'modelo' in dados: moto.modelo = dados['modelo']
-    if 'cor' in dados: moto.cor = dados['cor']
-    if 'status' in dados: moto.status = dados['status']
+    modelo_antigo = moto.modelo
+    cor_antiga = moto.cor
+    milhas_antiga = moto.milhagem_atual
+    mot_antigo = moto.vencimento_mot
+    tax_antigo = moto.vencimento_tax
+    sorn_antigo = bool(getattr(moto, 'tax_sorn', False))
+    
+    alteracoes = []
+
+    if 'modelo' in dados and dados['modelo']:
+        novo_modelo = str(dados['modelo']).strip()
+        if novo_modelo != modelo_antigo:
+            alteracoes.append(f"Modelo alterado de '{modelo_antigo}' para '{novo_modelo}'")
+            moto.modelo = novo_modelo
+
+    if 'cor' in dados and dados['cor']:
+        nova_cor = str(dados['cor']).strip()
+        if nova_cor != cor_antiga:
+            alteracoes.append(f"Cor alterada de '{cor_antiga or 'N/A'}' para '{nova_cor}'")
+            moto.cor = nova_cor
+
+    if 'status' in dados and dados['status'] != status_antigo:
+        alteracoes.append(f"Status alterado de '{status_antigo}' para '{dados['status']}'")
+        moto.status = dados['status']
+
     if 'milhagem_atual' in dados and dados['milhagem_atual'] is not None:
         try:
-            moto.milhagem_atual = int(dados['milhagem_atual'])
+            nova_milhagem = int(dados['milhagem_atual'])
+            if nova_milhagem != milhas_antiga:
+                alteracoes.append(f"Milhagem atualizada de {milhas_antiga or 0} para {nova_milhagem} mi")
+                moto.milhagem_atual = nova_milhagem
         except (ValueError, TypeError):
             pass
     
     if 'vencimento_mot' in dados:
         if dados['vencimento_mot']:
             try:
-                moto.vencimento_mot = datetime.strptime(dados['vencimento_mot'], "%Y-%m-%d").date()
+                novo_mot = datetime.strptime(dados['vencimento_mot'], "%Y-%m-%d").date()
+                if novo_mot != mot_antigo:
+                    alteracoes.append(f"MOT atualizado para {novo_mot.strftime('%d/%m/%Y')}")
+                    moto.vencimento_mot = novo_mot
             except ValueError:
                 pass
         else:
-            moto.vencimento_mot = None
+            if mot_antigo is not None:
+                alteracoes.append("MOT removido")
+                moto.vencimento_mot = None
             
     if 'tax_sorn' in dados:
-        moto.tax_sorn = bool(dados['tax_sorn'])
-        if moto.tax_sorn:
-            moto.vencimento_tax = None
+        novo_sorn = bool(dados['tax_sorn'])
+        if novo_sorn != sorn_antigo:
+            alteracoes.append("SORN ativado (Off Road)" if novo_sorn else "SORN desativado")
+            moto.tax_sorn = novo_sorn
+            if novo_sorn:
+                moto.vencimento_tax = None
 
     if not getattr(moto, 'tax_sorn', False) and 'vencimento_tax' in dados:
         if dados['vencimento_tax']:
             try:
-                moto.vencimento_tax = datetime.strptime(dados['vencimento_tax'], "%Y-%m-%d").date()
+                novo_tax = datetime.strptime(dados['vencimento_tax'], "%Y-%m-%d").date()
+                if novo_tax != tax_antigo:
+                    alteracoes.append(f"Road Tax atualizado para {novo_tax.strftime('%d/%m/%Y')}")
+                    moto.vencimento_tax = novo_tax
             except ValueError:
                 pass
         else:
-            moto.vencimento_tax = None
+            if tax_antigo is not None:
+                alteracoes.append("Road Tax removido")
+                moto.vencimento_tax = None
     
     db.session.commit()
     
-    if 'status' in dados and dados['status'] != status_antigo:
-        operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    if 'status' in dados and dados['status'] != status_antigo and len(alteracoes) == 1:
         registrar_log('MOTO_STATUS_CHANGE', 'Motorcycle', placa, f"Status da moto {placa} alterado de '{status_antigo}' para '{dados['status']}' por {operador_atual}")
+    elif alteracoes:
+        registrar_log('MOTO_UPDATE', 'Motorcycle', placa, f"Moto {placa} atualizada por {operador_atual}: {', '.join(alteracoes)}")
 
     return jsonify({'message': 'Motorbike updated successfully', 'mensagem': 'Moto atualizada com sucesso'})
 
@@ -2967,7 +3243,9 @@ def atualizar_seguro_contrato(id):
             contrato.url_seguro = f"/static/uploads/{nome_salvo}"
             db.session.commit()
             operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-            registrar_log('INSURANCE_UPLOADED', 'Contract', contrato.id, f"Apólice de seguro do contrato #{contrato.id} atualizada por {operador_atual}.")
+            cliente_nome = (contrato.cliente.nome if contrato.cliente else contrato.cliente_nome) or 'Cliente'
+            placa = contrato.placa or contrato.moto_placa or 'N/A'
+            registrar_log('INSURANCE_UPLOADED', 'Contract', contrato.id, f"Apólice de seguro do Contrato #{contrato.id} (Placa: {placa}, Cliente: {cliente_nome}) atualizada por {operador_atual}.")
             return jsonify({'message': 'Insurance document updated successfully', 'mensagem': 'Seguro atualizado'})
             
     return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
@@ -3337,10 +3615,18 @@ def listar_contratos():
     limit = request.args.get('limit', 50, type=int)
     search = request.args.get('search', '', type=str)
     tipo_filter = request.args.get('tipo', '', type=str).strip()
+    dia_pagamento_filter = request.args.get('dia_pagamento', '', type=str).strip()
+    data_inicio_filter = request.args.get('data_inicio', '', type=str).strip()
+    data_fim_filter = request.args.get('data_fim', '', type=str).strip()
     sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
-    query = Contract.query.options(selectinload(Contract.vistorias)).join(Client, Contract.id_cliente == Client.id)
+    query = Contract.query.options(
+        selectinload(Contract.vistorias),
+        selectinload(Contract.moto),
+        contains_eager(Contract.cliente)
+    ).join(Client, Contract.id_cliente == Client.id)
+
     if search:
         search_clean = search.strip().replace(' ', '')
         search_term = f"%{search.strip()}%"
@@ -3351,7 +3637,10 @@ def listar_contratos():
             Contract.placa.ilike(search_term),
             Contract.status.ilike(search_term),
             Contract.tipo_contrato.ilike(search_term),
-            Client.nome.ilike(search_term)
+            Contract.cliente_telefone.ilike(search_term),
+            Contract.moto_modelo.ilike(search_term),
+            Client.nome.ilike(search_term),
+            Client.telefone.ilike(search_term)
         ))
 
     if tipo_filter:
@@ -3363,6 +3652,23 @@ def listar_contratos():
             query = query.filter(Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']))
         else:
             query = query.filter(Contract.tipo_contrato == tipo_filter)
+
+    if dia_pagamento_filter != '' and dia_pagamento_filter.isdigit():
+        query = query.filter(Contract.dia_pagamento_semanal == int(dia_pagamento_filter))
+
+    if data_inicio_filter:
+        try:
+            dt_ini = datetime.strptime(data_inicio_filter, '%Y-%m-%d')
+            query = query.filter(Contract.data_retirada >= dt_ini)
+        except ValueError:
+            pass
+
+    if data_fim_filter:
+        try:
+            dt_fim = datetime.strptime(data_fim_filter, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(Contract.data_retirada < dt_fim)
+        except ValueError:
+            pass
         
     status_filter = request.args.get('status', '', type=str)
     if status_filter:
@@ -3428,6 +3734,27 @@ def listar_contratos():
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
     paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
+    # Real-time financial balances: Aggregate unpaid (pending) and paid totals per contract
+    contract_ids = [c.id for c in paginated.items]
+    pendentes_map = {}
+    pagos_map = {}
+    if contract_ids:
+        tx_aggs = db.session.query(
+            FinancialTransaction.id_contrato,
+            FinancialTransaction.status,
+            db.func.sum(FinancialTransaction.valor)
+        ).filter(
+            FinancialTransaction.id_contrato.in_(contract_ids),
+            ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+        ).group_by(FinancialTransaction.id_contrato, FinancialTransaction.status).all()
+
+        for cid, st, total_val in tx_aggs:
+            st_norm = (st or '').strip().lower()
+            if st_norm in ['pending', 'pendente']:
+                pendentes_map[cid] = pendentes_map.get(cid, 0.0) + float(total_val or 0.0)
+            elif st_norm in ['paid', 'pago']:
+                pagos_map[cid] = pagos_map.get(cid, 0.0) + float(total_val or 0.0)
+
     itens = []
     for c in paginated.items:
         is_purchase = (getattr(c, 'tipo_contrato', None) in [ContractType.PURCHASE.value, 'Purchase', 'Compra'])
@@ -3445,12 +3772,17 @@ def listar_contratos():
             'id': c.id, 
             'id_cliente': c.id_cliente, 
             'cliente_nome': c.cliente_nome or (c.cliente.nome if c.cliente else 'Customer'), 
+            'cliente_telefone': c.cliente_telefone or (c.cliente.telefone if c.cliente else ''),
             'placa': c.moto_placa or c.placa,
+            'moto_modelo': c.moto_modelo or (c.moto.modelo if c.moto else ''),
+            'moto_cor': c.moto_cor or (c.moto.cor if c.moto else ''),
             'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
             'categoria_historico': c.categoria_historico,
             'valor_total_venda': float(c.valor_total_venda) if c.valor_total_venda is not None else None,
             'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
             'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
+            'total_pendente': round(pendentes_map.get(c.id, 0.0), 2),
+            'total_pago': round(pagos_map.get(c.id, 0.0), 2),
             'valor_compra_veiculo': float(c.valor_compra_veiculo) if c.valor_compra_veiculo is not None else None,
             'metodo_pagamento_compra': c.metodo_pagamento_compra,
             'detalhes_pagamento_compra': c.detalhes_pagamento_compra,
@@ -3467,14 +3799,59 @@ def listar_contratos():
             'pendente_liberacao': pendente_liberacao,
             'tem_v5c': tem_v5c,
             'needs_v5c': needs_v5c,
-            'v5c_count': v5c_count
+            'v5c_count': v5c_count,
+            'assinado': bool(c.assinatura_cliente_inicial),
+            'data_assinatura_inicial': c.data_assinatura_inicial.isoformat() if c.data_assinatura_inicial else None
         })
+
+    # Executive KPI Summary for Contracts
+    kpi_checkout_subq = db.session.query(Inspection.id).filter(
+        Inspection.id_contrato == Contract.id,
+        Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
+    ).exists()
+
+    kpi_v5c_subq = db.session.query(MotorcycleV5C.id).filter(
+        MotorcycleV5C.placa == Contract.placa
+    ).exists()
+
+    kpi_rentals = Contract.query.filter(
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+        db.or_(Contract.tipo_contrato == ContractType.RENT.value, Contract.tipo_contrato == None, Contract.tipo_contrato == 'Rent')
+    ).count()
+
+    kpi_sales = Contract.query.filter(
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+        Contract.tipo_contrato.in_([ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment'])
+    ).count()
+
+    kpi_pendente_liberacao = Contract.query.filter(
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+        ~Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+        db.or_(Contract.url_seguro == None, ~kpi_checkout_subq)
+    ).count()
+
+    kpi_deposit_holds = Contract.query.filter(
+        Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])
+    ).count()
+
+    kpi_pending_v5c = Contract.query.filter(
+        Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+        ~kpi_v5c_subq
+    ).count()
     
     return jsonify({
         'itens': itens,
         'total': paginated.total,
         'paginas': paginated.pages,
-        'pagina_atual': paginated.page
+        'pagina_atual': paginated.page,
+        'kpis': {
+            'rentals': kpi_rentals,
+            'sales': kpi_sales,
+            'pending_release': kpi_pendente_liberacao,
+            'deposit_holds': kpi_deposit_holds,
+            'pending_v5c': kpi_pending_v5c
+        }
     })
 
 @app.route('/api/contratos/<int:id>', methods=['GET'])
@@ -3526,6 +3903,9 @@ def detalhe_contrato(id):
     
     # Transações filtradas para o extrato do cliente (não exibe a devolução de caução como cobrança devida)
     transacoes_cliente = [t for t in transacoes if t.tipo not in [TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito']]
+    total_pago_contrato = sum(float(t.valor) for t in transacoes_cliente if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago'])
+    total_pendente_contrato = sum(float(t.valor) for t in transacoes_cliente if t.status in [TransactionStatus.PENDING.value, 'Pending', 'Pendente', 'Overdue', 'Atrasado'])
+    total_faturado_contrato = sum(float(t.valor) for t in transacoes_cliente)
     
     # 15-Day Insurance Compliance (askMID Verification) - apenas para contratos de aluguel (Rent)
     tipo_contrato_val = getattr(c, 'tipo_contrato', 'Rent') or 'Rent'
@@ -3667,6 +4047,9 @@ def detalhe_contrato(id):
         'saldo_deposito': saldo_deposito,
         'valor_restituido': valor_restituido,
         'deducoes_lista': deducoes_lista,
+        'total_pago': total_pago_contrato,
+        'total_pendente': total_pendente_contrato,
+        'total_faturado': total_faturado_contrato,
         'transacoes': [{
             'id': t.id,
             'tipo': t.tipo,
@@ -3726,20 +4109,22 @@ def criar_cobranca(id):
         'other': 'Other'
     }
     tipo_final = tipo_map.get(str(tipo).strip().lower(), str(tipo).strip())
-
+    nota_input = (request.json.get('nota') or '').strip() if request.is_json and request.json else ''
     nova_cobranca = FinancialTransaction(
         id_contrato=c.id,
         tipo=tipo_final,
         data_vencimento=data_vencimento,
         valor=float(valor),
-        status=TransactionStatus.PENDING.value
+        status=TransactionStatus.PENDING.value,
+        nota=nota_input if nota_input else None
     )
     db.session.add(nova_cobranca)
     sync_sale_contract_status(c)
     db.session.commit()
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo_final}) gerada por {operador_atual} para o Contrato #{c.id}")
+    nota_log = f" (Nota: '{nota_input}')" if nota_input else ""
+    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo_final}) gerada por {operador_atual} para o Contrato #{c.id}{nota_log}")
 
     return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
 
@@ -4141,6 +4526,16 @@ def registrar_lembrete_cobranca(id):
     t.ultimo_lembrete_por = operador
     db.session.commit()
     
+    cli_nome = (t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else (t.contrato.cliente_nome if t.contrato else 'Cliente')) or 'Cliente'
+    placa = t.contrato.placa if t.contrato else 'N/A'
+    venc_str = t.data_vencimento.strftime('%d/%m/%Y') if t.data_vencimento else 'N/A'
+    registrar_log(
+        'PAYMENT_REMINDER',
+        'Transaction',
+        t.id,
+        f"Lembrete de cobrança WhatsApp enviado por {operador} para {cli_nome} (Contrato #{t.id_contrato or 'N/A'}, Placa: {placa}, Cobrança #{t.id}: £{float(t.valor):.2f} {t.tipo}, Venc: {venc_str})"
+    )
+
     return jsonify({
         'sucesso': True,
         'message': 'Reminder logged successfully',
@@ -4503,6 +4898,14 @@ def relatorio_fechamento_caixa_print():
     for k in metodos_resumo:
         metodos_resumo[k]['total'] = round(metodos_resumo[k]['total'], 2)
 
+    operador_nome = current_user.nome if (current_user and current_user.is_authenticated) else 'Duty Staff'
+    registrar_log(
+        'CASH_CLOSING_PRINTED',
+        'Finance',
+        target_date.strftime('%Y-%m-%d'),
+        f"Folha de fechamento de caixa diário ({target_date.strftime('%d/%m/%Y')}) gerada/impressa por {operador_nome}. Total arrecadado: £{total_dia:.2f} ({len(transacoes)} recebimentos)."
+    )
+
     return render_template(
         'relatorio_fechamento_caixa.html',
         data_formatada=target_date.strftime('%d/%m/%Y'),
@@ -4512,7 +4915,7 @@ def relatorio_fechamento_caixa_print():
         total_transacoes=len(transacoes),
         metodos=metodos_resumo,
         itens=itens_todos,
-        operador=current_user.nome if (current_user and current_user.is_authenticated) else 'Duty Staff'
+        operador=operador_nome
     )
 
 
@@ -4569,7 +4972,8 @@ def criar_cobranca_avulsa():
     db.session.commit()
     
     operador = current_user.nome if (current_user and current_user.is_authenticated) else 'Staff'
-    registrar_log('CREATE_CHARGE', 'Transaction', nova.id, f"Cobrança avulsa de £{valor:.2f} ({tipo_final}) criada por {operador} para Contrato #{contrato.id}")
+    nota_log = f" (Nota: '{nota}')" if nota else ""
+    registrar_log('CREATE_CHARGE', 'Transaction', nova.id, f"Cobrança avulsa de £{valor:.2f} ({tipo_final}) criada por {operador} para Contrato #{contrato.id}{nota_log}")
     
     return jsonify({
         'message': 'Charge created successfully',
@@ -5252,12 +5656,19 @@ def excluir_transacao(id):
         return jsonify({'error': 'Cannot delete an already paid transaction', 'erro': 'Não é possível excluir uma transação já paga'}), 400
         
     id_contrato = t.id_contrato
+    valor_t = float(t.valor or 0.0)
+    tipo_t = t.tipo
+    venc_t = t.data_vencimento.strftime('%d/%m/%Y') if t.data_vencimento else 'N/A'
+    placa_t = t.contrato.placa if t.contrato else 'N/A'
+    cli_t = (t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else (t.contrato.cliente_nome if t.contrato else 'N/A')) or 'N/A'
+    nota_t = f" (Nota: '{t.nota}')" if t.nota else ""
+
     db.session.delete(t)
     if id_contrato:
         sync_sale_contract_status(id_contrato)
     db.session.commit()
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('TRANSACTION_DELETE', 'Transaction', id, f"Transação #{id} excluída por {operador_atual}")
+    registrar_log('TRANSACTION_DELETE', 'Transaction', id, f"Transação #{id} de £{valor_t:.2f} ({tipo_t}, Venc: {venc_t}) do Contrato #{id_contrato or 'N/A'} (Placa: {placa_t}, Cliente: {cli_t}) excluída por {operador_atual}{nota_t}")
     return jsonify({'message': 'Transaction deleted successfully', 'mensagem': 'Transação excluída com sucesso'}), 200
 
 @app.route('/api/busca-rapida', methods=['GET'])
@@ -5911,7 +6322,10 @@ def finalizar_quarentena(id):
     contrato.status = ContractStatus.COMPLETED.value
     db.session.commit()
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    registrar_log('QUARANTINE_END', 'Contract', contrato.id, f"Quarentena do contrato #{contrato.id} finalizada por {operador_atual}.")
+    cliente_nome = (contrato.cliente.nome if contrato.cliente else contrato.cliente_nome) or 'Cliente'
+    placa = contrato.placa or contrato.moto_placa or 'N/A'
+    comp_txt = " com comprovante bancário de restituição anexado" if url_comprovante else " (sem anexo de comprovante)"
+    registrar_log('QUARANTINE_END', 'Contract', contrato.id, f"Quarentena do contrato #{contrato.id} (Placa: {placa}, Cliente: {cliente_nome}) finalizada por {operador_atual}{comp_txt}.")
     return jsonify({'message': 'Deposit hold finalized successfully', 'mensagem': 'Quarentena finalizada com sucesso'})
 
 @app.route('/api/relatorios/resumo', methods=['GET'])

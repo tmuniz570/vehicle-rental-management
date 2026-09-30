@@ -197,10 +197,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const telVal = data.telefone || data.cliente_telefone;
         if (elTel) {
             if (telVal) {
+                const waNum = formatWhatsAppNumber(telVal);
+                const placaRef = (data.placa || data.moto_placa || '').trim();
+                const bikeRef = (placaRef && placaRef !== '-') ? `regarding vehicle ${placaRef}` : 'regarding your vehicle';
+                const waMsg = encodeURIComponent(`Hello ${data.cliente || data.cliente_nome || ''}, this is FF Motors ${bikeRef}: `);
                 elTel.innerHTML = `
-                    <a href="tel:${encodeURIComponent(telVal)}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${escapeHtml(telVal)}">
-                        <span>📞</span> <span style="text-decoration:underline;">${escapeHtml(telVal)}</span>
-                    </a>
+                    <div style="display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                        <a href="tel:${encodeURIComponent(telVal)}" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" title="Click to call ${escapeHtml(telVal)}">
+                            <span>📞</span> <span style="text-decoration:underline;">${escapeHtml(telVal)}</span>
+                        </a>
+                        ${waNum ? `<a href="https://wa.me/${waNum}?text=${waMsg}" target="_blank" rel="noopener noreferrer" class="btn-action" style="padding:2px 8px; font-size:0.75rem; background:rgba(37,211,102,0.15); border:1px solid rgba(37,211,102,0.35); color:#25D366; border-radius:4px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600;" title="Send WhatsApp Message">💬 WhatsApp</a>` : ''}
+                    </div>
                 `;
             } else {
                 elTel.innerHTML = '<span>📞 No phone</span>';
@@ -363,16 +370,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const linksCliente = document.getElementById('info_cliente_links');
         if (linksCliente) {
             linksCliente.innerHTML = '';
-            if (data.telefone) {
-                const waNumber = formatWhatsAppNumber(data.telefone);
-                const waLink = document.createElement('a');
-                waLink.href = `https://wa.me/${waNumber}`;
-                waLink.target = '_blank';
-                waLink.className = 'btn-action';
-                waLink.style.cssText = 'flex: 1; text-align: center; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.8rem; padding: 6px 10px; text-decoration: none; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;';
-                waLink.innerHTML = '<span>💬 WhatsApp</span>';
-                linksCliente.appendChild(waLink);
-            }
             const clientProfileLink = document.createElement('a');
             clientProfileLink.href = `/clientes?search=${encodeURIComponent(data.id_cliente || data.cliente || '')}`;
             clientProfileLink.className = 'btn-action';
@@ -821,6 +818,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const infoSeguro = document.getElementById('info_seguro');
 
         if (isPurchaseContrato) {
+            const boxSeguroSection = document.getElementById('box_seguro_section');
+            if (boxSeguroSection) boxSeguroSection.style.display = 'none';
             if (titleSeguro) {
                 titleSeguro.innerHTML = '🛡️ Vehicle Acquisition Status';
             }
@@ -1293,7 +1292,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const depSaldo = isCompleted ? 0 : (data.saldo_deposito !== undefined ? data.saldo_deposito : Math.max(0, depOriginal - depDeducoes));
         const depRestituido = Math.max(0, depOriginal - depDeducoes);
 
-        if (boxDep && depOriginal > 0) {
+        if (isVenda || isPurchaseContrato) {
+            if (boxDep) boxDep.style.display = 'none';
+        } else if (boxDep && depOriginal > 0) {
             boxDep.style.display = 'block';
             document.getElementById('dep_original_valor').textContent = formatoMoeda.format(depOriginal);
             
@@ -1558,6 +1559,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             cardFinancialStatement.style.display = isPurchaseContrato ? 'none' : 'flex';
         }
 
+        const navPillFin = document.getElementById('nav_pill_financial');
+        if (navPillFin) {
+            navPillFin.style.display = isPurchaseContrato ? 'none' : 'inline-flex';
+        }
+
         const resumoExtrato = document.getElementById('resumoExtrato');
         if (resumoExtrato) {
             let depSummary = '';
@@ -1567,9 +1573,163 @@ document.addEventListener('DOMContentLoaded', async () => {
             resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>${depSummary}`;
         }
 
+        function updateFinancialSummaryPanel() {
+            const panel = document.getElementById('fin_summary_panel');
+            if (!panel) return;
+            if (isPurchaseContrato) {
+                panel.style.display = 'none';
+                return;
+            }
+
+            panel.style.display = 'block';
+            const elTotal = document.getElementById('fin_stat_total');
+            const elPaid = document.getElementById('fin_stat_paid');
+            const elBalance = document.getElementById('fin_stat_balance');
+            const lblTotal = document.getElementById('fin_stat_label_total');
+            const lblBalance = document.getElementById('fin_stat_label_balance');
+            const extraCol = document.getElementById('fin_stat_extra_col');
+            const extraVal = document.getElementById('fin_stat_extra_val');
+            const extraLbl = document.getElementById('fin_stat_extra_label');
+
+            const progContainer = document.getElementById('fin_progression_container');
+            const progPercent = document.getElementById('fin_progress_percent');
+            const progBar = document.getElementById('fin_progress_bar');
+            const progLabel = document.getElementById('fin_progress_label');
+            const progDetails = document.getElementById('fin_progress_details');
+
+            // Calculate current paid and pending from extratoState.transacoes
+            let calcPago = 0;
+            let calcPendente = 0;
+            (extratoState.transacoes || []).forEach(t => {
+                const s = (t.status || '').toLowerCase();
+                const tip = (t.tipo || '').toLowerCase();
+                const val = parseFloat(t.valor) || 0;
+                if ((s === 'paid' || s === 'pago') && tip !== 'deposit_refund' && tip !== 'devolucao_deposito') {
+                    calcPago += val;
+                } else if (s === 'pending' || s === 'pendente' || s === 'overdue' || s === 'atrasado') {
+                    calcPendente += val;
+                }
+            });
+
+            let contractTotal = 0;
+            let currentBalance = calcPendente;
+            let currentPaid = calcPago;
+
+            if (isVendaContrato) {
+                contractTotal = parseFloat(data.valor_total_venda) || (calcPago + calcPendente);
+                if (data.saldo_devedor !== undefined && data.saldo_devedor !== null) {
+                    currentBalance = parseFloat(data.saldo_devedor);
+                }
+                if (lblTotal) lblTotal.textContent = 'Vehicle Sale Total';
+                if (lblBalance) lblBalance.textContent = 'Outstanding Balance';
+            } else {
+                contractTotal = (data.total_faturado !== undefined && data.total_faturado !== null) ? data.total_faturado : (calcPago + calcPendente);
+                if (lblTotal) lblTotal.textContent = 'Total Invoiced';
+                if (lblBalance) lblBalance.textContent = 'Balance Due';
+            }
+
+            if (elTotal) elTotal.textContent = formatoMoeda.format(contractTotal);
+            if (elPaid) elPaid.textContent = formatoMoeda.format(currentPaid);
+            if (elBalance) {
+                elBalance.textContent = formatoMoeda.format(currentBalance);
+                elBalance.style.color = currentBalance > 0 ? 'var(--text-primary)' : 'var(--text-secondary)';
+            }
+
+            // Security deposit indicator for rentals
+            if (extraCol && extraVal) {
+                if (!isVendaContrato && depOriginal > 0) {
+                    extraCol.style.display = 'block';
+                    if (extraLbl) extraLbl.textContent = isCompleted ? 'Deposit (Closed)' : 'Deposit Held';
+                    extraVal.textContent = formatoMoeda.format(depSaldo);
+                    extraVal.style.color = isCompleted ? 'var(--text-secondary)' : '#60a5fa';
+                } else {
+                    extraCol.style.display = 'none';
+                }
+            }
+
+            // Installment & Settlement Progress
+            if (progContainer && progPercent && progBar) {
+                if (isVendaContrato && data.tipo_contrato === 'Sale_Installment') {
+                    progContainer.style.display = 'block';
+                    const allParcelas = (extratoState.transacoes || []).filter(t => {
+                        const tp = (t.tipo || '').toLowerCase();
+                        return tp === 'sale_installment' || tp === 'venda_parcela';
+                    });
+                    const paidParcelas = allParcelas.filter(t => {
+                        const st = (t.status || '').toLowerCase();
+                        return st === 'paid' || st === 'pago';
+                    });
+
+                    const totalCount = allParcelas.length;
+                    const paidCount = paidParcelas.length;
+                    const pct = contractTotal > 0 ? Math.min(100, Math.round((currentPaid / contractTotal) * 100)) : (totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 0);
+
+                    if (progLabel) progLabel.textContent = `Instalment Settlement (${paidCount} of ${totalCount} paid)`;
+                    progPercent.textContent = `${pct}%`;
+                    progBar.style.width = `${pct}%`;
+
+                    if (progDetails) {
+                        const isSettled = pct >= 100 || currentBalance <= 0;
+                        if (isSettled) {
+                            progDetails.innerHTML = `
+                                <span style="color:#4ade80; font-weight:700;">🎉 Contract fully paid and settled!</span>
+                                <span class="badge badge-success" style="font-size:0.72rem; padding: 2px 8px;">SETTLED</span>
+                            `;
+                        } else {
+                            const pendingSorted = allParcelas.filter(t => {
+                                const st = (t.status || '').toLowerCase();
+                                return st === 'pending' || st === 'pendente' || st === 'overdue' || st === 'atrasado';
+                            }).sort((a,b) => (new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0)));
+
+                            let nextText = '';
+                            if (pendingSorted.length > 0) {
+                                const nextDue = pendingSorted[0].data_vencimento ? new Date(pendingSorted[0].data_vencimento).toLocaleDateString('en-GB') : '-';
+                                nextText = `Next instalment: <strong>${formatoMoeda.format(pendingSorted[0].valor)}</strong> due on <strong>${nextDue}</strong>`;
+                            }
+                            progDetails.innerHTML = `
+                                <span>${nextText}</span>
+                                <span>${totalCount - paidCount} instalment(s) remaining</span>
+                            `;
+                        }
+                    }
+                } else if (isVendaContrato && data.tipo_contrato === 'Sale_Full') {
+                    progContainer.style.display = 'block';
+                    const isSettled = currentBalance <= 0;
+                    const pct = isSettled ? 100 : Math.min(100, Math.round((currentPaid / (contractTotal || 1)) * 100));
+                    if (progLabel) progLabel.textContent = 'Sale Payment Status';
+                    progPercent.textContent = `${pct}%`;
+                    progBar.style.width = `${pct}%`;
+                    if (progDetails) {
+                        progDetails.innerHTML = isSettled 
+                            ? `<span style="color:#4ade80; font-weight:700;">✓ Full vehicle sale payment received and cleared.</span><span class="badge badge-success" style="font-size:0.72rem; padding: 2px 8px;">CLEARED</span>`
+                            : `<span>Pending full payment clearance</span>`;
+                    }
+                } else {
+                    progContainer.style.display = 'none';
+                }
+            }
+        }
+
+        // Setup smooth scroll for quick navigation pills
+        document.querySelectorAll('.nav-pill-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetId = btn.getAttribute('href');
+                if (targetId && targetId.startsWith('#')) {
+                    const targetEl = document.querySelector(targetId);
+                    if (targetEl && targetEl.style.display !== 'none') {
+                        e.preventDefault();
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }
+            });
+        });
+
+        updateFinancialSummaryPanel();
+
         let splitPaymentMgrContract = null;
 
         function renderExtrato() {
+            updateFinancialSummaryPanel();
             const tbody = document.querySelector('#extratoTable tbody');
             if (!tbody) return;
             tbody.innerHTML = '';

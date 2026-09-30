@@ -79,39 +79,153 @@
 
 <!-- Tab 2: Audit Trail Section -->
 <div id="tabContentAudit" style="display: none;">
-    <!-- Audit Filter Controls -->
-    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem;">
-        <div style="flex: 2; min-width: 240px; position: relative;">
+    <!-- Quick Audit Metric Cards -->
+    <div class="dashboard-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 1.75rem;">
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Events Today</div>
+            <div id="statAuditToday" style="font-size: 2rem; font-weight: 700; color: var(--text-primary); margin-top: 0.5rem;">-</div>
+        </div>
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Active Staff Today</div>
+            <div id="statAuditStaff" style="font-size: 2rem; font-weight: 700; color: #10b981; margin-top: 0.5rem;">-</div>
+        </div>
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Financial Ops Today</div>
+            <div id="statAuditFinance" style="font-size: 2rem; font-weight: 700; color: #f59e0b; margin-top: 0.5rem;">-</div>
+        </div>
+        <div class="card" style="padding: 1.25rem;">
+            <div style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600;">Security / System</div>
+            <div id="statAuditSecurity" style="font-size: 2rem; font-weight: 700; color: #c084fc; margin-top: 0.5rem;">-</div>
+        </div>
+    </div>
+
+    <!-- Audit Filter Controls: Row 1 (Text & Select Filters) -->
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <div style="flex: 2; min-width: 220px; position: relative;">
             <input type="text" id="auditSearchInput" placeholder="Search by operator, action, plate, or details..." style="width: 100%; padding: 0.75rem 1rem 0.75rem 2.5rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none;">
             <svg style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none;" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
         </div>
-        <div style="flex: 1; min-width: 180px;">
+        <div style="flex: 1; min-width: 170px;">
             <select id="auditAcaoFilter" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
                 <option value="">All Operational Actions</option>
-                <option value="PAYMENT_RECEIVED">Payment Received</option>
-                <option value="PAYMENT_CANCELLED">Payment Cancelled</option>
-                <option value="CREATE_CONTRACT">Contract Created</option>
-                <option value="CREATE_INSPECTION">Inspection Performed</option>
-                <option value="RETURN_VEHICLE">Vehicle Returned</option>
-                <option value="MOTO_STATUS_CHANGE">Motorbike Status Changed</option>
-                <option value="CREATE_CLIENT">Customer Registered</option>
-                <option value="USER_CREATE">User Account Created</option>
-                <option value="USER_UPDATE">User Account Updated</option>
-                <option value="USER_DELETE">User Account Deleted</option>
+                <optgroup label="Financial & Payments">
+                    <option value="PAYMENT_RECEIVED">Payment Received</option>
+                    <option value="PAYMENT_CANCELLED">Payment Cancelled / Reverted</option>
+                    <option value="PAYMENT_REMINDER">Payment WhatsApp Reminder</option>
+                    <option value="CREATE_CHARGE">Charge Created</option>
+                    <option value="TRANSACTION_DELETE">Charge Deleted</option>
+                    <option value="BATCH_PAYMENT">Batch Payment</option>
+                    <option value="TRANSACTION_MERGED">Balance Re-integrated</option>
+                    <option value="CASH_CLOSING_PRINTED">Daily Cash Closing Printed</option>
+                </optgroup>
+                <optgroup label="Contracts & Agreements">
+                    <option value="CREATE_CONTRACT">Contract Created</option>
+                    <option value="CONTRACT_CANCELLED">Contract Cancelled</option>
+                    <option value="CONTRACT_DUE_DAY_UPDATED">Payment Due Day Changed</option>
+                    <option value="CONTRACT_COMPLETED">Contract Completed</option>
+                    <option value="CONTRACT_REOPENED">Contract Reopened</option>
+                    <option value="CONTRACT_SIGNED_START">Signed at Check-out</option>
+                    <option value="CONTRACT_SIGNED_RETURN">Signed at Return</option>
+                    <option value="QUARANTINE_END">Deposit Hold Finalized</option>
+                    <option value="ATTACHMENT_UPLOADED">Contract Attachment Uploaded</option>
+                    <option value="ATTACHMENT_DELETED">Contract Attachment Deleted</option>
+                </optgroup>
+                <optgroup label="Vehicle Fleet & Compliance">
+                    <option value="MOTO_CREATE">Vehicle Registered</option>
+                    <option value="MOTO_UPDATE">Vehicle Details Updated</option>
+                    <option value="MOTO_STATUS_CHANGE">Vehicle Status Changed</option>
+                    <option value="MOTO_V5C_UPLOADED">V5C Logbook Uploaded</option>
+                    <option value="MOTO_V5C_DELETED">V5C Logbook Deleted</option>
+                    <option value="MOTO_TRACKER_ADDED">GPS Tracker Installed</option>
+                    <option value="MOTO_TRACKER_REMOVED">GPS Tracker Removed</option>
+                    <option value="INSURANCE_UPLOADED">Insurance Policy Uploaded</option>
+                    <option value="INSURANCE_VERIFIED">Insurance askMID Verified</option>
+                    <option value="INSURANCE_CANCELLED">Insurance askMID Cancelled</option>
+                </optgroup>
+                <optgroup label="Inspections">
+                    <option value="CREATE_INSPECTION">Inspection Performed</option>
+                    <option value="RETURN_VEHICLE">Vehicle Returned</option>
+                </optgroup>
+                <optgroup label="Customers">
+                    <option value="CREATE_CLIENT">Customer Registered</option>
+                    <option value="CLIENT_UPDATE">Customer Updated</option>
+                </optgroup>
+                <optgroup label="Claims & Storage">
+                    <option value="CLAIM_CREATE">Claim Registered</option>
+                    <option value="CLAIM_UPDATE">Claim Updated</option>
+                    <option value="CLAIM_DELETE">Claim Deleted</option>
+                </optgroup>
+                <optgroup label="System & Security">
+                    <option value="LOGIN_SUCCESS">Login Successful</option>
+                    <option value="LOGIN_FAILED">Login Failed</option>
+                    <option value="LOGOUT">User Logged Out</option>
+                    <option value="PASSWORD_CHANGE">Password Changed</option>
+                    <option value="USER_CREATE">User Account Created</option>
+                    <option value="USER_UPDATE">User Account Updated</option>
+                    <option value="USER_DELETE">User Account Deleted</option>
+                    <option value="JOB_DAILY_ROUTINE">Automated Daily Routine</option>
+                    <option value="CLEANUP_DUPLICATE_RENT">Duplicate Cleanup</option>
+                </optgroup>
             </select>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; background: var(--card-bg); padding: 0.35rem 0.85rem; border-radius: 12px; border: 1px solid var(--border-color);">
-            <label for="auditDateFilter" style="color: var(--text-secondary); font-size: 0.85rem;">Date:</label>
-            <input type="date" id="auditDateFilter" style="padding: 0.4rem; border: none; background: transparent; color: var(--text-primary); outline: none; cursor: pointer;">
+        <div style="flex: 1; min-width: 160px;">
+            <select id="auditUserFilter" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
+                <option value="">All Staff / Operators</option>
+            </select>
         </div>
-        <button type="button" id="btnClearAuditDate" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.75rem 1rem; border-radius: 12px; cursor: pointer; font-size: 0.85rem; font-weight: 500;">
-            Clear Date
-        </button>
-        <button type="button" id="btnRefreshAudit" class="btn-secondary" style="padding: 0.75rem 1.25rem; width: auto; font-size: 0.9rem;" title="Refresh Audit Trail">
-            🔄 Refresh
-        </button>
+        <div style="flex: 1; min-width: 150px;">
+            <select id="auditModuleFilter" style="width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer;">
+                <option value="">All Modules</option>
+                <option value="Contract">Contracts & Rentals</option>
+                <option value="Motorcycle">Vehicle Fleet</option>
+                <option value="Client">Customers</option>
+                <option value="Claim">Claims & Storage</option>
+                <option value="Financial">Financial / Cash</option>
+                <option value="User">Users & Security</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Audit Filter Controls: Row 2 (Presets, Dates, Limit & Actions) -->
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem; justify-content: space-between;">
+        <!-- Quick Date Preset Buttons -->
+        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;" id="auditDatePresets">
+            <button type="button" class="btn-preset active" data-preset="all" style="padding: 0.45rem 0.85rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: white; font-size: 0.8rem; font-weight: 600; cursor: pointer;">All Time</button>
+            <button type="button" class="btn-preset" data-preset="today" style="padding: 0.45rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; cursor: pointer;">Today</button>
+            <button type="button" class="btn-preset" data-preset="yesterday" style="padding: 0.45rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; cursor: pointer;">Yesterday</button>
+            <button type="button" class="btn-preset" data-preset="week" style="padding: 0.45rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; cursor: pointer;">Last 7 Days</button>
+            <button type="button" class="btn-preset" data-preset="month" style="padding: 0.45rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; cursor: pointer;">This Month</button>
+        </div>
+
+        <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+            <!-- Date Range Inputs -->
+            <div style="display: flex; align-items: center; gap: 0.4rem; background: var(--card-bg); padding: 0.35rem 0.75rem; border-radius: 10px; border: 1px solid var(--border-color); font-size: 0.85rem;">
+                <span style="color: var(--text-secondary);">From:</span>
+                <input type="date" id="auditDateFrom" style="border: none; background: transparent; color: var(--text-primary); outline: none; cursor: pointer; font-size: 0.85rem;">
+                <span style="color: var(--text-secondary); margin: 0 2px;">To:</span>
+                <input type="date" id="auditDateTo" style="border: none; background: transparent; color: var(--text-primary); outline: none; cursor: pointer; font-size: 0.85rem;">
+            </div>
+
+            <!-- Page Size -->
+            <select id="auditLimitSelect" style="padding: 0.45rem 0.65rem; border-radius: 10px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); outline: none; cursor: pointer; font-size: 0.85rem;" title="Items per page">
+                <option value="25">25 / page</option>
+                <option value="50" selected>50 / page</option>
+                <option value="100">100 / page</option>
+                <option value="250">250 / page</option>
+            </select>
+
+            <button type="button" id="btnRefreshAudit" class="btn-secondary" style="padding: 0.45rem 0.85rem; border-radius: 10px; width: auto; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;" title="Refresh Audit Trail">
+                🔄 Refresh
+            </button>
+            <button type="button" id="btnClearAuditFilters" class="btn-secondary" style="padding: 0.45rem 0.85rem; border-radius: 10px; width: auto; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px; background: rgba(239, 68, 68, 0.1); color: #f87171; border-color: rgba(239, 68, 68, 0.25);" title="Reset all filters">
+                🧹 Clear
+            </button>
+            <button type="button" id="btnExportAuditCsv" class="btn-secondary" style="padding: 0.45rem 0.85rem; border-radius: 10px; width: auto; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px; border-color: rgba(16, 185, 129, 0.3); color: #10b981;" title="Export filtered logs to CSV">
+                📥 Export CSV
+            </button>
+        </div>
     </div>
 
     <!-- Audit Log Table -->
@@ -119,17 +233,18 @@
         <table id="auditTable">
             <thead>
                 <tr>
-                    <th>Date & Time</th>
-                    <th>Staff / Operator</th>
-                    <th>Action</th>
-                    <th>Activity Description</th>
-                    <th>Target</th>
-                    <th>IP</th>
+                    <th data-sort-field="data_hora" class="sortable-th" style="cursor: pointer; width: 175px;">Date & Time</th>
+                    <th data-sort-field="usuario_nome" class="sortable-th" style="cursor: pointer; width: 160px;">Staff / Operator</th>
+                    <th data-sort-field="acao" class="sortable-th" style="cursor: pointer; width: 170px;">Action</th>
+                    <th data-sort-field="descricao" class="sortable-th" style="cursor: pointer;">Activity Description</th>
+                    <th data-sort-field="entidade" class="sortable-th" style="cursor: pointer; width: 140px;">Target</th>
+                    <th data-sort-field="ip_origem" class="sortable-th" style="cursor: pointer; width: 130px;">IP Address</th>
+                    <th style="width: 50px; text-align: center;">View</th>
                 </tr>
             </thead>
             <tbody id="auditTableBody">
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2.5rem; color: var(--text-secondary);">Loading activity log...</td>
+                    <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-secondary);">Loading activity log...</td>
                 </tr>
             </tbody>
         </table>
@@ -139,6 +254,51 @@
         <button id="btnPrevAuditPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 90px;">&laquo; Previous</button>
         <span id="auditPaginationInfo" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
         <button id="btnNextAuditPage" class="btn-primary" style="padding: 8px 16px; width: auto; min-width: 90px;">Next &raquo;</button>
+    </div>
+</div>
+
+<!-- Modal: Audit Event Detail -->
+<div id="modalAuditDetail" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:1150; justify-content:center; align-items:center; padding:1rem; backdrop-filter:blur(6px);">
+    <div class="glass-card" style="width:100%; max-width:540px; padding:2rem; position:relative; max-height:90vh; overflow-y:auto; border-radius: 20px;">
+        <button type="button" class="close-modal-btn" onclick="fecharModalAuditDetail()" style="position:absolute; top:1.25rem; right:1.25rem; background:transparent; border:none; color:var(--text-secondary); font-size:1.5rem; cursor:pointer; line-height:1;" aria-label="Close">&times;</button>
+        
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.35rem;">
+            <span style="font-size: 1.4rem;">📜</span>
+            <h2 id="modalAuditTitle" style="margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Audit Event Details</h2>
+        </div>
+        <p id="modalAuditSubtitle" style="margin: 0 0 1.5rem; color: var(--text-secondary); font-size: 0.85rem;">Complete trace metadata and operation context.</p>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; background: rgba(0,0,0,0.25); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color);">
+            <div>
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">Date & Time (London)</div>
+                <div id="modalAuditDateTime" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-top: 2px;">-</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">Staff / Operator</div>
+                <div id="modalAuditOperator" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-top: 2px;">-</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">Action Code</div>
+                <div id="modalAuditAction" style="margin-top: 4px;">-</div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">Target Entity</div>
+                <div id="modalAuditTarget" style="font-size: 0.9rem; font-family: monospace; color: var(--text-primary); margin-top: 2px;">-</div>
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600;">IP Address</div>
+                <div id="modalAuditIp" style="font-size: 0.85rem; font-family: monospace; color: var(--text-secondary); margin-top: 2px;">-</div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 1.5rem;">
+            <label style="display:block; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.4rem;">Full Description / Activity Record</label>
+            <div id="modalAuditDescription" style="padding: 1rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.35); color: var(--text-primary); font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;">-</div>
+        </div>
+        
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" onclick="fecharModalAuditDetail()" class="btn-primary" style="padding: 0.65rem 1.5rem; width: auto;">Close</button>
+        </div>
     </div>
 </div>
 
@@ -270,5 +430,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/usuarios.js?v=2"></script>
+<script src="/static/js/usuarios.js?v=4"></script>
 {% endblock %}

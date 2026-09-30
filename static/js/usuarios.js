@@ -2,10 +2,20 @@
 let listaUsuarios = [];
 let usuarioLogadoId = null;
 let abaAtual = 'users';
+
+// Audit Trail State
 let auditPaginaAtual = 1;
 let auditTermoBusca = '';
 let auditAcaoFiltro = '';
-let auditDataFiltro = '';
+let auditUsuarioFiltro = '';
+let auditModuloFiltro = '';
+let auditDataInicio = '';
+let auditDataFim = '';
+let auditLimit = 50;
+let auditSortBy = 'data_hora';
+let auditSortOrder = 'desc';
+let auditLogsCache = [];
+let auditUsersPopulated = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     carregarUsuarios();
@@ -30,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         formEdit.addEventListener('submit', handleEditUsuarioSubmit);
     }
 
-    // Audit Log Controls
+    // --- Audit Log Controls ---
     const auditSearch = document.getElementById('auditSearchInput');
     let searchTimeout;
     if (auditSearch) {
@@ -53,27 +63,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const auditDate = document.getElementById('auditDateFilter');
-    const btnClearAuditDate = document.getElementById('btnClearAuditDate');
-    if (auditDate) {
-        auditDate.addEventListener('change', (e) => {
-            auditDataFiltro = e.target.value;
-            if (btnClearAuditDate) {
-                btnClearAuditDate.style.display = auditDataFiltro ? 'inline-block' : 'none';
-            }
+    const auditUser = document.getElementById('auditUserFilter');
+    if (auditUser) {
+        auditUser.addEventListener('change', (e) => {
+            auditUsuarioFiltro = e.target.value;
             auditPaginaAtual = 1;
             carregarAuditoria();
         });
     }
 
-    if (btnClearAuditDate) {
-        btnClearAuditDate.addEventListener('click', () => {
-            if (auditDate) auditDate.value = '';
-            auditDataFiltro = '';
-            btnClearAuditDate.style.display = 'none';
+    const auditModule = document.getElementById('auditModuleFilter');
+    if (auditModule) {
+        auditModule.addEventListener('change', (e) => {
+            auditModuloFiltro = e.target.value;
             auditPaginaAtual = 1;
             carregarAuditoria();
         });
+    }
+
+    const auditLimitSelect = document.getElementById('auditLimitSelect');
+    if (auditLimitSelect) {
+        auditLimitSelect.addEventListener('change', (e) => {
+            auditLimit = parseInt(e.target.value, 10) || 50;
+            auditPaginaAtual = 1;
+            carregarAuditoria();
+        });
+    }
+
+    const dateFrom = document.getElementById('auditDateFrom');
+    const dateTo = document.getElementById('auditDateTo');
+    if (dateFrom) {
+        dateFrom.addEventListener('change', (e) => {
+            auditDataInicio = e.target.value;
+            syncPresetPillButtons('');
+            auditPaginaAtual = 1;
+            carregarAuditoria();
+        });
+    }
+    if (dateTo) {
+        dateTo.addEventListener('change', (e) => {
+            auditDataFim = e.target.value;
+            syncPresetPillButtons('');
+            auditPaginaAtual = 1;
+            carregarAuditoria();
+        });
+    }
+
+    // Quick Date Presets
+    const presetsContainer = document.getElementById('auditDatePresets');
+    if (presetsContainer) {
+        presetsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-preset');
+            if (!btn) return;
+            const preset = btn.getAttribute('data-preset');
+            aplicarPresetData(preset);
+        });
+    }
+
+    const btnClearAuditFilters = document.getElementById('btnClearAuditFilters');
+    if (btnClearAuditFilters) {
+        btnClearAuditFilters.addEventListener('click', resetAuditFilters);
     }
 
     const btnRefreshAudit = document.getElementById('btnRefreshAudit');
@@ -81,6 +130,11 @@ document.addEventListener('DOMContentLoaded', () => {
         btnRefreshAudit.addEventListener('click', () => {
             carregarAuditoria();
         });
+    }
+
+    const btnExportAuditCsv = document.getElementById('btnExportAuditCsv');
+    if (btnExportAuditCsv) {
+        btnExportAuditCsv.addEventListener('click', exportarAuditCsv);
     }
 
     const btnPrevAudit = document.getElementById('btnPrevAuditPage');
@@ -97,6 +151,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnNextAudit) {
         btnNextAudit.addEventListener('click', () => {
             auditPaginaAtual++;
+            carregarAuditoria();
+        });
+    }
+
+    // Enable True Server-Side Sorting on auditTable
+    if (typeof enableTableSorting === 'function') {
+        enableTableSorting('auditTable', (field, order) => {
+            auditSortBy = field;
+            auditSortOrder = order;
+            auditPaginaAtual = 1;
             carregarAuditoria();
         });
     }
@@ -146,11 +210,15 @@ async function carregarUsuarios() {
     try {
         const response = await fetch('/api/usuarios');
         if (!response.ok) {
+            if (response.status === 401) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">Your session has expired. <a href="/login" style="color:var(--accent); text-decoration:underline; font-weight:600;">Sign in again</a>.</td></tr>';
+                return;
+            }
             if (response.status === 403) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">Access Denied. Administrator privileges required.</td></tr>';
                 return;
             }
-            throw new Error('Failed to fetch users');
+            throw new Error(`Server returned HTTP ${response.status}`);
         }
 
         const data = await response.json();
@@ -161,15 +229,18 @@ async function carregarUsuarios() {
         renderizarTabela(listaUsuarios);
     } catch (error) {
         console.error('Error loading users:', error);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">Error loading accounts. Please refresh the page.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">
+            Error loading accounts: ${escapeHtml(error.message || 'Please refresh the page.')}<br>
+            <button type="button" onclick="carregarUsuarios()" class="btn-secondary" style="margin-top:0.75rem; padding:6px 14px; font-size:0.85rem; width:auto;">🔄 Try Again</button>
+        </td></tr>`;
     }
 }
 
 function atualizarEstatisticas(usuarios) {
     const total = usuarios.length;
     const ativos = usuarios.filter(u => u.ativo).length;
-    const admins = usuarios.filter(u => u.role === 'admin').length;
-    const staff = usuarios.filter(u => u.role !== 'admin').length;
+    const admins = usuarios.filter(u => u.is_admin || u.role === 'admin').length;
+    const staff = usuarios.filter(u => !u.is_admin && u.role !== 'admin').length;
 
     const elTotal = document.getElementById('statTotalUsers');
     const elAtivos = document.getElementById('statActiveUsers');
@@ -500,27 +571,48 @@ async function carregarAuditoria() {
     if (!tbody) return;
 
     try {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">Loading activity log...</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2.5rem; color:var(--text-secondary);">Loading activity log...</td></tr>';
 
         const params = new URLSearchParams({
             page: auditPaginaAtual,
-            limit: 20,
+            limit: auditLimit,
             search: auditTermoBusca,
             acao: auditAcaoFiltro,
-            data: auditDataFiltro
+            usuario: auditUsuarioFiltro,
+            entidade: auditModuloFiltro,
+            data_inicio: auditDataInicio,
+            data_fim: auditDataFim,
+            sort_by: auditSortBy,
+            sort_order: auditSortOrder
         });
 
         const res = await fetch(`/api/auditoria?${params.toString()}`);
         if (!res.ok) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">Error loading audit trail.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#f87171; padding:2rem;">Error loading audit trail.</td></tr>';
             return;
         }
 
         const data = await res.json();
         const logs = data.itens || [];
+        auditLogsCache = logs;
+
+        // Update live KPI cards
+        if (data.stats) {
+            const elToday = document.getElementById('statAuditToday');
+            const elStaff = document.getElementById('statAuditStaff');
+            const elFinance = document.getElementById('statAuditFinance');
+            const elSecurity = document.getElementById('statAuditSecurity');
+            if (elToday) elToday.textContent = data.stats.hoje ?? 0;
+            if (elStaff) elStaff.textContent = data.stats.operadores_hoje ?? 0;
+            if (elFinance) elFinance.textContent = data.stats.financeiro_hoje ?? 0;
+            if (elSecurity) elSecurity.textContent = data.stats.seguranca_hoje ?? 0;
+        }
+
+        // Populate User Filter options dynamically once
+        popularAuditUserFilter();
 
         if (logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No activity recorded with current filters.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2.5rem; color:var(--text-secondary);">No activity recorded with current filters.</td></tr>';
             if (paginationInfo) paginationInfo.textContent = '';
             const btnPrev = document.getElementById('btnPrevAuditPage');
             const btnNext = document.getElementById('btnNextAuditPage');
@@ -532,54 +624,83 @@ async function carregarAuditoria() {
         tbody.innerHTML = '';
         logs.forEach(log => {
             const tr = document.createElement('tr');
-            const dataFmt = log.data_hora ? new Date(log.data_hora).toLocaleString('en-GB') : '-';
+            tr.style.cursor = 'pointer';
+            tr.className = 'audit-row';
+            tr.title = 'Click to inspect full event details';
+
+            const dt = log.data_hora ? new Date(log.data_hora) : null;
+            const dataFmt = dt ? dt.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-';
 
             // Action Badge
             let acaoBadge = '';
             const a = log.acao || '';
-            if (a.includes('CANCEL')) {
-                acaoBadge = '<span class="badge badge-danger">Cancelled</span>';
-            } else if (a.includes('PAYMENT')) {
-                acaoBadge = '<span class="badge badge-success">Payment</span>';
-            } else if (a.includes('CONTRACT')) {
-                acaoBadge = '<span class="badge badge-info">Contract</span>';
-            } else if (a.includes('INSPECTION') || a.includes('RETURN')) {
-                acaoBadge = '<span class="badge badge-warning">Inspection</span>';
-            } else if (a.includes('USER')) {
-                acaoBadge = '<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc;">User</span>';
-            } else if (a.includes('MOTO')) {
-                acaoBadge = '<span class="badge" style="background:rgba(245,158,11,0.15); color:#f59e0b;">Vehicle</span>';
+            const aUpper = a.toUpperCase();
+            if (aUpper.includes('CANCEL') || aUpper.includes('DELETE') || aUpper.includes('FAILED')) {
+                acaoBadge = `<span class="badge badge-danger" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('PAYMENT') || aUpper.includes('SUCCESS') || aUpper.includes('COMPLETED') || aUpper.includes('VERIFIED')) {
+                acaoBadge = `<span class="badge badge-success" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('CONTRACT') || aUpper.includes('SIGNED') || aUpper.includes('DUE_DAY') || aUpper.includes('ATTACHMENT')) {
+                acaoBadge = `<span class="badge badge-info" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('INSPECTION') || aUpper.includes('RETURN') || aUpper.includes('QUARANTINE')) {
+                acaoBadge = `<span class="badge badge-warning" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('USER') || aUpper.includes('PASSWORD') || aUpper.includes('LOGIN') || aUpper.includes('LOGOUT')) {
+                acaoBadge = `<span class="badge" style="background:rgba(168,85,247,0.18); color:#c084fc; border:1px solid rgba(168,85,247,0.3);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('MOTO') || aUpper.includes('TRACKER') || aUpper.includes('V5C')) {
+                acaoBadge = `<span class="badge" style="background:rgba(245,158,11,0.18); color:#f59e0b; border:1px solid rgba(245,158,11,0.3);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('CLIENT')) {
+                acaoBadge = `<span class="badge" style="background:rgba(14,165,233,0.18); color:#38bdf8; border:1px solid rgba(14,165,233,0.3);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('CLAIM')) {
+                acaoBadge = `<span class="badge" style="background:rgba(236,72,153,0.18); color:#f472b6; border:1px solid rgba(236,72,153,0.3);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper.includes('JOB') || aUpper.includes('CLEANUP') || aUpper.includes('CLOSING') || aUpper.includes('CHARGE')) {
+                acaoBadge = `<span class="badge" style="background:rgba(100,116,139,0.25); color:#cbd5e1; border:1px solid rgba(100,116,139,0.35);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
             } else {
-                acaoBadge = `<span class="badge">${escapeHtml(a)}</span>`;
+                acaoBadge = `<span class="badge" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
             }
 
             const targetTxt = log.entidade ? `${log.entidade} ${log.entidade_id ? '#' + log.entidade_id : ''}` : '-';
 
             tr.innerHTML = `
-                <td data-sort="${log.data_hora || ''}" style="font-size:0.85rem; color:var(--text-secondary); white-space:nowrap;">${dataFmt}</td>
-                <td data-sort="${escapeHtml(log.usuario_nome || 'System')}" style="font-weight:600; color:var(--text-primary); white-space:nowrap;">
+                <td style="font-size:0.85rem; color:var(--text-secondary); white-space:nowrap;">
+                    ${dataFmt}
+                </td>
+                <td style="font-weight:600; color:var(--text-primary); white-space:nowrap;">
                     👤 ${escapeHtml(log.usuario_nome || 'System')}
                 </td>
-                <td data-sort="${escapeHtml(log.acao || '')}" class="nowrap">${acaoBadge}</td>
-                <td data-sort="${escapeHtml(log.descricao || '')}" style="font-size:0.9rem; color:var(--text-primary); max-width:380px;">
+                <td class="nowrap">${acaoBadge}</td>
+                <td style="font-size:0.9rem; color:var(--text-primary); max-width:420px; line-height:1.4;">
                     ${escapeHtml(log.descricao)}
                 </td>
-                <td data-sort="${escapeHtml(targetTxt)}" style="font-family:monospace; font-size:0.82rem; color:var(--text-secondary); white-space:nowrap;">
+                <td style="font-family:monospace; font-size:0.85rem; color:var(--text-secondary); white-space:nowrap;">
                     ${escapeHtml(targetTxt)}
                 </td>
-                <td data-sort="${escapeHtml(log.ip_origem || '')}" style="font-size:0.8rem; color:var(--text-secondary); opacity:0.7; white-space:nowrap;">
+                <td style="font-size:0.82rem; font-family:monospace; color:var(--text-secondary); opacity:0.85; white-space:nowrap;">
                     ${escapeHtml(log.ip_origem || '-')}
                 </td>
+                <td style="text-align:center;">
+                    <button type="button" class="btn-secondary btn-inspect-audit" data-id="${log.id}" style="padding: 4px 8px; font-size: 0.8rem; border-radius: 8px; width: auto;" title="View details">👁️</button>
+                </td>
             `;
+
+            // Clicking anywhere on row opens details
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('a')) return;
+                abrirModalAuditDetail(log.id);
+            });
+
             tbody.appendChild(tr);
         });
 
-        if (typeof enableTableSorting === 'function') {
-            enableTableSorting('auditTable');
+        // Visually update the active sort indicator (arrow & classes)
+        if (typeof setTableSortIndicator === 'function') {
+            setTableSortIndicator('auditTable', auditSortBy, auditSortOrder);
         }
 
         if (paginationInfo) {
-            paginationInfo.textContent = `Page ${data.pagina_atual} of ${data.paginas || 1} (${data.total} events)`;
+            const inicioItem = (data.pagina_atual - 1) * auditLimit + 1;
+            const fimItem = Math.min(data.pagina_atual * auditLimit, data.total);
+            paginationInfo.textContent = data.total > 0
+                ? `Showing ${inicioItem}–${fimItem} of ${data.total} activities (Page ${data.pagina_atual} of ${data.paginas || 1})`
+                : '';
         }
 
         const btnPrev = document.getElementById('btnPrevAuditPage');
@@ -588,6 +709,194 @@ async function carregarAuditoria() {
         if (btnNext) btnNext.disabled = data.pagina_atual >= (data.paginas || 1);
     } catch (e) {
         console.error('Audit load error:', e);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#f87171; padding:2rem;">Network error loading activity log.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#f87171; padding:2rem;">Network error loading activity log.</td></tr>';
     }
+}
+
+function popularAuditUserFilter() {
+    const userSelect = document.getElementById('auditUserFilter');
+    if (!userSelect || auditUsersPopulated) return;
+
+    const currentValue = userSelect.value;
+    const usersMap = new Map();
+    usersMap.set('System', 'System (Automated)');
+
+    if (Array.isArray(listaUsuarios) && listaUsuarios.length > 0) {
+        listaUsuarios.forEach(u => {
+            if (u.nome) usersMap.set(u.nome, u.nome + (u.is_admin ? ' (Admin)' : ''));
+        });
+    }
+
+    userSelect.innerHTML = '<option value="">All Staff / Operators</option>';
+    usersMap.forEach((label, val) => {
+        const opt = document.createElement('option');
+        opt.value = val;
+        opt.textContent = label;
+        if (val === currentValue) opt.selected = true;
+        userSelect.appendChild(opt);
+    });
+
+    auditUsersPopulated = true;
+}
+
+function aplicarPresetData(preset) {
+    const dateFrom = document.getElementById('auditDateFrom');
+    const dateTo = document.getElementById('auditDateTo');
+
+    const hoje = new Date();
+    const formatYMD = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+
+    if (preset === 'all') {
+        auditDataInicio = '';
+        auditDataFim = '';
+        if (dateFrom) dateFrom.value = '';
+        if (dateTo) dateTo.value = '';
+    } else if (preset === 'today') {
+        const str = formatYMD(hoje);
+        auditDataInicio = str;
+        auditDataFim = str;
+        if (dateFrom) dateFrom.value = str;
+        if (dateTo) dateTo.value = str;
+    } else if (preset === 'yesterday') {
+        const ontem = new Date();
+        ontem.setDate(hoje.getDate() - 1);
+        const str = formatYMD(ontem);
+        auditDataInicio = str;
+        auditDataFim = str;
+        if (dateFrom) dateFrom.value = str;
+        if (dateTo) dateTo.value = str;
+    } else if (preset === 'week') {
+        const semanaAtras = new Date();
+        semanaAtras.setDate(hoje.getDate() - 6);
+        auditDataInicio = formatYMD(semanaAtras);
+        auditDataFim = formatYMD(hoje);
+        if (dateFrom) dateFrom.value = auditDataInicio;
+        if (dateTo) dateTo.value = auditDataFim;
+    } else if (preset === 'month') {
+        const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+        auditDataInicio = formatYMD(inicioMes);
+        auditDataFim = formatYMD(hoje);
+        if (dateFrom) dateFrom.value = auditDataInicio;
+        if (dateTo) dateTo.value = auditDataFim;
+    }
+
+    syncPresetPillButtons(preset);
+    auditPaginaAtual = 1;
+    carregarAuditoria();
+}
+
+function syncPresetPillButtons(activePreset) {
+    const presetsContainer = document.getElementById('auditDatePresets');
+    if (!presetsContainer) return;
+
+    presetsContainer.querySelectorAll('.btn-preset').forEach(btn => {
+        const p = btn.getAttribute('data-preset');
+        if (p === activePreset) {
+            btn.classList.add('active');
+            btn.style.background = 'var(--accent)';
+            btn.style.color = 'white';
+            btn.style.borderColor = 'var(--accent)';
+            btn.style.fontWeight = '600';
+        } else {
+            btn.classList.remove('active');
+            btn.style.background = 'var(--card-bg)';
+            btn.style.color = 'var(--text-secondary)';
+            btn.style.borderColor = 'var(--border-color)';
+            btn.style.fontWeight = '500';
+        }
+    });
+}
+
+function resetAuditFilters() {
+    auditTermoBusca = '';
+    auditAcaoFiltro = '';
+    auditUsuarioFiltro = '';
+    auditModuloFiltro = '';
+    auditDataInicio = '';
+    auditDataFim = '';
+    auditLimit = 50;
+    auditSortBy = 'data_hora';
+    auditSortOrder = 'desc';
+    auditPaginaAtual = 1;
+
+    const s = document.getElementById('auditSearchInput');
+    const a = document.getElementById('auditAcaoFilter');
+    const u = document.getElementById('auditUserFilter');
+    const m = document.getElementById('auditModuleFilter');
+    const df = document.getElementById('auditDateFrom');
+    const dt = document.getElementById('auditDateTo');
+    const l = document.getElementById('auditLimitSelect');
+
+    if (s) s.value = '';
+    if (a) a.value = '';
+    if (u) u.value = '';
+    if (m) m.value = '';
+    if (df) df.value = '';
+    if (dt) dt.value = '';
+    if (l) l.value = '50';
+
+    syncPresetPillButtons('all');
+    carregarAuditoria();
+}
+
+function exportarAuditCsv() {
+    const params = new URLSearchParams({
+        search: auditTermoBusca,
+        acao: auditAcaoFiltro,
+        usuario: auditUsuarioFiltro,
+        entidade: auditModuloFiltro,
+        data_inicio: auditDataInicio,
+        data_fim: auditDataFim,
+        sort_by: auditSortBy,
+        sort_order: auditSortOrder
+    });
+
+    window.location.href = `/api/auditoria/exportar-csv?${params.toString()}`;
+}
+
+function abrirModalAuditDetail(logId) {
+    const log = (auditLogsCache || []).find(l => l.id === logId);
+    if (!log) return;
+
+    const modal = document.getElementById('modalAuditDetail');
+    if (!modal) return;
+
+    const elTitle = document.getElementById('modalAuditTitle');
+    const elDate = document.getElementById('modalAuditDateTime');
+    const elOp = document.getElementById('modalAuditOperator');
+    const elAction = document.getElementById('modalAuditAction');
+    const elTarget = document.getElementById('modalAuditTarget');
+    const elIp = document.getElementById('modalAuditIp');
+    const elDesc = document.getElementById('modalAuditDescription');
+
+    if (elTitle) elTitle.textContent = `Audit Event #${log.id}`;
+    if (elDate) {
+        const dt = log.data_hora ? new Date(log.data_hora) : null;
+        elDate.textContent = dt ? dt.toLocaleString('en-GB') : '-';
+    }
+    if (elOp) elOp.textContent = log.usuario_nome || 'System';
+    if (elAction) {
+        elAction.innerHTML = `<span class="badge" style="background:rgba(255,102,0,0.15); color:var(--accent); border:1px solid rgba(255,102,0,0.3); font-weight:700;">${escapeHtml(log.acao || '')}</span>`;
+    }
+    if (elTarget) {
+        elTarget.textContent = log.entidade ? `${log.entidade} ${log.entidade_id ? '#' + log.entidade_id : ''}` : 'N/A';
+    }
+    if (elIp) {
+        elIp.textContent = log.ip_origem ? `${log.ip_origem}` : 'Unknown IP';
+    }
+    if (elDesc) {
+        elDesc.textContent = log.descricao || 'No description provided.';
+    }
+
+    modal.style.display = 'flex';
+}
+
+function fecharModalAuditDetail() {
+    const modal = document.getElementById('modalAuditDetail');
+    if (modal) modal.style.display = 'none';
 }

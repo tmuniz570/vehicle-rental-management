@@ -1624,9 +1624,11 @@
                 chargeDescription = `${item.tipo} payment`;
             }
 
-            const plateOrRef = (item.placa && item.placa !== '-') ? item.placa : (item.contrato_id ? `Agreement #${item.contrato_id}` : 'General Charge');
+            const plateRef = (item.placa && item.placa !== '-') ? item.placa : '';
+            const plateDisplay = plateRef || 'FF Motors';
+            const bikeMention = plateRef ? `for motorbike ${plateRef}` : 'with FF Motors';
             const whatsappMsg = encodeURIComponent(
-                `Hello ${item.cliente_nome}, this is FF Motors. A friendly reminder that your ${chargeDescription} of £${valorNum.toFixed(2)} for motorbike ${plateOrRef} is due today. If you have already made this payment, please disregard this message. Thank you!`
+                `Hello ${item.cliente_nome || ''}, this is FF Motors. A friendly reminder that your ${chargeDescription} of £${valorNum.toFixed(2)} ${bikeMention} is due today. If you have already made this payment, please disregard this message. Thank you!`
             );
             const waLink = waNum ? `https://wa.me/${waNum}?text=${whatsappMsg}` : '#';
 
@@ -1635,7 +1637,7 @@
                     <div style="min-width: 0; flex: 1;">
                         <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 3px;">
                             <span class="badge" style="background: rgba(255,102,0,0.12); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-family: monospace; font-size: 0.85rem; font-weight: 700; padding: 2px 6px;">
-                                ${escapeHtml(plateOrRef)}
+                                ${escapeHtml(plateDisplay)}
                             </span>
                             <strong style="color: var(--text-primary); font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                 ${escapeHtml(item.cliente_nome)}
@@ -1735,7 +1737,8 @@
 
                             const hirerTel = m.hirer_telefone || '';
                             const hirerWaNum = (hirerTel && typeof formatWhatsAppNumber === 'function') ? formatWhatsAppNumber(hirerTel) : '';
-                            const hirerWaBtn = hirerWaNum ? `<a href="https://wa.me/${hirerWaNum}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.82rem;" title="WhatsApp ${escapeHtml(m.hirer_name || m.cliente_atual)}" onclick="event.stopPropagation();">💬</a>` : '';
+                            const hirerWaMsg = encodeURIComponent(`Hello ${m.hirer_name || m.cliente_atual || ''}, this is FF Motors regarding motorbike ${m.placa || ''}: `);
+                            const hirerWaBtn = hirerWaNum ? `<a href="https://wa.me/${hirerWaNum}?text=${hirerWaMsg}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.82rem;" title="WhatsApp ${escapeHtml(m.hirer_name || m.cliente_atual)}" onclick="event.stopPropagation();">💬</a>` : '';
 
                             outHtml += `
                                 <div class="search-result-card">
@@ -1788,7 +1791,8 @@
                             }
 
                             const waNum = (c.telefone && typeof formatWhatsAppNumber === 'function') ? formatWhatsAppNumber(c.telefone) : '';
-                            const waBtn = waNum ? `<a href="https://wa.me/${waNum}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp" onclick="event.stopPropagation();">💬</a>` : '';
+                            const custWaMsg = encodeURIComponent(`Hello ${c.nome || ''}, this is FF Motors: `);
+                            const waBtn = waNum ? `<a href="https://wa.me/${waNum}?text=${custWaMsg}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp" onclick="event.stopPropagation();">💬</a>` : '';
 
                             outHtml += `
                                 <div class="search-result-card">

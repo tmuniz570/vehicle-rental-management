@@ -134,9 +134,10 @@ function enableTableSorting(tableId, onSortCallback) {
 
     const headers = thead.querySelectorAll('th');
     headers.forEach((th, index) => {
+        // Ignore non-sortable columns unless explicitly marked with data-sort-field
         const title = th.textContent.trim().toLowerCase();
-        // Ignore action / non-sortable columns
-        if (title.includes('action') || title === 'actions' || title === 'edit' || title.includes('view') || title === 'documents' || title === 'doc' || title === 'docs' || title === 'photos' || title === 'observations') {
+        const hasExplicitSortField = th.hasAttribute('data-sort-field');
+        if (!hasExplicitSortField && (title.includes('action') || title === 'actions' || title === 'edit' || title.includes('view') || title === 'documents' || title === 'doc' || title === 'docs' || title === 'photos' || title === 'observations')) {
             return;
         }
 

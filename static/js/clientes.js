@@ -61,8 +61,9 @@ async function carregarClientes() {
             const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${escapeHtml(c.nome || '')}" data-tel="${escapeHtml(c.telefone || '')}" data-email="${escapeHtml(emailVal)}" data-endereco="${escapeHtml(c.endereco || '')}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             const waNum = formatWhatsAppNumber(c.telefone);
+            const waGreeting = encodeURIComponent(`Hello ${c.nome || ''}, this is FF Motors: `);
             const telHtml = waNum 
-                ? `<a href="https://wa.me/${waNum}" target="_blank" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp">💬 ${escapeHtml(c.telefone)}</a>`
+                ? `<a href="https://wa.me/${waNum}?text=${waGreeting}" target="_blank" rel="noopener noreferrer" style="color:var(--text-primary); text-decoration:none; display:inline-flex; align-items:center; gap:5px;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp">💬 ${escapeHtml(c.telefone)}</a>`
                 : escapeHtml(c.telefone || '-');
             
             const emailHtml = c.email 
