@@ -56,6 +56,26 @@ class User(db.Model, UserMixin):
     def pode_admin(self):
         return bool(self.is_admin)
 
+MASTER_ADMIN_EMAIL = "tmuniz570@gmail.com"
+
+@event.listens_for(User, 'before_delete')
+def protect_root_admin_delete(mapper, connection, target):
+    if target.email and target.email.strip().lower() == MASTER_ADMIN_EMAIL:
+        raise PermissionError(f"Root administrator account ({MASTER_ADMIN_EMAIL}) is system-protected and cannot be deleted.")
+
+@event.listens_for(User, 'before_update')
+def protect_root_admin_update(mapper, connection, target):
+    state = inspect(target)
+    history = state.get_history('email', True)
+    original_email = history.deleted[0] if (history and history.deleted) else target.email
+    if original_email and original_email.strip().lower() == MASTER_ADMIN_EMAIL:
+        target.email = MASTER_ADMIN_EMAIL
+        target.is_admin = True
+        target.role = 'admin'
+        target.ativo = True
+        target.perm_alugueis = True
+        target.perm_claims = True
+
 class MotoStatus(str, Enum):
     AVAILABLE = "Available"
     RENTED = "Rented"

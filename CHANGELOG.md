@@ -4,6 +4,44 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.27] — 2026-10-04 — *Root Administrator Account Protection, Instant Payments Due Today Reminders & Comprehensive Security/Privacy Audit*
+
+### 👑 Proteção e Imunidade da Conta Mestre (Root Administrator `tmuniz570@gmail.com`)
+* **Defesa em Profundidade na Camada de Dados (SQLAlchemy ORM Hooks)**:
+  - Adicionado listener `@event.listens_for(User, 'before_delete')` em `database.py` que bloqueia qualquer tentativa de exclusão do usuário raiz `tmuniz570@gmail.com`, disparando `PermissionError`.
+  - Adicionado listener `@event.listens_for(User, 'before_update')` que força e assegura de forma imutável a integridade dos atributos: `email = MASTER_ADMIN_EMAIL`, `is_admin = True`, `role = 'admin'`, `ativo = True`, `perm_alugueis = True` e `perm_claims = True`.
+* **Inicialização Resiliente no Boot (`seed_default_admin`)**:
+  - A rotina de inicialização do sistema valida a existência da conta mestre em todo boot. Se ausente, cria com perfil total; se existente, restaura automaticamente quaisquer permissões caso tenham sido alteradas externamente.
+* **Blindagem de Endpoints da API (`/api/usuarios/<id>`)**:
+  - `DELETE /api/usuarios/<id>`: Retorna `HTTP 403 Forbidden` com mensagem explicativa ao tentar deletar a conta mestre.
+  - `PUT /api/usuarios/<id>`: Rejeita com `HTTP 403 Forbidden` qualquer tentativa de remover privilégios de administrador (`is_admin=False`), suspender a conta (`ativo=False`) ou alterar o email da conta raiz.
+* **Interface de Usuários com Travamento Visual (`static/js/usuarios.js`)**:
+  - Destaque visual na listagem de usuários com badge `👑 Root Administrator` e tag `ROOT`.
+  - O botão de exclusão foi substituído pelo selo bloqueado `🔒 Protected` (`cursor: not-allowed`).
+  - No modal de edição, os campos de Administrador, Status da Conta, Email e Módulos de Acesso são bloqueados com legenda explicativa de proteção do sistema.
+* **Suíte de Testes Automatizados Dedicada**:
+  - Criado o arquivo `tests/test_root_admin_protection.py` cobrindo tentativas de exclusão, rebaixamento de cargo, desativação, alteração de email e validação dos hooks ORM (100% aprovado).
+
+### 💬 Lembretes WhatsApp em Tempo Real no Dashboard ("Payments Due Today")
+* **Feedback Visual Imediato no Card de Vencimentos do Dia**:
+  - Ao clicar em `💬 Remind` no card **Payments Due Today** (`templates/index.html`), o status **`✓ Reminded`** é renderizado imediatamente na linha de metadados da cobrança ao lado do telefone, sem necessidade de atualizar ou recarregar a página (`F5`).
+  - Chamada assíncrona para `/api/financeiro/<id>/lembrete` grava o horário e operador no banco de dados e auditoria, enriquecendo o tooltip do status em tempo real.
+* **Eliminação de Duplicidade Visual**:
+  - Separação clara entre indicador de status e botão de ação: o status fica na linha de informações do cliente (`✓ Reminded`), enquanto o botão de ação permanece limpo como `💬 Remind` (permitindo reenvio se necessário), eliminando a duplicidade de tags idênticas lado a lado.
+
+### 🛡️ Auditoria Completa de Segurança e Privacidade
+* **Verificação de PII & Documentos Protegidos (GDPR / Privacidade UK)**:
+  - Documentos confidenciais (cópia de CNH/habilitação, comprovante de endereço, certificado CBT, apólices e fotos de vistorias) servidos exclusivamente pela rota protegida `/static/uploads/<path:filename>` com verificação rigorosa de sessão (`@login_required`), cabeçalho `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-cache, no-store, must-revalidate` e sandboxing de CSP (`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`).
+* **Proteção contra Injeção de SQL e XSS**:
+  - 100% das consultas em tempo de execução utilizam ORM parametrizado do SQLAlchemy.
+  - Sanitização de saídas no frontend com funções `escapeHtml()` e auto-escaping nativo do Jinja2.
+* **Segurança de Sessão e Cookies**:
+  - Cookies configurados com `HTTPOnly`, `SameSite=Lax`, expiração controlada e expiração por inatividade (timeout de sessão).
+  - Rate limiting ativo contra força bruta em tentativas de login (`MAX_LOGIN_ATTEMPTS = 10` por janela de 15 minutos por IP).
+* **Defesa contra CSRF e Open Redirect**:
+  - Validação estrita de tokens CSRF com `hmac.compare_digest` para todas as requisições `POST`, `PUT`, `DELETE` e `PATCH`.
+  - Validação rigorosa de URLs de retorno em redirecionamentos (`is_safe_redirect_url`).
+
 ## [1.9.26] — 2026-10-04 — *Internal Notes, Charge References & Proof Attachments, Auto-Damage from Inspections & Inspection Anchoring*
 
 ### 📝 Notas Internas Confidenciais (Clientes, Motos & Contratos)

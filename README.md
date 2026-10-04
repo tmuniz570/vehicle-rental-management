@@ -136,11 +136,17 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Installable App:** Manifest configuration (`manifest.json`) and app icons allowing home screen installation on iOS (Safari) and Android (Chrome).
 
 ### 🔐 9. Authentication, Modular Permissions, Web Hardening & Audit Trail
+* **Root Administrator Account Immunity (`tmuniz570@gmail.com`):**
+  - **Multi-Layer Defense in Depth:** Permanent protection for the master owner account ensuring it cannot be deleted, demoted, suspended, or modified by any user or automated task.
+  - **SQLAlchemy ORM Event Hooks:** Database-level `@event.listens_for(User, 'before_delete')` aborts deletion attempts with a `PermissionError`. The `@event.listens_for(User, 'before_update')` hook guarantees email integrity, administrator status (`is_admin=True`), active state (`ativo=True`), and full module permissions.
+  - **API Shielding:** `DELETE /api/usuarios/<id>` and `PUT /api/usuarios/<id>` return `HTTP 403 Forbidden` if any operation attempts to delete the root user or remove admin privileges.
+  - **Self-Healing Startup Seed (`seed_default_admin`):** Automatic boot-time verification that re-affirms master permissions and status on every server start.
+  - **Frontend Safeguards:** Visual `👑 Root Administrator` and `ROOT` badges, locked privilege toggles in the edit modal, and replacement of the Delete button with a `🔒 Protected` disabled badge.
 * **Granular Modular Access Control:** True role separation allowing individual per-user permission toggles:
   - **Rental Module (`perm_alugueis`):** Access to fleet, customers, contracts, inspections, financial transactions, and overdue reports. Non-rental users are strictly blocked at route and API levels.
   - **Claims Module (`perm_claims`):** Access to accident claims, yard storage monitoring, referral fees, and storage invoices.
   - **Administrator (`is_admin`):** Full privileges to manage accounts, audit logs, and system operations.
-* **Comprehensive Audit Trail:** 100% coverage of state-modifying actions (Login/Logout, Client updates, Transaction deletions, Contract alterations) capturing User, Timestamp, IP, and exact action details.
+* **Comprehensive Audit Trail:** 100% coverage of state-modifying actions (Login/Logout, Client updates, Transaction deletions, Contract alterations, WhatsApp payment reminders) capturing User, Timestamp, IP, and exact action details.
 * **Brute-force Protection & Rate Limiting:** Built-in IP-based login rate limiting, blocking users after consecutive failed attempts.
 * **Storage Optimization Script:** Standalone cleanup script to prune orphan file uploads generated from aborted registrations, preventing server bloat.
 * **Role-Based Access Control (RBAC):** Distinct permissions (`admin`, `operador`, `financeiro`, `alugueis`) providing granular control over sensitive financial data and system configurations.

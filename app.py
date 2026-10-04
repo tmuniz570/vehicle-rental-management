@@ -488,7 +488,8 @@ init_db(app)
 def seed_default_admin():
     with app.app_context():
         try:
-            if User.query.count() == 0:
+            admin = User.query.filter(User.email.ilike("tmuniz570@gmail.com")).first()
+            if not admin:
                 default_password = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'Admin123!')
                 admin = User(
                     nome="Thiago Brandão",
@@ -503,6 +504,15 @@ def seed_default_admin():
                 db.session.add(admin)
                 db.session.commit()
                 print("[Auth] Master Admin 'Thiago Brandão' (tmuniz570@gmail.com) criado com sucesso.")
+            else:
+                if not admin.is_admin or not admin.ativo or not admin.perm_alugueis or not admin.perm_claims or admin.role != 'admin':
+                    admin.is_admin = True
+                    admin.role = 'admin'
+                    admin.ativo = True
+                    admin.perm_alugueis = True
+                    admin.perm_claims = True
+                    db.session.commit()
+                    print("[Auth] Master Admin 'Thiago Brandão' (tmuniz570@gmail.com) privilégios reafirmados.")
         except Exception as e:
             print(f"[Auth] Erro ao verificar ou criar admin padrão: {e}")
 
@@ -1484,6 +1494,17 @@ def atualizar_usuario(user_id):
     data = request.get_json() or {}
     alteracoes = []
     
+    is_master = bool(user.email and user.email.strip().lower() == 'tmuniz570@gmail.com')
+
+    # Strict protection for root administrator
+    if is_master:
+        if 'is_admin' in data and not bool(data['is_admin']):
+            return jsonify({'error': 'Administrator privileges cannot be removed from root administrator tmuniz570@gmail.com', 'erro': 'Não é permitido remover privilégios de administrador do usuário mestre tmuniz570@gmail.com.'}), 403
+        if 'ativo' in data and not bool(data['ativo']):
+            return jsonify({'error': 'The root administrator account (tmuniz570@gmail.com) cannot be suspended or deactivated.', 'erro': 'A conta de administrador mestre (tmuniz570@gmail.com) não pode ser desativada ou suspensa.'}), 403
+        if 'email' in data and data['email'].strip().lower() != 'tmuniz570@gmail.com':
+            return jsonify({'error': 'The email address of root administrator tmuniz570@gmail.com cannot be changed.', 'erro': 'O email do administrador mestre tmuniz570@gmail.com não pode ser alterado.'}), 403
+
     # Check if modifying name
     if 'nome' in data and data['nome'].strip():
         if user.nome != data['nome'].strip():
@@ -1493,6 +1514,8 @@ def atualizar_usuario(user_id):
     # Check if modifying permissions
     if 'is_admin' in data:
         novo_admin = bool(data['is_admin'])
+        if is_master and not novo_admin:
+            return jsonify({'error': 'Administrator privileges cannot be removed from root administrator tmuniz570@gmail.com'}), 403
         if user.id == current_user.id and not novo_admin:
             return jsonify({'error': 'You cannot remove your own administrator privileges'}), 400
         if user.is_admin != novo_admin:
@@ -1515,6 +1538,8 @@ def atualizar_usuario(user_id):
     # Check if modifying status (ativo)
     if 'ativo' in data:
         novo_status = bool(data['ativo'])
+        if is_master and not novo_status:
+            return jsonify({'error': 'The root administrator account tmuniz570@gmail.com cannot be suspended'}), 403
         if user.id == current_user.id and not novo_status:
             return jsonify({'error': 'You cannot suspend your own account'}), 400
         if user.ativo != novo_status:
@@ -1529,6 +1554,15 @@ def atualizar_usuario(user_id):
         user.set_password(data['password'])
         alteracoes.append("senha redefinida")
         
+    # Guarantee root administrator immutable permissions
+    if is_master:
+        user.email = 'tmuniz570@gmail.com'
+        user.is_admin = True
+        user.role = 'admin'
+        user.ativo = True
+        user.perm_alugueis = True
+        user.perm_claims = True
+
     db.session.commit()
     
     if alteracoes:
@@ -1555,6 +1589,12 @@ def deletar_usuario(user_id):
     if not user:
         return jsonify({'error': 'User not found'}), 404
     
+    if user.email and user.email.strip().lower() == 'tmuniz570@gmail.com':
+        return jsonify({
+            'error': 'This root administrator account (tmuniz570@gmail.com) is system-protected and cannot be deleted under any circumstances.',
+            'erro': 'Esta conta de administrador raiz (tmuniz570@gmail.com) é protegida pelo sistema e não pode ser excluída sob nenhuma circunstância.'
+        }), 403
+
     if user.id == current_user.id:
         return jsonify({'error': 'You cannot delete your own account'}), 400
         

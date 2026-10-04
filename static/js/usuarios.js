@@ -268,6 +268,8 @@ function filtrarUsuarios() {
     renderizarTabela(filtrados);
 }
 
+const MASTER_ADMIN_EMAIL = 'tmuniz570@gmail.com';
+
 function renderizarTabela(usuarios) {
     const tbody = document.getElementById('usersTableBody');
     if (!tbody) return;
@@ -284,10 +286,13 @@ function renderizarTabela(usuarios) {
         // Initial letter
         const inicial = user.nome ? user.nome.charAt(0).toUpperCase() : 'U';
         const isCurrent = user.id === usuarioLogadoId;
+        const isMaster = (user.email && user.email.toLowerCase() === MASTER_ADMIN_EMAIL);
 
         // Role & Permissions badge
         let roleBadge = '';
-        if (user.is_admin) {
+        if (isMaster) {
+            roleBadge = '<span class="badge" style="background:linear-gradient(135deg, rgba(245,158,11,0.2), rgba(239,68,68,0.2)); color:#fbbf24; border:1px solid rgba(245,158,11,0.4); font-weight:700;">👑 Root Administrator</span>';
+        } else if (user.is_admin) {
             roleBadge = '<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3);">Administrator</span>';
         } else {
             const perms = [];
@@ -305,16 +310,37 @@ function renderizarTabela(usuarios) {
         // Creation Date
         const dataFormatada = user.data_criacao ? user.data_criacao.substring(0, 10) : '-';
 
+        // Actions
+        let actionButtons = `
+            <button class="btn-secondary" onclick="abrirModalEditUsuario(${user.id})" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 6px;">
+                Edit
+            </button>
+        `;
+
+        if (isMaster) {
+            actionButtons += `
+                <span class="badge" style="padding: 6px 10px; font-size: 0.75rem; background: rgba(255,255,255,0.05); color: #94a3b8; border: 1px solid rgba(255,255,255,0.12); cursor: not-allowed; display: inline-flex; align-items: center; gap: 4px;" title="Root administrator account cannot be deleted or suspended">
+                    🔒 Protected
+                </span>
+            `;
+        } else if (!isCurrent) {
+            actionButtons += `
+                <button class="btn-secondary" onclick="confirmarExclusaoUsuario(${user.id}, '${escapeHtml(user.nome)}')" style="padding: 6px 12px; font-size: 0.8rem; color: #f87171; border-color: rgba(239, 68, 68, 0.2);">
+                    Delete
+                </button>
+            `;
+        }
+
         tr.innerHTML = `
             <td>
                 <div style="display: flex; align-items: center; gap: 12px;">
-                    <div style="width: 38px; height: 38px; border-radius: 50%; background: ${user.is_admin ? 'var(--accent-gradient)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)'}; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 0.95rem; flex-shrink: 0;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: ${isMaster ? 'linear-gradient(135deg, #f59e0b, #ef4444)' : (user.is_admin ? 'var(--accent-gradient)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)')}; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 0.95rem; flex-shrink: 0;">
                         ${inicial}
                     </div>
                     <div>
                         <div style="font-weight: 600; color: var(--text-primary);">
                             ${escapeHtml(user.nome)}
-                            ${isCurrent ? '<span style="font-size:0.7rem; margin-left:6px; padding:2px 6px; border-radius:6px; background:rgba(255,102,0,0.15); color:var(--accent); font-weight:700;">YOU</span>' : ''}
+                            ${isMaster ? '<span style="font-size:0.7rem; margin-left:6px; padding:2px 6px; border-radius:6px; background:rgba(245,158,11,0.2); color:#fbbf24; font-weight:700;">ROOT</span>' : (isCurrent ? '<span style="font-size:0.7rem; margin-left:6px; padding:2px 6px; border-radius:6px; background:rgba(255,102,0,0.15); color:var(--accent); font-weight:700;">YOU</span>' : '')}
                         </div>
                         <div style="font-size: 0.75rem; color: var(--text-secondary); display: md-none;">
                             ID: #${user.id}
@@ -329,14 +355,7 @@ function renderizarTabela(usuarios) {
             <td>${statusBadge}</td>
             <td style="color: var(--text-secondary); font-size: 0.85rem;">${dataFormatada}</td>
             <td style="text-align: right;">
-                <button class="btn-secondary" onclick="abrirModalEditUsuario(${user.id})" style="padding: 6px 12px; font-size: 0.8rem; margin-right: 6px;">
-                    Edit
-                </button>
-                ${!isCurrent ? `
-                <button class="btn-secondary" onclick="confirmarExclusaoUsuario(${user.id}, '${escapeHtml(user.nome)}')" style="padding: 6px 12px; font-size: 0.8rem; color: #f87171; border-color: rgba(239, 68, 68, 0.2);">
-                    Delete
-                </button>
-                ` : ''}
+                ${actionButtons}
             </td>
         `;
         tbody.appendChild(tr);
@@ -376,17 +395,33 @@ function abrirModalEditUsuario(userId) {
     document.getElementById('edit_password').value = '';
 
     const isCurrent = user.id === usuarioLogadoId;
+    const isMaster = user.email && user.email.toLowerCase() === MASTER_ADMIN_EMAIL;
     const selectAtivo = document.getElementById('edit_ativo');
     const chkAdmin = document.getElementById('edit_is_admin');
+    const chkAlugueis = document.getElementById('edit_perm_alugueis');
+    const chkClaims = document.getElementById('edit_perm_claims');
+    const inputEmail = document.getElementById('edit_email');
     
-    // Prevent self-lockout
-    if (isCurrent) {
+    if (isMaster) {
         selectAtivo.disabled = true;
         chkAdmin.disabled = true;
+        chkAlugueis.disabled = true;
+        chkClaims.disabled = true;
+        if (inputEmail) inputEmail.disabled = true;
+        document.getElementById('editUserSubtitle').innerHTML = '<span style="color:#fbbf24; font-weight:600;">👑 Root Administrator Account</span> — Protected against demotion, suspension, or deletion. You may update display name or password.';
+    } else if (isCurrent) {
+        selectAtivo.disabled = true;
+        chkAdmin.disabled = true;
+        chkAlugueis.disabled = false;
+        chkClaims.disabled = false;
+        if (inputEmail) inputEmail.disabled = false;
         document.getElementById('editUserSubtitle').textContent = 'Editing your own profile. (Status & Admin locked to prevent lockout)';
     } else {
         selectAtivo.disabled = false;
         chkAdmin.disabled = false;
+        chkAlugueis.disabled = false;
+        chkClaims.disabled = false;
+        if (inputEmail) inputEmail.disabled = false;
         document.getElementById('editUserSubtitle').textContent = 'Modify permissions, modules, and credentials.';
     }
 
@@ -443,13 +478,16 @@ async function handleEditUsuarioSubmit(e) {
     const btn = document.getElementById('btnSalvarEditUsuario');
     if (btn) btn.disabled = true;
 
-    const userId = document.getElementById('edit_user_id').value;
+    const userId = parseInt(document.getElementById('edit_user_id').value, 10);
+    const user = listaUsuarios.find(u => u.id === userId);
+    const isMaster = user && user.email && user.email.toLowerCase() === MASTER_ADMIN_EMAIL;
+
     const payload = {
         nome: document.getElementById('edit_nome').value.trim(),
-        perm_alugueis: document.getElementById('edit_perm_alugueis').checked,
-        perm_claims: document.getElementById('edit_perm_claims').checked,
-        is_admin: document.getElementById('edit_is_admin').checked,
-        ativo: document.getElementById('edit_ativo').value === 'true',
+        perm_alugueis: isMaster ? true : document.getElementById('edit_perm_alugueis').checked,
+        perm_claims: isMaster ? true : document.getElementById('edit_perm_claims').checked,
+        is_admin: isMaster ? true : document.getElementById('edit_is_admin').checked,
+        ativo: isMaster ? true : (document.getElementById('edit_ativo').value === 'true'),
         password: document.getElementById('edit_password').value
     };
 
@@ -478,6 +516,12 @@ async function handleEditUsuarioSubmit(e) {
 }
 
 async function toggleStatusUsuario(userId, novoStatus) {
+    const targetUser = listaUsuarios.find(u => u.id === userId);
+    if (targetUser && targetUser.email && targetUser.email.toLowerCase() === MASTER_ADMIN_EMAIL) {
+        alert('Security Alert: The root administrator account cannot be suspended.');
+        return;
+    }
+
     const acao = novoStatus ? 'activate' : 'suspend';
     if (!confirm(`Are you sure you want to ${acao} this user account?`)) return;
 
@@ -506,6 +550,12 @@ async function confirmarExclusaoUsuario(userId, nome) {
 }
 
 async function deletarUsuario(userId, nome) {
+    const targetUser = listaUsuarios.find(u => u.id === userId);
+    if (targetUser && targetUser.email && targetUser.email.toLowerCase() === MASTER_ADMIN_EMAIL) {
+        alert('Security Alert: The root administrator account (tmuniz570@gmail.com) is permanently protected and cannot be deleted.');
+        return;
+    }
+
     if (!confirm(`CAUTION: Are you sure you want to permanently delete user "${nome}"? This action cannot be undone.`)) {
         return;
     }
