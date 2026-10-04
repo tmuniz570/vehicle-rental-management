@@ -18,6 +18,10 @@ O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/p
 * **Otimização de Consultas do Dashboard (`/api/dashboard`)**:
   - Consulta de motos sem V5C (`motos_sem_v5c`) otimizada para `~Motorcycle.v5c_arquivos.any()`, executando cláusula SQL `NOT EXISTS` direta sem carregar a frota inteira em memória.
   - Carregamento de transações em contratos de caução atualizado para `selectinload(Contract.transacoes)`, prevenindo a duplicação em produto cartesiano.
+* **Cálculo em Tempo Real de Saldo Devedor no Extrato (`Financial Statement` -> `Outstanding Balance`)**:
+  - Corrigido o cálculo do card `Outstanding Balance` em contratos de venda (`Sale_Full` e `Sale_Installment`): o montante agora reflete a soma dinâmica em tempo real de todas as parcelas e cobranças pendentes (`calcPendente`), decrescendo e atualizando-se instantaneamente à medida que pagamentos são recebidos no balcão.
+  - O rótulo nos termos contratuais originais foi alinhado para `Financed Balance`, preservando a distinção clara entre o valor originalmente financiado e o saldo devedor atualizado em tempo real.
+  - Cachebuster de `detalhe_contrato.js` incrementado para `v=33`.
 
 ## [1.9.24] — 2026-09-30 — *Contract Details Screen Ergonomics, Financial Progress & Contextual Intelligence*
 

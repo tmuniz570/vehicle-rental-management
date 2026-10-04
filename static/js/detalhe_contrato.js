@@ -1617,13 +1617,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (isVendaContrato) {
                 contractTotal = parseFloat(data.valor_total_venda) || (calcPago + calcPendente);
-                if (data.saldo_devedor !== undefined && data.saldo_devedor !== null) {
-                    currentBalance = parseFloat(data.saldo_devedor);
-                }
+                currentBalance = calcPendente;
                 if (lblTotal) lblTotal.textContent = 'Vehicle Sale Total';
                 if (lblBalance) lblBalance.textContent = 'Outstanding Balance';
             } else {
                 contractTotal = (data.total_faturado !== undefined && data.total_faturado !== null) ? data.total_faturado : (calcPago + calcPendente);
+                currentBalance = calcPendente;
                 if (lblTotal) lblTotal.textContent = 'Total Invoiced';
                 if (lblBalance) lblBalance.textContent = 'Balance Due';
             }
