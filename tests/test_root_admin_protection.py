@@ -1,6 +1,7 @@
 import os
 import sys
 import unittest
+import secrets
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -38,7 +39,7 @@ class TestRootAdminProtection(unittest.TestCase):
                 perm_alugueis=True,
                 perm_claims=True
             )
-            self.root_admin.set_password('RootSecretPassword123!')
+            self.root_admin.set_password(secrets.token_hex(16))
             db.session.add(self.root_admin)
             db.session.commit()
         else:
@@ -58,7 +59,7 @@ class TestRootAdminProtection(unittest.TestCase):
                 perm_alugueis=True,
                 perm_claims=True
             )
-            self.sec_admin.set_password('SecAdminPass123!')
+            self.sec_admin.set_password(secrets.token_hex(16))
             db.session.add(self.sec_admin)
             db.session.commit()
 
