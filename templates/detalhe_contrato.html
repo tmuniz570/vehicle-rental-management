@@ -46,6 +46,9 @@
     <a href="#section_inspections" class="btn-action nav-pill-btn" style="padding: 6px 14px; font-size: 0.82rem; border-radius: 9999px; text-decoration: none; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
         <span>📷</span> Inspections
     </a>
+    <a href="#section_notas_internas" class="btn-action nav-pill-btn" style="padding: 6px 14px; font-size: 0.82rem; border-radius: 9999px; text-decoration: none; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-primary); display: inline-flex; align-items: center; gap: 6px; font-weight: 500;">
+        <span>📝</span> Internal Notes
+    </a>
 </div>
 
 <!-- 4 Summary Cards at Top: Customer, Vehicle, Contract & Terms, Inspections -->
@@ -321,6 +324,29 @@
     </div>
 </div>
 
+<!-- Internal Notes Card -->
+<div class="glass-card" id="section_notas_internas" style="padding: 1.5rem; margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <h3 style="color: var(--text-primary); margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                <span>📝 Internal Notes</span>
+            </h3>
+            <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 0.75rem; padding: 2px 8px; font-weight: 600;">
+                Internal Use Only
+            </span>
+        </div>
+        <button type="button" id="btnSalvarNotasContrato" class="btn-primary" style="width: auto; padding: 0.5rem 1.15rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+            <span>Save Notes</span>
+        </button>
+    </div>
+    <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0; margin-bottom: 0.85rem;">
+        Keep track of case particularities, agreements, special payment terms, or private staff reminders for this contract.
+    </p>
+    <textarea id="contrato_notas_internas" rows="3" placeholder="Type internal notes about this contract..." style="width: 100%; border-radius: 10px; border: 1px solid var(--border-color); background: var(--input-bg, #1a1a24); color: var(--text-primary); padding: 0.85rem 1rem; font-family: inherit; font-size: 0.9rem; resize: vertical; line-height: 1.5;"></textarea>
+    <div id="status_salvar_notas" style="font-size: 0.85rem; margin-top: 8px; display: none; font-weight: 600;"></div>
+</div>
+
 <!-- Rental Agreement, Signatures & Physical Attachments -->
 <div class="glass-card" id="section_agreement" style="padding: 1.5rem; margin-bottom: 2rem;">
     <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
@@ -406,7 +432,6 @@
     <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
         <div>
             <h3 style="color: var(--text-primary); margin: 0; font-size: 1.25rem;">Financial Statement</h3>
-            <span id="resumoExtrato" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
         </div>
         <button id="btnLancCob" class="btn-primary" style="padding: 0.6rem 1rem; font-size: 0.85rem; width: auto; display: inline-flex; align-items: center; gap: 0.4rem;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
@@ -498,6 +523,10 @@
         </div>
         <div class="modal-body">
             <div style="background: rgba(15, 23, 42, 0.5); padding: 1rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1rem;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;" id="modalVistoriaIdRow">
+                    <span style="color:var(--text-secondary); font-size:0.85rem;">Inspection ID:</span>
+                    <strong id="modalVistoriaId" style="color:var(--accent); font-size:0.9rem; font-weight:700;">-</strong>
+                </div>
                 <div style="display:flex; justify-content:space-between; margin-bottom: 0.5rem;">
                     <span style="color:var(--text-secondary); font-size:0.85rem;">Type:</span>
                     <span id="modalVistoriaTipo"></span>
@@ -526,17 +555,17 @@
 
 <!-- Add Charge Modal -->
 <div id="cobrancaModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 420px;">
+    <div class="modal-card" style="max-width: 480px;">
         <div class="modal-header">
             <h3>Add Charge</h3>
             <button id="closeCobrancaModal" class="modal-close">&times;</button>
         </div>
         <div class="modal-body">
-            <form id="cobrancaForm" class="modern-form">
+            <form id="cobrancaForm" class="modern-form" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="cob_tipo">Charge Type</label>
                     <select id="cob_tipo" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
-                        <option value="Fine">Fine / Penalty</option>
+                        <option value="Fine">Fine / PCN / Penalty</option>
                         <option value="Damage">Damage / Repair</option>
                         <option value="Rent">Extra Rent</option>
                         <option value="Deposit">Deposit</option>
@@ -544,14 +573,48 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="cob_valor">Amount (£)</label>
-                    <input type="number" inputmode="decimal" id="cob_valor" step="0.01" required placeholder="e.g. 50.00" style="width: 100%;">
+                    <label for="cob_referencia">Reference / Description <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Optional)</span></label>
+                    <input type="text" id="cob_referencia" placeholder="e.g. PCN Ticket #12345, Speeding Notice A45, Extra Helmet..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
+                    <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 4px;">Particularities or details of what this charge refers to.</small>
                 </div>
-                <div class="form-group">
-                    <label for="cob_data">Due Date</label>
-                    <input type="date" id="cob_data" required style="width: 100%;">
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label for="cob_valor">Amount (£)</label>
+                        <input type="number" inputmode="decimal" id="cob_valor" step="0.01" required placeholder="e.g. 50.00" style="width: 100%;">
+                    </div>
+                    <div class="form-group half">
+                        <label for="cob_data">Due Date</label>
+                        <input type="date" id="cob_data" required style="width: 100%;">
+                    </div>
                 </div>
-                <button type="submit" id="btnSalvarCob" class="btn-primary" style="width: 100%; margin-top: 0.5rem;">Create Charge</button>
+
+                <!-- Optional Photo / Document Attachments -->
+                <div class="form-group" style="margin-top: 0.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <label style="margin: 0; font-weight: 600;">Attach Document / Photo <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Optional)</span></label>
+                        <span id="cobPhotoCountBadge" class="badge" style="background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3); font-size: 0.72rem;">0 attached</span>
+                    </div>
+
+                    <div class="photo-uploader-actions" style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                        <button type="button" id="btnCobTakePhoto" class="btn-primary" style="flex: 1; min-width: 130px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0.65rem 0.85rem; font-size: 0.85rem;">
+                            <span>📸</span> Camera
+                        </button>
+                        <input type="file" id="cobCameraInput" accept="image/*" capture="environment" style="display: none;">
+
+                        <button type="button" id="btnCobPickGallery" class="btn-secondary" style="flex: 1; min-width: 130px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0.65rem 0.85rem; font-size: 0.85rem;">
+                            <span>🖼️ / 📄</span> Gallery or PDF
+                        </button>
+                        <input type="file" id="cobGalleryInput" accept="image/*,.pdf" multiple style="display: none;">
+                    </div>
+
+                    <small style="color: var(--text-secondary); display: block; margin-top: 0.4rem; font-size: 0.75rem;">
+                        Attach PCN fine letter, postal notice, repair invoice or photo (JPG, PNG, PDF).
+                    </small>
+
+                    <div id="cob_preview" class="photo-grid" style="display:none; margin-top:0.75rem;"></div>
+                </div>
+
+                <button type="submit" id="btnSalvarCob" class="btn-primary" style="width: 100%; margin-top: 0.75rem;">Create Charge</button>
             </form>
         </div>
     </div>
@@ -559,7 +622,7 @@
 
 <!-- New Incident / Return Inspection Modal -->
 <div id="ocorrenciaModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 500px;">
+    <div class="modal-card" style="max-width: 520px;">
         <div class="modal-header">
             <h3 id="ocorrenciaModalTitle">New Inspection (Incident)</h3>
             <button id="closeOcorrenciaModal" class="modal-close">&times;</button>
@@ -603,9 +666,49 @@
                     <label for="oc_obs">Inspection Notes / Observations</label>
                     <textarea id="oc_obs" rows="3" placeholder="Describe pre-existing condition, damages or notes..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;"></textarea>
                 </div>
+
+                <!-- Optional Linked Charge Generation -->
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 1rem; margin-top: 0.75rem;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; color: #f87171; margin-bottom: 0;">
+                        <input type="checkbox" id="oc_gerar_cobranca" name="gerar_cobranca" value="1" style="width: 17px; height: 17px; accent-color: #ef4444; cursor: pointer;">
+                        <span>Generate Damage / Repair Charge from this Inspection</span>
+                    </label>
+                    <div id="oc_cobranca_fields" style="display: none; margin-top: 0.85rem; padding-top: 0.85rem; border-top: 1px solid rgba(239, 68, 68, 0.2);">
+                        <div class="form-row">
+                            <div class="form-group half" style="margin-bottom: 0.5rem;">
+                                <label for="oc_cob_valor" style="font-size: 0.8rem; color: #fca5a5;">Repair Amount (£) *</label>
+                                <input type="number" inputmode="decimal" id="oc_cob_valor" name="cobranca_valor" step="0.01" placeholder="e.g. 120.00" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.7rem 0.85rem; border-radius: 10px; width: 100%;">
+                            </div>
+                            <div class="form-group half" style="margin-bottom: 0.5rem;">
+                                <label for="oc_cob_vencimento" style="font-size: 0.8rem; color: #fca5a5;">Due Date</label>
+                                <input type="date" id="oc_cob_vencimento" name="cobranca_vencimento" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.7rem 0.85rem; border-radius: 10px; width: 100%;">
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label for="oc_cob_referencia" style="font-size: 0.8rem; color: #fca5a5;">Charge Reference / Details (Optional)</label>
+                            <input type="text" id="oc_cob_referencia" name="cobranca_referencia" placeholder="e.g. Broken mirror, scratched exhaust, fairing repair" style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.7rem 0.85rem; border-radius: 10px; width: 100%;">
+                        </div>
+                        <small style="color: var(--text-secondary); font-size: 0.75rem; display: block; margin-top: 6px;">
+                            The inspection photos will be automatically linked to this charge as proof.
+                        </small>
+                    </div>
+                </div>
                 
-                <button type="submit" id="btnSalvarOcorr" class="btn-primary" style="width: 100%; margin-top: 0.5rem;">Save Inspection</button>
+                <button type="submit" id="btnSalvarOcorr" class="btn-primary" style="width: 100%; margin-top: 1rem;">Save Inspection</button>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Attachment Viewer Modal for Charges -->
+<div id="cobrancaAnexoModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 id="cobrancaAnexoModalTitle">Charge Proof & Attachments</h3>
+            <button id="closeCobrancaAnexoModal" class="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" id="cobrancaAnexoModalBody" style="padding: 1rem 0.5rem;">
+            <!-- Dynamically injected -->
         </div>
     </div>
 </div>
@@ -711,6 +814,10 @@
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
                         <span style="color:#64748b;">Description:</span>
                         <strong id="rec_tipo" style="color:#0f172a;">-</strong>
+                    </div>
+                    <div id="rec_row_ref" style="display:none; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem; align-items:flex-start;">
+                        <span style="color:#64748b;">Charge Reference:</span>
+                        <strong id="rec_ref" style="color:#0f172a; max-width:65%; text-align:right; font-weight:600;">-</strong>
                     </div>
                     <div style="display:flex; justify-content:space-between; border-bottom: 1px solid #f1f5f9; padding-bottom:0.4rem;">
                         <span style="color:#64748b;">Payment Date:</span>
@@ -978,6 +1085,6 @@
     const CONTRATO_ID = {{ contrato_id }};
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/moto_modal_shared.js?v=5"></script>
-<script src="/static/js/detalhe_contrato.js?v=33"></script>
+<script src="/static/js/moto_modal_shared.js?v=6"></script>
+<script src="/static/js/detalhe_contrato.js?v=36"></script>
 {% endblock %}

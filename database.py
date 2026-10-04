@@ -139,6 +139,7 @@ class Client(db.Model):
     url_habilitacao_verso = db.Column(db.String(255), nullable=True)
     url_cbt = db.Column(db.String(255), nullable=True)
     url_comprovante_endereco = db.Column(db.String(255), nullable=True)
+    notas_internas = db.Column(db.Text, nullable=True)
     
     contratos = db.relationship('Contract', backref='cliente', lazy=True)
 
@@ -153,6 +154,7 @@ class Motorcycle(db.Model):
     vencimento_mot = db.Column(db.Date, nullable=True, index=True)
     vencimento_tax = db.Column(db.Date, nullable=True, index=True)
     tax_sorn = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    notas_internas = db.Column(db.Text, nullable=True)
     
     contratos = db.relationship('Contract', backref='moto', lazy=True)
     v5c_arquivos = db.relationship('MotorcycleV5C', backref='moto', lazy=True, cascade='all, delete-orphan')
@@ -245,6 +247,7 @@ class Contract(db.Model):
     moto_placa = db.Column(db.String(10), nullable=True)
     valor_deposito = db.Column(db.Numeric(10, 2), nullable=True)
     dia_pagamento_semanal_original = db.Column(db.Integer, nullable=True) # Snapshot: dia da semana originalmente assinado no documento impresso
+    notas_internas = db.Column(db.Text, nullable=True)
     
     vistorias = db.relationship('Inspection', backref='contrato', lazy=True)
     transacoes = db.relationship('FinancialTransaction', backref='contrato', lazy=True)
@@ -271,6 +274,7 @@ class Inspection(db.Model):
     observacoes = db.Column(db.Text, nullable=True)
     url_fotos = db.Column(db.String(255), nullable=True) # Pode ser JSON array se forem várias fotos
     realizado_por_nome = db.Column(db.String(100), nullable=True)
+    cobrancas = db.relationship('FinancialTransaction', backref='vistoria', lazy=True)
 
 class FinancialTransaction(db.Model):
     __tablename__ = 'financeiro_transacoes'
@@ -284,7 +288,10 @@ class FinancialTransaction(db.Model):
     status = db.Column(db.String(20), default=TransactionStatus.PENDENTE.value, nullable=False, index=True)
     forma_pagamento = db.Column(db.String(255), nullable=True)
     detalhes_pagamento_json = db.Column(db.Text, nullable=True)
-    nota = db.Column(db.Text, nullable=True)
+    nota = db.Column(db.Text, nullable=True) # Descrição/referência da cobrança (ex: multa, dano, vistoria, acessórios)
+    nota_pagamento = db.Column(db.Text, nullable=True) # Observação/referência específica do pagamento (ex: forma, banco, comprovante)
+    url_anexos = db.Column(db.Text, nullable=True) # URLs de fotos ou documentos (PCN, multas, orçamentos, fotos de danos)
+    id_vistoria = db.Column(db.Integer, db.ForeignKey('vistorias.id', ondelete='SET NULL'), nullable=True, index=True)
     id_transacao_origem = db.Column(db.Integer, nullable=True)
     registrado_por_nome = db.Column(db.String(100), nullable=True)
     ultimo_lembrete = db.Column(db.DateTime, nullable=True)
@@ -418,6 +425,7 @@ def init_db(app):
                         ('moto_placa', 'VARCHAR(10)'),
                         ('valor_deposito', 'NUMERIC(10, 2)'),
                         ('dia_pagamento_semanal_original', 'INTEGER'),
+                        ('notas_internas', 'TEXT'),
                     ]
                     for col_name, col_type in snapshot_cols:
                         if col_name not in cols_c:
@@ -560,6 +568,9 @@ def init_db(app):
                     if 'milhagem_atual' not in cols_m:
                         conn.execute(db.text("ALTER TABLE motos ADD COLUMN milhagem_atual INTEGER DEFAULT 0"))
                         conn.commit()
+                    if 'notas_internas' not in cols_m:
+                        conn.execute(db.text("ALTER TABLE motos ADD COLUMN notas_internas TEXT"))
+                        conn.commit()
 
                 # Clientes
                 if 'clientes' in existing_tables:
@@ -569,6 +580,9 @@ def init_db(app):
                         conn.commit()
                     if 'url_cbt' not in cols_cl:
                         conn.execute(db.text("ALTER TABLE clientes ADD COLUMN url_cbt VARCHAR(255)"))
+                        conn.commit()
+                    if 'notas_internas' not in cols_cl:
+                        conn.execute(db.text("ALTER TABLE clientes ADD COLUMN notas_internas TEXT"))
                         conn.commit()
 
                     # Ensure email is nullable (Optional email)
@@ -626,7 +640,7 @@ def init_db(app):
                         conn.execute(db.text("UPDATE usuarios SET perm_claims = 1 WHERE role = 'admin'"))
                         conn.commit()
 
-                # Transações Financeiras: Suporte a Registro de Lembretes
+                # Transações Financeiras: Suporte a Registro de Lembretes, Anexos e Vínculo com Vistoria
                 if 'financeiro_transacoes' in existing_tables:
                     cols_ft = [col['name'] for col in inspector.get_columns('financeiro_transacoes')]
                     if 'ultimo_lembrete' not in cols_ft:
@@ -635,6 +649,28 @@ def init_db(app):
                     if 'ultimo_lembrete_por' not in cols_ft:
                         conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN ultimo_lembrete_por VARCHAR(100);"))
                         conn.commit()
+                    if 'url_anexos' not in cols_ft:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN url_anexos TEXT;"))
+                        conn.commit()
+                    if 'id_vistoria' not in cols_ft:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN id_vistoria INTEGER;"))
+                        conn.commit()
+                    if 'nota_pagamento' not in cols_ft:
+                        conn.execute(db.text("ALTER TABLE financeiro_transacoes ADD COLUMN nota_pagamento TEXT;"))
+                        conn.commit()
+
+                    # Auto-heal: restore any inspection notes that were lost
+                    try:
+                        conn.execute(db.text("""
+                            UPDATE financeiro_transacoes
+                            SET nota = (SELECT observacoes FROM vistorias WHERE vistorias.id = financeiro_transacoes.id_vistoria)
+                            WHERE (nota IS NULL OR nota = '') AND id_vistoria IS NOT NULL AND EXISTS (
+                                SELECT 1 FROM vistorias WHERE vistorias.id = financeiro_transacoes.id_vistoria AND observacoes IS NOT NULL AND observacoes != ''
+                            );
+                        """))
+                        conn.commit()
+                    except Exception as e_heal:
+                        pass
 
                 # Performance: Auto-create essential indexes on existing database
                 indexes_to_create = [
@@ -642,6 +678,7 @@ def init_db(app):
                     ("idx_contratos_placa", "contratos", "placa"),
                     ("idx_contratos_status", "contratos", "status"),
                     ("idx_transacoes_contrato", "financeiro_transacoes", "id_contrato"),
+                    ("idx_transacoes_vistoria", "financeiro_transacoes", "id_vistoria"),
                     ("idx_transacoes_status", "financeiro_transacoes", "status"),
                     ("idx_transacoes_vencimento", "financeiro_transacoes", "data_vencimento"),
                     ("idx_transacoes_pagamento", "financeiro_transacoes", "data_pagamento"),
@@ -708,4 +745,11 @@ def receive_after_delete_inspection(mapper, connection, target):
     if target.url_fotos:
         fotos = target.url_fotos.split(',')
         for f in fotos:
+            delete_file_if_exists(f.strip())
+
+@event.listens_for(FinancialTransaction, 'after_delete')
+def receive_after_delete_transaction(mapper, connection, target):
+    # Only delete files if not linked to an inspection (to avoid deleting inspection photos)
+    if target.url_anexos and not target.id_vistoria:
+        for f in target.url_anexos.split(','):
             delete_file_if_exists(f.strip())

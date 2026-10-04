@@ -5,7 +5,7 @@ import json
 import urllib.parse
 from app import app
 from database import (
-    db, Client, Contract, Inspection, ContractAttachment, MotorcycleV5C, MotorcycleTracker
+    db, Client, Contract, Inspection, ContractAttachment, MotorcycleV5C, MotorcycleTracker, FinancialTransaction
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -95,6 +95,28 @@ def collect_valid_files():
         if not url_fotos:
             continue
         raw = url_fotos.strip()
+        if (raw.startswith('[') and raw.endswith(']')) or (raw.startswith('{') and raw.endswith('}')):
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        fname = extract_clean_filename(str(item))
+                        if fname:
+                            valid_files.add(fname)
+                    continue
+            except Exception:
+                pass
+        urls = [u.strip() for u in raw.split(',') if u.strip()]
+        for u in urls:
+            fname = extract_clean_filename(u)
+            if fname:
+                valid_files.add(fname)
+
+    # 7. Financial Transactions Attachments (Fines, PCN, Damage Proof)
+    for (url_anexos,) in db.session.query(FinancialTransaction.url_anexos).filter(FinancialTransaction.url_anexos.isnot(None)).all():
+        if not url_anexos:
+            continue
+        raw = url_anexos.strip()
         if (raw.startswith('[') and raw.endswith(']')) or (raw.startswith('{') and raw.endswith('}')):
             try:
                 parsed = json.loads(raw)

@@ -103,6 +103,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Multi-Angle Camera Capture:** Tailored for yard operators using smartphones to snap vehicle photos at check-out, return check-in, or road incidents.
 * **Client-Side Image Compression:** Automatic compression via `browser-image-compression` converting high-res smartphone captures to lightweight WebP formats before upload, saving bandwidth and cloud storage.
 * **High-Definition Gallery:** Inspection modals with zoomable image grids and timestamped condition logs.
+* **Auto-Damage Charge Generation:** 1-click option when logging road incidents or return damages to automatically create an itemized repair charge (`Damage`) on the contract ledger, transferring condition notes and photographic evidence.
+* **Inspection Numbering & Interactive Anchoring:** Clear `#ID` badges displayed across all inspection views, with clickable ledger links (`🔍 Inspection #ID`) that smoothly scroll and pulse-highlight the exact inspection record.
 
 ### 💳 7. Advanced Financial Hub, Cashing Up & High-Density Statements
 * **Smart Synchronized Filters (Status & Date Field Alignment):** Intelligent cross-filter tracking across the entire financial command center:

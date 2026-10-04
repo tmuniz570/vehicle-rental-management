@@ -183,6 +183,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const data = await response.json();
         
+        // Internal Notes
+        const txtNotasContrato = document.getElementById('contrato_notas_internas');
+        if (txtNotasContrato) {
+            txtNotasContrato.value = data.notas_internas || '';
+        }
+        
         // 1. Customer Card
         const elClienteId = document.getElementById('info_cliente_id');
         if (elClienteId) {
@@ -1564,15 +1570,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             navPillFin.style.display = isPurchaseContrato ? 'none' : 'inline-flex';
         }
 
-        const resumoExtrato = document.getElementById('resumoExtrato');
-        if (resumoExtrato) {
-            let depSummary = '';
-            if (depOriginal > 0) {
-                depSummary = ` &bull; Deposit Balance: <strong style="color:${isCompleted ? 'var(--text-secondary)' : 'var(--success)'};">${formatoMoeda.format(depSaldo)}</strong>`;
-            }
-            resumoExtrato.innerHTML = `&bull; Pending: <strong style="color:${totalPendente > 0 ? '#f87171' : 'var(--text-primary)'};">${formatoMoeda.format(totalPendente)}</strong> &bull; Total Paid: <strong style="color:var(--success);">${formatoMoeda.format(totalPago)}</strong>${depSummary}`;
-        }
-
         function updateFinancialSummaryPanel() {
             const panel = document.getElementById('fin_summary_panel');
             if (!panel) return;
@@ -1821,6 +1818,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 else if (tipoLower === 'deposit_refund' || tipoLower === 'devolucao_deposito') tipoBadge = '<span class="badge badge-success">Deposit Refund</span>';
                 else tipoBadge = `<span class="badge">${t.tipo}</span>`;
 
+                // Reference & Attachments & Linked Inspection
+                let refNotaHtml = '';
+                if (t.nota) {
+                    refNotaHtml = `<span style="display:block; font-size:0.75rem; color:#cbd5e1; margin-top:3px; word-break:break-word; max-width:260px;" title="${escapeHtml(t.nota)}">📝 <strong style="color:#e2e8f0;">${escapeHtml(t.nota)}</strong></span>`;
+                }
+
+                let anexoBadgeHtml = '';
+                if (t.url_anexos) {
+                    const urls = t.url_anexos.split(',').map(u => u.trim()).filter(Boolean);
+                    if (urls.length > 0) {
+                        anexoBadgeHtml = `<button type="button" class="btn-ver-anexo" data-urls="${escapeHtml(JSON.stringify(urls))}" data-ref="${escapeHtml(t.nota || t.tipo)}" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa; border:1px solid rgba(59, 130, 246, 0.35); font-size:0.72rem; padding:2px 7px; border-radius:6px; margin-top:3px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; font-weight:600;" title="Click to view attached documents/photos">📎 Proof (${urls.length})</button>`;
+                    }
+                }
+
+                let vistoriaLinkHtml = '';
+                if (t.id_vistoria) {
+                    vistoriaLinkHtml = `<a href="#inspection-item-${t.id_vistoria}" onclick="highlightInspection(${t.id_vistoria})" class="badge" style="background:rgba(239, 68, 68, 0.15); color:#fca5a5; border:1px solid rgba(239, 68, 68, 0.35); font-size:0.7rem; padding:2px 6px; border-radius:6px; margin-top:3px; text-decoration:none; display:inline-flex; align-items:center; gap:3px; cursor:pointer;" title="Go to Inspection #${t.id_vistoria}">🔍 Inspection #${t.id_vistoria}</a>`;
+                }
+
                 let acoesHtml = '';
                 if (isPending) {
                     acoesHtml = `
@@ -1837,7 +1853,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const descFinal = t.descricao || (typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(t.tipo) : t.tipo);
                     acoesHtml = `
                         <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
-                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${parseFloat(t.valor).toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" data-nota="${escapeHtml(t.nota || '')}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
+                            <button class="btn-action btn-recibo" data-id="${t.id}" data-tipo="${t.tipo}" data-descricao="${descFinal}" data-valor="${parseFloat(t.valor).toFixed(2)}" data-forma="${t.forma_pagamento || '-'}" data-data="${t.data_pagamento || '-'}" data-nota="${escapeHtml(t.nota_pagamento || '')}" data-ref="${escapeHtml(t.nota || '')}" style="background:rgba(255,255,255,0.06); border:1px solid var(--border-color); color:var(--text-primary); padding:4px 10px; font-size:0.8rem;" title="View Receipt">
                                 🧾 Receipt
                             </button>
                             <button class="btn-action btn-reverter-pagamento" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${parseFloat(t.valor).toFixed(2)}" style="background:rgba(239, 68, 68, 0.12); border:1px solid rgba(239, 68, 68, 0.3); color:#f87171; padding:4px 9px; font-size:0.8rem; border-radius:6px; cursor:pointer;" title="Cancel payment and return to Pending">
@@ -1856,7 +1872,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (isDepositDeduction) colorStyle = 'color:#60a5fa; font-weight:600;';
                     else if (isExchange) colorStyle = 'color:#34d399; font-weight:600;';
                     const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.7rem; color:#c084fc; margin-top:2px;">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
-                    const notaHtml = t.nota ? `<span style="display:block; font-size:0.73rem; color:#cbd5e1; background:rgba(255,255,255,0.06); border-left:2px solid var(--accent, #ff6b00); padding:2px 6px; border-radius:3px; margin-top:3px; word-break:break-word;" title="Payment note">📝 ${escapeHtml(t.nota)}</span>` : '';
+                    const notaHtml = t.nota_pagamento ? `<span style="display:block; font-size:0.73rem; color:#cbd5e1; background:rgba(255,255,255,0.06); border-left:2px solid var(--accent, #ff6b00); padding:2px 6px; border-radius:3px; margin-top:3px; word-break:break-word;" title="Payment note">📝 ${escapeHtml(t.nota_pagamento)}</span>` : '';
                     celulaPagamento = `<span>${dataPag} <small style="${colorStyle} display:block; font-size:0.75rem;">${escapeHtml(formaLabel)}</small>${staffHtml}${notaHtml}</span>`;
                 }
 
@@ -1866,7 +1882,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 tr.innerHTML = `
-                    <td>${tipoBadge}</td>
+                    <td>
+                        <div style="line-height:1.25;">
+                            ${tipoBadge}
+                            ${refNotaHtml}
+                            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:3px;">
+                                ${anexoBadgeHtml}
+                                ${vistoriaLinkHtml}
+                            </div>
+                        </div>
+                    </td>
                     <td style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${formatoMoeda.format(t.valor)}</td>
                     <td>${celulaVencimento}</td>
                     <td>${celulaPagamento}</td>
@@ -1909,6 +1934,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const forma = b.getAttribute('data-forma') || 'Not specified';
                     const dataStr = b.getAttribute('data-data');
                     const nota = b.getAttribute('data-nota') || '';
+                    const ref = b.getAttribute('data-ref') || '';
 
                     document.getElementById('rec_id').textContent = `#${id}`;
                     document.getElementById('rec_contrato_id').textContent = `Contract #${CONTRATO_ID}`;
@@ -1918,6 +1944,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                     document.getElementById('rec_valor').textContent = formatoMoeda.format(valor);
                     document.getElementById('rec_forma').textContent = forma;
                     document.getElementById('rec_data').textContent = dataStr && dataStr !== '-' ? new Date(dataStr).toLocaleString('en-GB') : '-';
+
+                    const rowRef = document.getElementById('rec_row_ref');
+                    const elRef = document.getElementById('rec_ref');
+                    if (rowRef && elRef) {
+                        if (ref) {
+                            elRef.textContent = ref;
+                            rowRef.style.display = 'flex';
+                        } else {
+                            rowRef.style.display = 'none';
+                        }
+                    }
 
                     const rowNota = document.getElementById('rec_row_nota');
                     const elNota = document.getElementById('rec_nota');
@@ -1990,7 +2027,70 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             });
+
+            // Bind Attachment View Buttons for current page
+            tbody.querySelectorAll('.btn-ver-anexo').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const b = e.target.closest('button');
+                    try {
+                        const urls = JSON.parse(b.getAttribute('data-urls') || '[]');
+                        const ref = b.getAttribute('data-ref') || '';
+                        window.openCobrancaAnexoModal(urls, ref);
+                    } catch(err) {
+                        console.error("Error opening attachments modal:", err);
+                    }
+                });
+            });
         }
+
+        window.openCobrancaAnexoModal = function(urls, ref) {
+            const modal = document.getElementById('cobrancaAnexoModal');
+            const title = document.getElementById('cobrancaAnexoModalTitle');
+            const body = document.getElementById('cobrancaAnexoModalBody');
+            if (!modal || !body) return;
+
+            if (title) title.textContent = ref ? `Proof / Attachment: ${ref}` : 'Charge Proof & Attachments';
+            body.innerHTML = '';
+
+            const grid = document.createElement('div');
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
+            grid.style.gap = '14px';
+            grid.style.padding = '0.5rem';
+
+            urls.forEach((url, i) => {
+                const isPdf = url.toLowerCase().endsWith('.pdf');
+                const card = document.createElement('div');
+                card.style.background = 'rgba(15, 23, 42, 0.6)';
+                card.style.border = '1px solid var(--border-color)';
+                card.style.borderRadius = '12px';
+                card.style.padding = '12px';
+                card.style.textAlign = 'center';
+
+                if (isPdf) {
+                    card.innerHTML = `
+                        <div style="font-size:2.8rem; margin-bottom:8px;">📄</div>
+                        <div style="font-size:0.8rem; font-weight:600; color:var(--text-primary); margin-bottom:8px;">Document #${i+1}</div>
+                        <a href="${url}" target="_blank" class="btn-primary" style="font-size:0.8rem; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; text-decoration:none; margin:0 auto;">
+                            <span>👁️</span> Open PDF
+                        </a>
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <a href="${url}" target="_blank" style="display:block; border-radius:8px; overflow:hidden; margin-bottom:8px;">
+                            <img src="${url}" alt="Attachment ${i+1}" style="width:100%; height:160px; object-fit:cover; display:block; border-radius:6px; transition:transform 0.2s ease;">
+                        </a>
+                        <a href="${url}" target="_blank" class="btn-secondary" style="font-size:0.75rem; padding:4px 10px; display:inline-flex; align-items:center; gap:4px; text-decoration:none; margin:0 auto;">
+                            🔍 View Full Image
+                        </a>
+                    `;
+                }
+                grid.appendChild(card);
+            });
+
+            body.appendChild(grid);
+            abrirModal('cobrancaAnexoModal');
+        };
 
         // Setup Header Sort Click Handlers
         const extratoHeaders = document.querySelectorAll('#extratoTable thead th[data-sort-field]');
@@ -2083,12 +2183,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 const fotosCount = v.foto_url ? v.foto_url.split(',').filter(Boolean).length : 0;
                 const fotosLabel = fotosCount > 0 ? `📷 ${fotosCount}` : `View`;
+                const idBadge = `<span class="badge" style="background: rgba(255, 255, 255, 0.08); color: var(--text-primary); border: 1px solid var(--border-color); font-weight: 700; font-size: 0.75rem;">#${v.id}</span>`;
 
                 const div = document.createElement('div');
-                div.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;";
+                div.id = `inspection-item-${v.id}`;
+                div.style.cssText = "background: rgba(15, 23, 42, 0.4); border: 1px solid var(--border-color); padding: 0.875rem 1rem; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; transition: all 0.3s ease;";
                 div.innerHTML = `
                     <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            ${idBadge}
                             ${tBadge}
                             <span style="font-size: 0.8rem; color: var(--text-secondary);">${dataVist}</span>
                             ${v.milhagem != null ? `<span style="font-size: 0.75rem; color: #fbbf24; font-weight: 600;">&bull; ⏱️ ${v.milhagem} mi</span>` : ''}
@@ -2098,7 +2201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             ${escapeHtml(v.observacoes) || '<em style="opacity:0.5;">No notes</em>'}
                         </div>
                     </div>
-                    <button class="btn-action btn-ver-foto" data-tipo="${escapeHtml(v.tipo)}" data-data="${dataVist}" data-foto="${v.foto_url || ''}" data-mil="${v.milhagem != null ? v.milhagem : ''}" data-obs="${escapeHtml(v.observacoes || 'No notes.')}" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
+                    <button class="btn-action btn-ver-foto" data-id="${v.id}" data-tipo="${escapeHtml(v.tipo)}" data-data="${dataVist}" data-foto="${v.foto_url || ''}" data-mil="${v.milhagem != null ? v.milhagem : ''}" data-obs="${escapeHtml(v.observacoes || 'No notes.')}" style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
                         ${fotosLabel}
                     </button>
                 `;
@@ -2109,12 +2212,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.querySelectorAll('.btn-ver-foto').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const b = e.target.closest('button');
+                    const inspId = b.getAttribute('data-id');
                     const fotosCsv = b.getAttribute('data-foto');
                     const obs = b.getAttribute('data-obs');
                     const tipo = b.getAttribute('data-tipo');
                     const dataStr = b.getAttribute('data-data');
                     const milhagem = b.getAttribute('data-mil');
                     
+                    if (document.getElementById('modalVistoriaTitle')) {
+                        document.getElementById('modalVistoriaTitle').textContent = inspId ? `Inspection #${inspId} Details` : 'Inspection Details';
+                    }
+                    if (document.getElementById('modalVistoriaId')) {
+                        document.getElementById('modalVistoriaId').textContent = inspId ? `#${inspId}` : '-';
+                    }
+
                     const tLower = (tipo || '').toLowerCase();
                     document.getElementById('modalVistoriaTipo').innerHTML = (
                         tLower === 'check-out' || tLower === 'saída' ? '<span class="badge badge-info">Check-out</span>' :
@@ -2144,11 +2255,123 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
+        window.highlightInspection = function(id) {
+            const el = document.getElementById('inspection-item-' + id);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.borderColor = '#ef4444';
+                el.style.boxShadow = '0 0 16px rgba(239, 68, 68, 0.45)';
+                el.style.background = 'rgba(239, 68, 68, 0.12)';
+                setTimeout(() => {
+                    el.style.borderColor = 'var(--border-color)';
+                    el.style.boxShadow = 'none';
+                    el.style.background = 'rgba(15, 23, 42, 0.4)';
+                }, 3000);
+            }
+        };
+        
         // 6. Setup forms and modals
         
+        // Charge Photo / Document Accumulator
+        let cobSelectedPhotos = [];
+        const btnCobTakePhoto = document.getElementById('btnCobTakePhoto');
+        const cobCameraInput = document.getElementById('cobCameraInput');
+        const btnCobPickGallery = document.getElementById('btnCobPickGallery');
+        const cobGalleryInput = document.getElementById('cobGalleryInput');
+        const cobPreview = document.getElementById('cob_preview');
+        const cobPhotoCountBadge = document.getElementById('cobPhotoCountBadge');
+
+        function resetCobPhotos() {
+            cobSelectedPhotos = [];
+            if (cobCameraInput) cobCameraInput.value = '';
+            if (cobGalleryInput) cobGalleryInput.value = '';
+            const refInput = document.getElementById('cob_referencia');
+            if (refInput) refInput.value = '';
+            renderCobPreviews();
+        }
+
+        if (btnCobTakePhoto && cobCameraInput) {
+            btnCobTakePhoto.addEventListener('click', () => cobCameraInput.click());
+            cobCameraInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    Array.from(e.target.files).forEach(file => cobSelectedPhotos.push(file));
+                    cobCameraInput.value = '';
+                    renderCobPreviews();
+                }
+            });
+        }
+
+        if (btnCobPickGallery && cobGalleryInput) {
+            btnCobPickGallery.addEventListener('click', () => cobGalleryInput.click());
+            cobGalleryInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    Array.from(e.target.files).forEach(file => cobSelectedPhotos.push(file));
+                    cobGalleryInput.value = '';
+                    renderCobPreviews();
+                }
+            });
+        }
+
+        function renderCobPreviews() {
+            if (!cobPreview) return;
+            cobPreview.innerHTML = '';
+
+            if (cobPhotoCountBadge) {
+                cobPhotoCountBadge.textContent = `${cobSelectedPhotos.length} attached`;
+                if (cobSelectedPhotos.length > 0) {
+                    cobPhotoCountBadge.style.background = 'rgba(34, 197, 94, 0.15)';
+                    cobPhotoCountBadge.style.color = '#4ade80';
+                    cobPhotoCountBadge.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                } else {
+                    cobPhotoCountBadge.style.background = 'rgba(255, 102, 0, 0.15)';
+                    cobPhotoCountBadge.style.color = 'var(--accent)';
+                    cobPhotoCountBadge.style.borderColor = 'rgba(255, 102, 0, 0.3)';
+                }
+            }
+
+            if (cobSelectedPhotos.length > 0) {
+                cobPreview.style.display = 'grid';
+                cobSelectedPhotos.forEach((file, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'photo-item';
+                    div.style.aspectRatio = '1 / 1';
+                    
+                    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                        div.innerHTML = `
+                            <span class="photo-badge-idx">#${index + 1}</span>
+                            <button type="button" class="photo-remove-btn" title="Remove" onclick="removeCobPhoto(${index})">&times;</button>
+                            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; font-size:0.75rem; color:#fca5a5; padding:4px;">
+                                <span style="font-size:1.8rem;">📄</span>
+                                <span style="overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">PDF</span>
+                            </div>
+                        `;
+                    } else {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            div.innerHTML = `
+                                <span class="photo-badge-idx">#${index + 1}</span>
+                                <button type="button" class="photo-remove-btn" title="Remove" onclick="removeCobPhoto(${index})">&times;</button>
+                                <img src="${e.target.result}" alt="Preview ${index + 1}">
+                            `;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                    cobPreview.appendChild(div);
+                });
+            } else {
+                cobPreview.style.display = 'none';
+            }
+        }
+
+        window.removeCobPhoto = function(index) {
+            cobSelectedPhotos.splice(index, 1);
+            renderCobPreviews();
+        };
+
         // Add Charge Form
         document.getElementById('btnLancCob')?.addEventListener('click', () => {
             document.getElementById('cob_data').value = new Date().toISOString().split('T')[0];
+            resetCobPhotos();
             abrirModal('cobrancaModal');
         });
         
@@ -2156,18 +2379,48 @@ document.addEventListener('DOMContentLoaded', async () => {
             e.preventDefault();
             const btn = document.getElementById('btnSalvarCob');
             btn.disabled = true;
-            btn.textContent = 'Adding...';
+            btn.textContent = 'Processing...';
 
-            const payload = {
-                tipo: document.getElementById('cob_tipo').value,
-                valor: document.getElementById('cob_valor').value,
-                data_vencimento: document.getElementById('cob_data').value
+            const tipoVal = document.getElementById('cob_tipo').value;
+            const valorVal = document.getElementById('cob_valor').value;
+            const dataVal = document.getElementById('cob_data').value;
+            const refVal = (document.getElementById('cob_referencia')?.value || '').trim();
+
+            const formData = new FormData();
+            formData.append('tipo', tipoVal);
+            formData.append('valor', valorVal);
+            formData.append('data_vencimento', dataVal);
+            if (refVal) formData.append('referencia', refVal);
+
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            const compOptions = {
+                maxSizeMB: 0.35,
+                maxWidthOrHeight: 1600,
+                useWebWorker: !isIOS,
+                fileType: isIOS ? 'image/jpeg' : 'image/webp',
+                initialQuality: 0.75
             };
+            const extReplacement = isIOS ? '.jpg' : '.webp';
+
+            for (let i = 0; i < cobSelectedPhotos.length; i++) {
+                const file = cobSelectedPhotos[i];
+                if (file.type && file.type.startsWith('image/')) {
+                    try {
+                        const compressed = await imageCompression(file, compOptions);
+                        formData.append('fotos', compressed, file.name.replace(/\.[^/.]+$/, extReplacement));
+                    } catch (err) {
+                        formData.append('fotos', file);
+                    }
+                } else {
+                    formData.append('fotos', file);
+                }
+            }
+
             try {
+                btn.textContent = 'Saving charge...';
                 const res = await fetch(`/api/contratos/${CONTRATO_ID}/cobrancas`, {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
+                    body: formData
                 });
                 if (res.ok) {
                     location.reload();
@@ -2179,7 +2432,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 alert('Connection error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = 'Add Charge';
+                btn.textContent = 'Create Charge';
             }
         });
         
@@ -2191,11 +2444,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         const ocGalleryInput = document.getElementById('ocGalleryInput');
         const ocPreview = document.getElementById('oc_preview');
         const ocPhotoCountBadge = document.getElementById('ocPhotoCountBadge');
+        const ocGerarCobrancaCheck = document.getElementById('oc_gerar_cobranca');
+        const ocCobrancaFields = document.getElementById('oc_cobranca_fields');
+        const ocCobVencimento = document.getElementById('oc_cob_vencimento');
+
+        if (ocGerarCobrancaCheck && ocCobrancaFields) {
+            ocGerarCobrancaCheck.addEventListener('change', () => {
+                ocCobrancaFields.style.display = ocGerarCobrancaCheck.checked ? 'block' : 'none';
+                if (ocGerarCobrancaCheck.checked && ocCobVencimento && !ocCobVencimento.value) {
+                    ocCobVencimento.value = new Date().toISOString().split('T')[0];
+                }
+            });
+        }
 
         function resetOcPhotos() {
             ocSelectedPhotos = [];
             if (ocCameraInput) ocCameraInput.value = '';
             if (ocGalleryInput) ocGalleryInput.value = '';
+            if (ocGerarCobrancaCheck) {
+                ocGerarCobrancaCheck.checked = false;
+                if (ocCobrancaFields) ocCobrancaFields.style.display = 'none';
+            }
+            const ocCobVal = document.getElementById('oc_cob_valor');
+            if (ocCobVal) ocCobVal.value = '';
+            const ocCobRef = document.getElementById('oc_cob_referencia');
+            if (ocCobRef) ocCobRef.value = '';
             renderOcPreviews();
         }
 
@@ -2329,6 +2602,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 formData.append('milhagem', ocMilhagem.value);
             }
             formData.append('observacoes', ocObsVal);
+
+            if (ocGerarCobrancaCheck && ocGerarCobrancaCheck.checked) {
+                const ocCobVal = document.getElementById('oc_cob_valor')?.value;
+                if (!ocCobVal || parseFloat(ocCobVal) <= 0) {
+                    alert('Please enter a valid repair/charge amount (£) or uncheck the charge option.');
+                    btn.disabled = false;
+                    btn.textContent = 'Save Inspection';
+                    return;
+                }
+                formData.append('gerar_cobranca', '1');
+                formData.append('cobranca_valor', ocCobVal);
+                const ocCobVenc = document.getElementById('oc_cob_vencimento')?.value;
+                if (ocCobVenc) formData.append('cobranca_vencimento', ocCobVenc);
+                const ocCobRef = (document.getElementById('oc_cob_referencia')?.value || '').trim();
+                if (ocCobRef) formData.append('cobranca_referencia', ocCobRef);
+            }
             
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const compOptions = {
@@ -2480,6 +2769,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeMapping = [
         ['closeViewModal', 'viewVistoriaModal'],
         ['closeCobrancaModal', 'cobrancaModal'],
+        ['closeCobrancaAnexoModal', 'cobrancaAnexoModal'],
         ['closeOcorrenciaModal', 'ocorrenciaModal'],
         ['closePagamentoModal', 'pagamentoModal'],
         ['closeReciboModal', 'reciboModal'],
@@ -3056,6 +3346,46 @@ document.addEventListener('DOMContentLoaded', async () => {
                 imprimirReciboDireto(recLink.href);
             } else {
                 window.print();
+            }
+        });
+    }
+
+    // Save Internal Notes Button
+    const btnSalvarNotas = document.getElementById('btnSalvarNotasContrato');
+    const txtNotas = document.getElementById('contrato_notas_internas');
+    const statusNotas = document.getElementById('status_salvar_notas');
+    if (btnSalvarNotas && txtNotas) {
+        btnSalvarNotas.addEventListener('click', async () => {
+            btnSalvarNotas.disabled = true;
+            const originalHtml = btnSalvarNotas.innerHTML;
+            btnSalvarNotas.innerHTML = '<span>Saving...</span>';
+            if (statusNotas) statusNotas.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/contratos/${CONTRATO_ID}/notas`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notas_internas: txtNotas.value.trim() })
+                });
+                const resData = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    if (statusNotas) {
+                        statusNotas.textContent = '✓ Internal notes saved successfully!';
+                        statusNotas.style.color = '#4ade80';
+                        statusNotas.style.display = 'block';
+                        setTimeout(() => {
+                            if (statusNotas) statusNotas.style.display = 'none';
+                        }, 3500);
+                    }
+                } else {
+                    alert(resData.error || resData.erro || 'Failed to update internal notes');
+                }
+            } catch (err) {
+                console.error('Error saving contract notes:', err);
+                alert('Connection error. Please try again.');
+            } finally {
+                btnSalvarNotas.disabled = false;
+                btnSalvarNotas.innerHTML = originalHtml;
             }
         });
     }

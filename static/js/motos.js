@@ -301,9 +301,11 @@ async function carregarMotos() {
                 </div>
             `;
 
+            const noteBadge = m.notas_internas ? `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); font-size:0.72rem; margin-left:6px; padding:1px 5px; cursor:pointer;" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabInfo', motosCache['${escapeHtml(m.placa)}'])" title="Internal Notes: ${escapeHtml(m.notas_internas)}">📝 Note</span>` : '';
+
             tr.innerHTML = `
                 <td class="nowrap">${plateHtml}</td>
-                <td>${escapeHtml(m.modelo)}</td>
+                <td><strong>${escapeHtml(m.modelo)}</strong>${noteBadge}</td>
                 <td>${escapeHtml(m.cor || '-')}</td>
                 <td data-sort="${m.milhagem_atual || 0}" style="font-weight: 600; color: #f8fafc;"><span style="color: var(--accent); font-weight:700;">${milhagemFormatada}</span></td>
                 <td data-sort="${isPound ? 'POUND' : (m.tax_sorn ? 'SORN' : (m.vencimento_tax || ''))}" class="nowrap">${taxBadge}</td>

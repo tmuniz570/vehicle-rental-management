@@ -385,6 +385,11 @@
             <textarea id="observacoes" name="observacoes" rows="3" placeholder="Describe general motorbike condition or pre-existing scratches..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px;"></textarea>
         </div>
 
+        <div class="form-group">
+            <label for="notas_internas">Internal Notes <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Visible internally only)</span></label>
+            <textarea id="notas_internas" name="notas_internas" rows="3" placeholder="Add internal particularities, deal arrangements, or operational notes..." style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; font-family: inherit; font-size: 0.875rem; resize: vertical;"></textarea>
+        </div>
+
         <div id="feedbackMessage" class="feedback-message hidden"></div>
 
         <div class="form-actions">
@@ -456,5 +461,5 @@
 
 {% block scripts %}
 <script src="/static/js/signature_pad.umd.min.js"></script>
-<script src="/static/js/novo_contrato.js?v=7"></script>
+<script src="/static/js/novo_contrato.js?v=8"></script>
 {% endblock %}

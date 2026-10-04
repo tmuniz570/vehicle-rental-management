@@ -84,6 +84,10 @@
                         <input type="file" id="edit_comprovante_endereco" accept="image/*,.pdf">
                     </div>
                 </div>
+                <div class="form-group" style="margin-top:0.5rem;">
+                    <label>Internal Notes <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Visible internally only)</span></label>
+                    <textarea id="edit_notas_internas" rows="3" placeholder="Add internal particularities, driver history, payment reminders, etc..." style="width:100%; border-radius:8px; border:1px solid var(--border-color); background:var(--input-bg, #1a1a24); color:var(--text-primary); padding:0.6rem 0.75rem; font-family:inherit; font-size:0.875rem; resize:vertical;"></textarea>
+                </div>
                 <div class="form-actions" style="margin-top:1.5rem; padding-bottom:0.25rem;">
                     <button type="submit" class="btn-primary" id="btnSalvarCliente" style="width:100%; padding:0.875rem 1.25rem; font-size:0.95rem; font-weight:600;">Save Changes</button>
                 </div>
@@ -94,5 +98,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clientes.js?v=3"></script>
+<script src="/static/js/clientes.js?v=4"></script>
 {% endblock %}

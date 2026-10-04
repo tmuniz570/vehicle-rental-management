@@ -163,7 +163,7 @@ async function carregarVistorias() {
                 </td>
                 <td class="nowrap"><span class="badge-plate">${escapeHtml(v.placa || '-')}</span></td>
                 <td style="font-weight: 500; white-space: nowrap;" title="${escapeHtml(v.cliente || '')}">${escapeHtml(v.cliente || '-')}</td>
-                <td>${tipoBadge}</td>
+                <td style="white-space: nowrap;"><span class="badge" style="background: rgba(255,255,255,0.08); font-weight:700; margin-right:4px;">#${v.id}</span>${tipoBadge}</td>
                 <td>${milhagemSnippet}</td>
                 <td>${obsSnippet}</td>
                 <td style="text-align: right; white-space: nowrap;">

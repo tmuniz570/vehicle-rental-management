@@ -1912,6 +1912,11 @@ def criar_cliente():
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_comp_end = f"/static/uploads/{nome_salvo}"
             
+    notas_internas = request.form.get('notas_internas')
+    if notas_internas is None and request.is_json:
+        notas_internas = (request.get_json() or {}).get('notas_internas')
+    notas_internas_clean = str(notas_internas).strip() if (notas_internas and str(notas_internas).strip()) else None
+
     novo_cliente = Client(
         nome=nome,
         telefone=telefone,
@@ -1920,7 +1925,8 @@ def criar_cliente():
         url_habilitacao=url_hab,
         url_habilitacao_verso=url_hab_verso,
         url_cbt=url_cbt,
-        url_comprovante_endereco=url_comp_end
+        url_comprovante_endereco=url_comp_end,
+        notas_internas=notas_internas_clean
     )
     db.session.add(novo_cliente)
     db.session.commit()
@@ -1965,6 +1971,9 @@ def criar_moto():
         except ValueError:
             pass
 
+    notas_moto = dados.get('notas_internas')
+    notas_moto_clean = str(notas_moto).strip() if (notas_moto and str(notas_moto).strip()) else None
+
     nova_moto = Motorcycle(
         placa=placa,
         modelo=dados['modelo'].strip(),
@@ -1973,7 +1982,8 @@ def criar_moto():
         milhagem_atual=int(dados.get('milhagem_atual') or 0),
         vencimento_mot=vencimento_mot,
         vencimento_tax=vencimento_tax,
-        tax_sorn=tax_sorn
+        tax_sorn=tax_sorn,
+        notas_internas=notas_moto_clean
     )
     db.session.add(nova_moto)
     db.session.commit()
@@ -2033,7 +2043,8 @@ def listar_clientes():
         'url_habilitacao': c.url_habilitacao,
         'url_habilitacao_verso': c.url_habilitacao_verso,
         'url_cbt': c.url_cbt,
-        'url_comprovante_endereco': c.url_comprovante_endereco
+        'url_comprovante_endereco': c.url_comprovante_endereco,
+        'notas_internas': c.notas_internas
     } for c in paginated.items]
     
     return jsonify({
@@ -2058,6 +2069,7 @@ def atualizar_cliente(id):
     hab_verso_antiga = cliente.url_habilitacao_verso
     cbt_antigo = cliente.url_cbt
     comp_end_antigo = cliente.url_comprovante_endereco
+    notas_antigas = getattr(cliente, 'notas_internas', None)
 
     if request.is_json:
         dados = request.get_json() or {}
@@ -2071,6 +2083,8 @@ def atualizar_cliente(id):
                 if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
             cliente.email = email_clean
         if 'endereco' in dados: cliente.endereco = dados['endereco'].strip() if dados['endereco'] else None
+        if 'notas_internas' in dados:
+            cliente.notas_internas = str(dados['notas_internas']).strip() if (dados['notas_internas'] and str(dados['notas_internas']).strip()) else None
     else:
         # Security: Validate upload file extensions
         for campo_file in ['habilitacao', 'habilitacao_verso', 'cbt', 'comprovante_endereco']:
@@ -2082,6 +2096,8 @@ def atualizar_cliente(id):
         if 'nome' in request.form: cliente.nome = request.form['nome'].strip()
         if 'telefone' in request.form: cliente.telefone = request.form['telefone'].strip()
         if 'endereco' in request.form: cliente.endereco = request.form['endereco'].strip() if request.form['endereco'] else None
+        if 'notas_internas' in request.form:
+            cliente.notas_internas = str(request.form['notas_internas']).strip() if (request.form['notas_internas'] and str(request.form['notas_internas']).strip()) else None
         if 'email' in request.form:
             raw_email = request.form['email']
             email_clean = raw_email.strip() if (raw_email and raw_email.strip()) else None
@@ -2130,6 +2146,8 @@ def atualizar_cliente(id):
         alteracoes.append(f"Email alterado para '{cliente.email or 'Nenhum'}'")
     if cliente.endereco != end_antigo:
         alteracoes.append("Endereço atualizado")
+    if (cliente.notas_internas or '').strip() != (notas_antigas or '').strip():
+        alteracoes.append("Notas internas atualizadas")
     if cliente.url_habilitacao != hab_antiga:
         alteracoes.append("Nova CNH/Licence anexada")
     if cliente.url_habilitacao_verso != hab_verso_antiga:
@@ -2267,6 +2285,7 @@ def listar_motos():
             'vencimento_mot': m.vencimento_mot.strftime('%Y-%m-%d') if m.vencimento_mot else None,
             'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None,
             'tax_sorn': bool(getattr(m, 'tax_sorn', False)),
+            'notas_internas': m.notas_internas,
             'v5c_count': len(m.v5c_arquivos) if m.v5c_arquivos else 0,
             'trackers_count': len(m.trackers) if m.trackers else 0,
             'trackers_summary': [{
@@ -2547,6 +2566,13 @@ def atualizar_moto(placa):
             if tax_antigo is not None:
                 alteracoes.append("Road Tax removido")
                 moto.vencimento_tax = None
+
+    if 'notas_internas' in dados:
+        notas_antigas = getattr(moto, 'notas_internas', None)
+        novas_notas = str(dados['notas_internas']).strip() if (dados['notas_internas'] and str(dados['notas_internas']).strip()) else None
+        if (novas_notas or '') != (notas_antigas or ''):
+            alteracoes.append("Notas internas atualizadas")
+            moto.notas_internas = novas_notas
     
     db.session.commit()
     
@@ -2579,6 +2605,7 @@ def detalhes_moto(placa):
         'vencimento_mot': moto.vencimento_mot.strftime('%Y-%m-%d') if moto.vencimento_mot else None,
         'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if moto.vencimento_tax else None,
         'tax_sorn': bool(getattr(moto, 'tax_sorn', False)),
+        'notas_internas': moto.notas_internas,
         'v5c_arquivos': [{
             'id': v.id,
             'url_arquivo': v.url_arquivo,
@@ -2954,6 +2981,10 @@ def criar_contrato():
     valor_aluguel_semanal = float(request.form.get('valor_aluguel_semanal', 250.0)) if request.form.get('valor_aluguel_semanal') else 0.0
     valor_deposito = float(request.form.get('valor_deposito', 0.0)) if request.form.get('valor_deposito') else 0.0
     observacoes = request.form.get('observacoes')
+    notas_internas_req = request.form.get('notas_internas')
+    if notas_internas_req is None and request.is_json:
+        notas_internas_req = (request.get_json() or {}).get('notas_internas')
+    notas_internas_contrato_clean = str(notas_internas_req).strip() if (notas_internas_req and str(notas_internas_req).strip()) else None
     
     # Specific Sale & Purchase Fields
     categoria_historico = request.form.get('categoria_historico', 'Clear')
@@ -3091,7 +3122,8 @@ def criar_contrato():
         moto_modelo=moto.modelo,
         moto_cor=moto.cor,
         moto_placa=moto.placa,
-        dia_pagamento_semanal_original=dia_pagamento_semanal if tipo_contrato == ContractType.RENT.value else None
+        dia_pagamento_semanal_original=dia_pagamento_semanal if tipo_contrato == ContractType.RENT.value else None,
+        notas_internas=notas_internas_contrato_clean
     )
     db.session.add(novo_contrato)
     
@@ -3612,6 +3644,32 @@ def alterar_dia_pagamento_contrato(id):
         'cobrancas_ajustadas': cobrancas_ajustadas
     }), 200
 
+@app.route('/api/contratos/<int:id>/notas', methods=['PUT', 'POST'])
+@alugueis_required
+def atualizar_notas_contrato(id):
+    """
+    Atualiza as notas internas do contrato para observações operacionais e particularidades.
+    """
+    contrato = db.session.get(Contract, id)
+    if not contrato:
+        return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
+
+    dados = request.get_json(silent=True) or request.form or {}
+    notas = dados.get('notas_internas')
+    novas_notas = str(notas).strip() if (notas and str(notas).strip()) else None
+
+    contrato.notas_internas = novas_notas
+    db.session.commit()
+
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    registrar_log('CONTRACT_NOTES_UPDATE', 'Contract', contrato.id, f"Notas internas do contrato #{contrato.id} atualizadas por {operador_atual}")
+
+    return jsonify({
+        'message': 'Internal notes updated successfully',
+        'mensagem': 'Notas internas atualizadas com sucesso',
+        'notas_internas': contrato.notas_internas
+    }), 200
+
 @app.route('/api/contratos', methods=['GET'])
 @alugueis_required
 def listar_contratos():
@@ -3805,7 +3863,8 @@ def listar_contratos():
             'needs_v5c': needs_v5c,
             'v5c_count': v5c_count,
             'assinado': bool(c.assinatura_cliente_inicial),
-            'data_assinatura_inicial': c.data_assinatura_inicial.isoformat() if c.data_assinatura_inicial else None
+            'data_assinatura_inicial': c.data_assinatura_inicial.isoformat() if c.data_assinatura_inicial else None,
+            'notas_internas': c.notas_internas
         })
 
     # Executive KPI Summary for Contracts
@@ -3958,6 +4017,7 @@ def detalhe_contrato(id):
     return jsonify({
         'id': c.id,
         'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
+        'notas_internas': c.notas_internas,
         'categoria_historico': c.categoria_historico,
         'valor_venda_veiculo': float(c.valor_venda_veiculo) if c.valor_venda_veiculo is not None else None,
         'acessorios_extras': c.acessorios_extras,
@@ -4066,8 +4126,10 @@ def detalhe_contrato(id):
             'status': t.status,
             'forma_pagamento': t.forma_pagamento,
             'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
-            'id_transacao_origem': t.id_transacao_origem,
-            'nota': t.nota,
+            'nota': t.nota or (t.vistoria.observacoes if (t.id_vistoria and t.vistoria and t.vistoria.observacoes) else None),
+            'nota_pagamento': t.nota_pagamento,
+            'url_anexos': t.url_anexos,
+            'id_vistoria': t.id_vistoria,
             'registrado_por_nome': t.registrado_por_nome or '',
             'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
             'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None
@@ -4090,9 +4152,12 @@ def criar_cobranca(id):
     if not c:
         return jsonify({'error': 'Contract not found', 'erro': 'Contrato não encontrado'}), 404
         
-    tipo = request.json.get('tipo')
-    valor = request.json.get('valor')
-    data_vencimento_str = request.json.get('data_vencimento')
+    is_form = not request.is_json
+    dados = request.form if is_form else (request.get_json() or {})
+
+    tipo = dados.get('tipo')
+    valor = dados.get('valor')
+    data_vencimento_str = dados.get('data_vencimento')
     
     if not tipo or not valor or not data_vencimento_str:
         return jsonify({'error': 'Missing required fields (type, amount and due date are required)', 'erro': 'Dados incompletos'}), 400
@@ -4113,24 +4178,63 @@ def criar_cobranca(id):
         'other': 'Other'
     }
     tipo_final = tipo_map.get(str(tipo).strip().lower(), str(tipo).strip())
-    nota_input = (request.json.get('nota') or '').strip() if request.is_json and request.json else ''
+    nota_input = (dados.get('referencia') or dados.get('nota') or '').strip()
+
+    # Process photo/document attachments if provided
+    urls_anexos = []
+    if request.files:
+        fotos = request.files.getlist('fotos')
+        if not fotos and 'foto' in request.files:
+            fotos = [request.files['foto']]
+        if not fotos and 'anexos' in request.files:
+            fotos = request.files.getlist('anexos')
+
+        timestamp = get_local_now().strftime("%Y%m%d%H%M%S")
+        for i, foto in enumerate(fotos):
+            if foto and foto.filename:
+                if not is_allowed_file(foto.filename):
+                    return jsonify({'error': 'Invalid attachment format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de anexo inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
+                filename = werkzeug.utils.secure_filename(foto.filename)
+                nome_arquivo = f"{timestamp}_cob_{i}_{filename}"
+                nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
+                urls_anexos.append(f"/static/uploads/{nome_salvo}")
+
+    url_anexos_str = ",".join(urls_anexos) if urls_anexos else None
+
+    id_vistoria_val = None
+    if dados.get('id_vistoria'):
+        try:
+            id_vistoria_val = int(dados.get('id_vistoria'))
+        except (ValueError, TypeError):
+            id_vistoria_val = None
+
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+
     nova_cobranca = FinancialTransaction(
         id_contrato=c.id,
         tipo=tipo_final,
         data_vencimento=data_vencimento,
         valor=float(valor),
         status=TransactionStatus.PENDING.value,
-        nota=nota_input if nota_input else None
+        nota=nota_input if nota_input else None,
+        url_anexos=url_anexos_str,
+        id_vistoria=id_vistoria_val,
+        registrado_por_nome=operador_atual
     )
     db.session.add(nova_cobranca)
     sync_sale_contract_status(c)
     db.session.commit()
     
-    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
-    nota_log = f" (Nota: '{nota_input}')" if nota_input else ""
-    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo_final}) gerada por {operador_atual} para o Contrato #{c.id}{nota_log}")
+    nota_log = f" (Ref/Nota: '{nota_input}')" if nota_input else ""
+    anexo_log = f" com {len(urls_anexos)} anexo(s)" if urls_anexos else ""
+    registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança manual de £{float(valor):.2f} ({tipo_final}) gerada por {operador_atual} para o Contrato #{c.id}{nota_log}{anexo_log}")
 
-    return jsonify({'message': 'Charge created successfully', 'mensagem': 'Cobrança gerada com sucesso'}), 201
+    return jsonify({
+        'message': 'Charge created successfully',
+        'mensagem': 'Cobrança gerada com sucesso',
+        'id': nova_cobranca.id,
+        'url_anexos': nova_cobranca.url_anexos
+    }), 201
 
 @app.route('/api/cobrancas/<int:id>/pagar', methods=['PUT', 'POST'])
 @alugueis_required
@@ -4222,7 +4326,46 @@ def criar_vistoria():
         if contrato and milhagem_val is not None:
             if not contrato.milhagem_inicial or contrato.milhagem_inicial == 0:
                 contrato.milhagem_inicial = milhagem_val
+
+    cobranca_gerada_id = None
+    gerar_cobranca_flag = request.form.get('gerar_cobranca') in ['1', 'true', 'True', True]
+    valor_cobranca_raw = request.form.get('cobranca_valor')
+    if (gerar_cobranca_flag or valor_cobranca_raw) and contrato:
+        try:
+            valor_cob = float(valor_cobranca_raw or 0.0)
+            if valor_cob > 0:
+                tipo_cob = request.form.get('cobranca_tipo') or TransactionType.DAMAGE.value
+                data_venc_cob_str = request.form.get('cobranca_vencimento')
+                try:
+                    data_venc_cob = datetime.strptime(data_venc_cob_str, "%Y-%m-%d") if data_venc_cob_str else get_local_now()
+                except (ValueError, TypeError):
+                    data_venc_cob = get_local_now()
                 
+                referencia_cob = (request.form.get('cobranca_referencia') or request.form.get('cobranca_nota') or '').strip()
+                if not referencia_cob:
+                    referencia_cob = f"Damage/Repair from {tipo} Inspection"
+                
+                db.session.flush()
+
+                nova_cobranca = FinancialTransaction(
+                    id_contrato=contrato.id,
+                    tipo=tipo_cob,
+                    data_vencimento=data_venc_cob,
+                    valor=valor_cob,
+                    status=TransactionStatus.PENDING.value,
+                    nota=referencia_cob,
+                    url_anexos=url_foto_str,
+                    id_vistoria=nova_vistoria.id,
+                    registrado_por_nome=operador_atual
+                )
+                db.session.add(nova_cobranca)
+                sync_sale_contract_status(contrato)
+                db.session.flush()
+                cobranca_gerada_id = nova_cobranca.id
+                registrar_log('CREATE_CHARGE', 'Transaction', nova_cobranca.id, f"Cobrança automática de £{valor_cob:.2f} ({tipo_cob}) vinculada à vistoria #{nova_vistoria.id} gerada por {operador_atual} para o Contrato #{contrato.id} (Ref: '{referencia_cob}')")
+        except (ValueError, TypeError):
+            pass
+
     db.session.commit()
     
     milhas_txt = f" (Milhagem: {milhagem_val} mi)" if milhagem_val is not None else ""
@@ -4230,7 +4373,14 @@ def criar_vistoria():
     if tipo in [InspectionType.CHECK_IN.value, 'Check-in', 'Entrada']:
         registrar_log('RETURN_VEHICLE', 'Contract', id_contrato, f"Moto devolvida / Check-in confirmado por {operador_atual} no Contrato #{id_contrato}{milhas_txt}")
     
-    return jsonify({'message': 'Inspection recorded successfully', 'mensagem': 'Vistoria registrada com sucesso', 'id': nova_vistoria.id, 'url': url_foto_str}), 201
+    return jsonify({
+        'message': 'Inspection recorded successfully',
+        'mensagem': 'Vistoria registrada com sucesso',
+        'id': nova_vistoria.id,
+        'url': url_foto_str,
+        'cobranca_id': cobranca_gerada_id,
+        'cobranca_gerada': bool(cobranca_gerada_id)
+    }), 201
 
 @app.route('/api/vistorias', methods=['GET'])
 @alugueis_required
@@ -4499,7 +4649,10 @@ def listar_financeiro():
         'forma_pagamento': t.forma_pagamento or '',
         'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
         'id_transacao_origem': t.id_transacao_origem,
-        'nota': t.nota,
+        'nota': t.nota or (t.vistoria.observacoes if (t.id_vistoria and t.vistoria and t.vistoria.observacoes) else None),
+        'nota_pagamento': t.nota_pagamento,
+        'url_anexos': t.url_anexos,
+        'id_vistoria': t.id_vistoria,
         'registrado_por_nome': t.registrado_por_nome or '',
         'placa': t.contrato.placa if t.contrato else '',
         'cliente': t.contrato.cliente.nome if (t.contrato and t.contrato.cliente) else '',
@@ -5445,7 +5598,7 @@ def pagar_transacao(id):
 
     detalhes_json = json.dumps(metodos_validos)
 
-    nota = str(data.get('nota') or '').strip() or None
+    nota_pag = str(data.get('nota') or '').strip() or None
 
     # 1. Update current transaction as PAID
     t.valor = valor_pago
@@ -5453,12 +5606,16 @@ def pagar_transacao(id):
     t.data_pagamento = get_local_now()
     t.forma_pagamento = forma_pagamento_consolidada
     t.detalhes_pagamento_json = detalhes_json
-    t.nota = nota
+    t.nota_pagamento = nota_pag
+    if nota_pag:
+        t.nota = f"{t.nota} | {nota_pag}" if t.nota else nota_pag
+    elif not t.nota and t.id_vistoria and t.vistoria and t.vistoria.observacoes:
+        t.nota = t.vistoria.observacoes
     t.registrado_por_nome = operador_atual
 
     # 2. If partial payment, generate child transaction for the remaining balance
     t_restante = None
-    nota_log = f" (Nota: {nota})" if nota else ""
+    nota_log = f" (Nota: {nota_pag})" if nota_pag else ""
     if is_parcial:
         t_restante = FinancialTransaction(
             id_contrato=t.id_contrato,
@@ -5468,7 +5625,10 @@ def pagar_transacao(id):
             status=TransactionStatus.PENDING.value,
             forma_pagamento=None,
             detalhes_pagamento_json=None,
-            nota=None,
+            nota=t.nota.split(' | ')[0] if (t.nota and ' | ' in t.nota) else t.nota,
+            nota_pagamento=None,
+            url_anexos=t.url_anexos,
+            id_vistoria=t.id_vistoria,
             registrado_por_nome=operador_atual,
             id_transacao_origem=t.id
         )
@@ -5545,7 +5705,11 @@ def reverter_pagamento(id):
     t.data_pagamento = None
     t.forma_pagamento = None
     t.detalhes_pagamento_json = None
-    t.nota = None
+    t.nota_pagamento = None
+    if t.nota and ' | ' in t.nota:
+        t.nota = t.nota.split(' | ')[0].strip()
+    elif not t.nota and t.id_vistoria and t.vistoria and t.vistoria.observacoes:
+        t.nota = t.vistoria.observacoes
     t.registrado_por_nome = None
 
     # Sincronização do status para contratos de venda (reabre para Active se houver pendência)

@@ -58,7 +58,8 @@ async function carregarClientes() {
             const docsHtml = docs.length > 0 ? docs.join('<br>') : '-';
             
             const emailVal = c.email || '';
-            const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${escapeHtml(c.nome || '')}" data-tel="${escapeHtml(c.telefone || '')}" data-email="${escapeHtml(emailVal)}" data-endereco="${escapeHtml(c.endereco || '')}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
+            const notasVal = c.notas_internas || '';
+            const btnEdit = `<button class="btn-edit" data-id="${c.id}" data-nome="${escapeHtml(c.nome || '')}" data-tel="${escapeHtml(c.telefone || '')}" data-email="${escapeHtml(emailVal)}" data-endereco="${escapeHtml(c.endereco || '')}" data-notas="${escapeHtml(notasVal)}" style="background:transparent; color:var(--accent); border:1px solid var(--accent); padding:10px 15px; min-width:60px; min-height:44px; border-radius:6px; cursor:pointer;">Edit</button>`;
             
             const waNum = formatWhatsAppNumber(c.telefone);
             const waGreeting = encodeURIComponent(`Hello ${c.nome || ''}, this is FF Motors: `);
@@ -70,9 +71,13 @@ async function carregarClientes() {
                 ? `<a href="mailto:${encodeURIComponent(c.email)}" style="color:var(--text-primary); text-decoration:none;" title="Send email">${escapeHtml(c.email)}</a>`
                 : `<span style="color:var(--text-secondary);">-</span>`;
 
+            const noteBadge = c.notas_internas 
+                ? `<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); font-size:0.75rem; margin-left:6px; padding:1px 6px; cursor:help;" title="Internal Notes: ${escapeHtml(c.notas_internas)}">📝 Note</span>` 
+                : '';
+
             tr.innerHTML = `
                 <td class="nowrap"><span style="font-weight:700; color:var(--accent); background:rgba(217,119,6,0.12); border:1px solid rgba(217,119,6,0.25); padding:3px 8px; border-radius:6px; font-size:0.85rem;">#${c.id}</span></td>
-                <td><strong>${escapeHtml(c.nome)}</strong></td>
+                <td><strong>${escapeHtml(c.nome)}</strong>${noteBadge}</td>
                 <td class="nowrap">${telHtml}</td>
                 <td>${emailHtml}</td>
                 <td class="cell-wrap">${escapeHtml(c.endereco) || '-'}</td>
@@ -102,6 +107,8 @@ async function carregarClientes() {
                 document.getElementById('edit_telefone').value = targetBtn.getAttribute('data-tel') || '';
                 document.getElementById('edit_email').value = targetBtn.getAttribute('data-email') || '';
                 document.getElementById('edit_endereco').value = targetBtn.getAttribute('data-endereco') || '';
+                const txtNotas = document.getElementById('edit_notas_internas');
+                if (txtNotas) txtNotas.value = targetBtn.getAttribute('data-notas') || '';
                 
                 // Clear file inputs
                 ['edit_habilitacao', 'edit_habilitacao_verso', 'edit_cbt', 'edit_comprovante_endereco'].forEach(fId => {
@@ -199,6 +206,10 @@ document.addEventListener('DOMContentLoaded', () => {
             data.append('telefone', document.getElementById('edit_telefone').value.trim());
             data.append('email', document.getElementById('edit_email').value.trim());
             data.append('endereco', document.getElementById('edit_endereco').value.trim());
+            const txtNotas = document.getElementById('edit_notas_internas');
+            if (txtNotas) {
+                data.append('notas_internas', txtNotas.value.trim());
+            }
             
             const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
             const compOptions = {

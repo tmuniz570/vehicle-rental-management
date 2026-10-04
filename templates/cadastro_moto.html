@@ -68,6 +68,11 @@
             </div>
         </div>
 
+        <div class="form-group" style="margin-top: 1rem;">
+            <label for="notas_internas">Internal Notes <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Visible internally only)</span></label>
+            <textarea id="notas_internas" name="notas_internas" rows="3" placeholder="Add internal notes about this motorbike (e.g. mechanical history, key location, special conditions)..." style="width: 100%; border-radius: 12px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-primary); padding: 0.875rem 1rem; font-family: inherit; font-size: 0.875rem; resize: vertical;"></textarea>
+        </div>
+
         <div id="feedbackMessage" class="feedback-message hidden"></div>
 
         <div class="form-actions">
@@ -81,5 +86,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/cadastro_moto.js?v=2"></script>
+<script src="/static/js/cadastro_moto.js?v=3"></script>
 {% endblock %}

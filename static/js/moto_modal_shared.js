@@ -275,6 +275,8 @@ async function carregarDetalhesMoto(placa) {
         if (!data.tax_sorn && editTax) {
             editTax.value = data.vencimento_tax || '';
         }
+        const editNotas = document.getElementById('edit_moto_notas');
+        if (editNotas) editNotas.value = data.notas_internas || '';
 
         renderV5CList(data.v5c_arquivos || []);
         renderTrackersList(data.trackers || []);
@@ -320,6 +322,8 @@ async function abrirModalMoto(placa, activeTab = 'tabInfo', initialData = null) 
         if (!(initialData && initialData.tax_sorn) && editTax) {
             editTax.value = (initialData && initialData.vencimento_tax) || '';
         }
+        const editNotas = document.getElementById('edit_moto_notas');
+        if (editNotas) editNotas.value = (initialData && initialData.notas_internas) || '';
     }
     
     // Reset V5C staged accumulator
@@ -587,7 +591,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 milhagem_atual: parseInt(document.getElementById('edit_milhagem').value || '0', 10),
                 vencimento_mot: document.getElementById('edit_mot').value || null,
                 vencimento_tax: isSorn ? null : (document.getElementById('edit_tax').value || null),
-                tax_sorn: isSorn
+                tax_sorn: isSorn,
+                notas_internas: document.getElementById('edit_moto_notas') ? document.getElementById('edit_moto_notas').value.trim() : null
             };
             
             try {

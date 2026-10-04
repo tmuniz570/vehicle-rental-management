@@ -4,6 +4,43 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.26] — 2026-10-04 — *Internal Notes, Charge References & Proof Attachments, Auto-Damage from Inspections & Inspection Anchoring*
+
+### 📝 Notas Internas Confidenciais (Clientes, Motos & Contratos)
+* **Arquitetura & Banco de Dados**:
+  - Adicionada coluna `notas_internas` (TEXT) nos modelos `Client`, `Motorcycle` e `Contract`, com migrações automáticas e suporte universal (PostgreSQL e SQLite).
+  - Preservação estrita em snapshots contratuais (`snapshot_cols`), congelando as notas originais do momento da formalização do contrato.
+* **Interfaces & Experiência de Uso (Dark Glassmorphism)**:
+  - **Tela de Detalhes do Contrato (`/contratos/<id>`)**: Novo card dedicado `📝 Internal Notes` com salvamento assíncrono em 1 clique via API (`PUT /api/contratos/<id>/notas`).
+  - **Gestão de Frotas (`/motos`) & Cadastro de Motos**: Campo de notas integrado ao formulário de criação e aba `📝 Internal Notes` no modal gerencial de motocicletas, com badge visual `📝 Note` na listagem da frota.
+  - **Gestão de Clientes (`/clientes`) & Cadastro de Clientes**: Campo de notas confidenciais com badge visual na tabela de clientes e edição modal.
+  - **Novo Contrato (`/contratos/novo`)**: Campo opcional de notas internas com captura no formulário inicial.
+
+### 📎 Referências & Anexos Probatórios em Cobranças Financeiras
+* **Registro de Referências e Anexos em Cobranças (`FinancialTransaction`)**:
+  - Suporte ao campo opcional de referência/descrição (`nota`) e anexos de documentos e fotos (`url_anexos`, múltiplos arquivos separados por vírgula).
+  - Modal **Add Charge** enriquecido com botões de câmera direta (📸 Take Photo) e seleção de galeria/documentos (📄 Upload Files) com suporte a JPG, PNG, WEBP e PDFs (até 32MB).
+  - Grid de pré-visualização de miniaturas com remoção individual antes do envio.
+  - Modal de visualização de comprovantes (`#cobrancaAnexoModal`) com suporte a carrossel de fotos em alta resolução e visualizador de PDFs integrados.
+  - **Governança de Limpeza (`cleanup_uploads.py`)**: Script otimizado para proteger e preservar todos os arquivos anexados em transações financeiras contra remoção acidental.
+
+### 🔍 Vínculo Automático Vistoria -> Cobrança de Danos & Avarias
+* **Geração Instantânea de Cobrança no Registro de Avarias (`Incident`)**:
+  - Modal de ocorrências (`#ocorrenciaModal`) equipado com a opção `[x] Generate Damage / Repair Charge from this Inspection`.
+  - Ao registrar o incidente com valor estimado de reparo, o sistema cria automaticamente uma transação do tipo `Damage` vinculada ao ID da vistoria (`id_vistoria`), transferindo as fotos e observações diretamente para o extrato financeiro.
+* **Identificação e Navegação Interativa de Vistorias (`detalhe_contrato.html` & `detalhe_contrato.js`)**:
+  - Cada vistoria no card **INSPECTIONS** agora exibe com destaque o seu identificador numérico (ex: `#47`).
+  - Na tabela do **Financial Statement**, o badge `🔍 Inspection #47` agora é clicável: ao clicar, rola suavemente a tela até a vistoria correspondente e aplica um efeito visual luminoso de destaque (pulse glow) temporário.
+  - Modal de vistoria (`#viewVistoriaModal`) e tabela geral da frota (`/vistorias`) atualizados para exibir o ID da inspeção de forma padronizada.
+
+### 🛡️ Persistência de Descrições de Cobrança e Separação de Notas de Pagamento
+* **Separação Estrutural de `t.nota` vs `t.nota_pagamento`**:
+  - Adicionada a coluna `nota_pagamento` na tabela `financeiro_transacoes`.
+  - `t.nota`: Armazena a descrição/motivo permanente da cobrança (ex: dano de vistoria, notificação de trânsito PCN, itens/acessórios), garantindo que **nunca seja apagada** após a liquidação do pagamento ou estorno.
+  - `t.nota_pagamento`: Armazena observações específicas inseridas na tela de confirmação de pagamento (ex: banco, detalhes de compensação).
+  - Rotina de auto-recuperação (*auto-heal*) no `init_db` para restaurar automaticamente cobranças com vistorias vinculadas cuja descrição havia sido limpa.
+  - Extrato financeiro, recibos e página de impressão (`/recibo/<id>`) adaptados para exibir tanto a justificativa/referência da cobrança quanto os dados do pagamento.
+
 ## [1.9.25] — 2026-10-04 — *Morning Performance & Cache Pre-Warming, Rescheduled Safe Cleanup*
 
 ### ⚡ Performance & Estabilidade Operacional Matinal

@@ -197,8 +197,15 @@
 
             {% if transacao.nota %}
             <div class="receipt-row" style="align-items: flex-start;">
+                <span>Reference / Reason:</span>
+                <span style="font-weight: 500; color: #1e293b; text-align: right; max-width: 65%;">{{ transacao.nota }}</span>
+            </div>
+            {% endif %}
+
+            {% if transacao.nota_pagamento %}
+            <div class="receipt-row" style="align-items: flex-start;">
                 <span>Payment Note:</span>
-                <span style="font-weight: 500; color: #475569; font-style: italic; text-align: right; max-width: 65%;">{{ transacao.nota }}</span>
+                <span style="font-weight: 500; color: #475569; font-style: italic; text-align: right; max-width: 65%;">{{ transacao.nota_pagamento }}</span>
             </div>
             {% endif %}
 

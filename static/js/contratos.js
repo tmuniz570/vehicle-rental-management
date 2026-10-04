@@ -262,8 +262,12 @@ async function carregarContratos() {
                 </div>
             `;
 
+            const contractNoteIcon = c.notas_internas 
+                ? `<span style="margin-left: 5px; cursor: help; font-size: 0.85rem;" title="Internal Notes: ${safeEscape(c.notas_internas)}">📝</span>` 
+                : '';
+
             tr.innerHTML = `
-                <td style="font-weight: 600; color: var(--text-secondary);">#${c.id}</td>
+                <td style="font-weight: 600; color: var(--text-secondary); white-space: nowrap;">#${c.id}${contractNoteIcon}</td>
                 <td>${tipoBadge}</td>
                 <td>${customerCell}</td>
                 <td>${vehicleCell}</td>

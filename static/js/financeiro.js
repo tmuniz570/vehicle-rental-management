@@ -211,6 +211,20 @@ async function carregarFinanceiro() {
 
             // Partial Split badge indicator (Compact)
             const balanceBadgeHtml = t.id_transacao_origem ? `<span style="display:inline-block; font-size:0.65rem; color:#f59e0b; font-weight:700; background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.35); border-radius:3px; padding:0 4px; margin-top:1px;">⚡ Bal #${t.id_transacao_origem}</span>` : '';
+
+            // Reference note & Attachment indicators
+            let refNotaHtml = '';
+            if (t.nota) {
+                refNotaHtml = `<span style="display:block; font-size:0.68rem; color:#cbd5e1; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px;" title="${escapeHtml(t.nota)}">📝 ${escapeHtml(t.nota)}</span>`;
+            }
+
+            let anexoHtml = '';
+            if (t.url_anexos) {
+                const urls = t.url_anexos.split(',').map(u => u.trim()).filter(Boolean);
+                if (urls.length > 0) {
+                    anexoHtml = `<a href="${urls[0]}" target="_blank" class="badge" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa; border:1px solid rgba(59, 130, 246, 0.35); text-decoration:none; display:inline-flex; align-items:center; gap:2px; font-size:0.65rem; padding:1px 5px; margin-top:2px;" title="View attached document/proof">📎 Proof (${urls.length})</a>`;
+                }
+            }
             
             // Formatted Amount
             const valorFmt = formatoMoeda.format(t.valor);
@@ -225,7 +239,7 @@ async function carregarFinanceiro() {
                 if (isDepositDeduction) colorStyle = 'color:#60a5fa; font-weight:600;';
                 else if (isExchange) colorStyle = 'color:#34d399; font-weight:600;';
                 const staffHtml = t.registrado_por_nome ? `<span style="display:block; font-size:0.65rem; color:#a855f7; line-height:1; margin-top:1px;" title="Recorded by ${escapeHtml(t.registrado_por_nome)}">👤 ${escapeHtml(t.registrado_por_nome)}</span>` : '';
-                const notaHtml = t.nota ? `<span style="display:block; font-size:0.68rem; color:#cbd5e1; background:rgba(255,255,255,0.06); border-left:2px solid var(--accent, #ff6b00); padding:1px 4px; border-radius:2px; margin-top:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.nota)}">📝 ${escapeHtml(t.nota)}</span>` : '';
+                const notaHtml = t.nota_pagamento ? `<span style="display:block; font-size:0.68rem; color:#cbd5e1; background:rgba(255,255,255,0.06); border-left:2px solid var(--accent, #ff6b00); padding:1px 4px; border-radius:2px; margin-top:2px; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(t.nota_pagamento)}">📝 ${escapeHtml(t.nota_pagamento)}</span>` : '';
                 celulaPagamento = `<div style="line-height:1.15;">
                     <span style="font-weight:600; font-size:0.8rem;">${pagamento}</span>
                     <small style="display:block; ${colorStyle} font-size:0.7rem; line-height:1;">${escapeHtml(formaLabel)}</small>
@@ -322,6 +336,8 @@ async function carregarFinanceiro() {
                 <td>
                     ${tipoBadge}
                     ${balanceBadgeHtml}
+                    ${anexoHtml}
+                    ${refNotaHtml}
                 </td>
                 <td class="nowrap" style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">${valorFmt}</td>
                 <td class="nowrap">${celulaVencimento}</td>

@@ -99,7 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
             milhagem_atual: document.getElementById('milhagem_atual') ? parseInt(document.getElementById('milhagem_atual').value || '0', 10) : 0,
             vencimento_mot: document.getElementById('vencimento_mot') ? document.getElementById('vencimento_mot').value || null : null,
             vencimento_tax: isSorn ? null : (vencimentoTaxInput && vencimentoTaxInput.value ? vencimentoTaxInput.value : null),
-            tax_sorn: isSorn
+            tax_sorn: isSorn,
+            notas_internas: document.getElementById('notas_internas') ? document.getElementById('notas_internas').value.trim() : null
         };
 
         try {

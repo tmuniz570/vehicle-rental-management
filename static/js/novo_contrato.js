@@ -729,6 +729,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // Check-out inspection
         formData.append('observacoes', document.getElementById('observacoes').value);
+        const txtNotasContrato = document.getElementById('notas_internas');
+        if (txtNotasContrato) {
+            formData.append('notas_internas', txtNotasContrato.value.trim());
+        }
         
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const compOptions = {

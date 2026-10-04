@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
         formData.append('telefone', document.getElementById('telefone').value.trim());
         formData.append('email', document.getElementById('email').value.trim());
         formData.append('endereco', document.getElementById('endereco').value.trim());
+        const txtNotas = document.getElementById('notas_internas');
+        if (txtNotas) {
+            formData.append('notas_internas', txtNotas.value.trim());
+        }
         
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
         const compOptions = {
