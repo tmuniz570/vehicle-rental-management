@@ -4,7 +4,9 @@ import glob
 import json
 import urllib.parse
 from app import app
-from database import Client, Contract, Inspection, ContractAttachment, MotorcycleV5C, MotorcycleTracker
+from database import (
+    db, Client, Contract, Inspection, ContractAttachment, MotorcycleV5C, MotorcycleTracker
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
@@ -31,35 +33,37 @@ def collect_valid_files():
     """Scans all database models and returns a set of valid filenames referenced in DB."""
     valid_files = set()
 
-    # 1. Clients
-    for c in Client.query.all():
-        for field in [c.url_habilitacao, c.url_habilitacao_verso, c.url_cbt, c.url_comprovante_endereco]:
+    # 1. Clients (selective column projection for minimal memory footprint)
+    for row in db.session.query(
+        Client.url_habilitacao, Client.url_habilitacao_verso, Client.url_cbt, Client.url_comprovante_endereco
+    ).all():
+        for field in row:
             fname = extract_clean_filename(field)
             if fname:
                 valid_files.add(fname)
 
     # 2. Contracts (live attachments & immutable snapshots)
-    for c in Contract.query.all():
-        for field in [
-            c.url_seguro, c.url_comprovante_deposito,
-            c.assinatura_cliente_inicial, c.assinatura_cliente_devolucao,
-            c.url_habilitacao, c.url_habilitacao_verso, c.url_cbt, c.url_comprovante_endereco
-        ]:
+    for row in db.session.query(
+        Contract.url_seguro, Contract.url_comprovante_deposito,
+        Contract.assinatura_cliente_inicial, Contract.assinatura_cliente_devolucao,
+        Contract.url_habilitacao, Contract.url_habilitacao_verso, Contract.url_cbt, Contract.url_comprovante_endereco
+    ).all():
+        for field in row:
             fname = extract_clean_filename(field)
             if fname:
                 valid_files.add(fname)
 
     # 3. Contract Attachments
-    for a in ContractAttachment.query.all():
-        fname = extract_clean_filename(a.url_arquivo)
+    for (url_arquivo,) in db.session.query(ContractAttachment.url_arquivo).all():
+        fname = extract_clean_filename(url_arquivo)
         if fname:
             valid_files.add(fname)
 
     # 4. Inspections (can be comma-separated or JSON list)
-    for i in Inspection.query.all():
-        if not i.url_fotos:
+    for (url_fotos,) in db.session.query(Inspection.url_fotos).filter(Inspection.url_fotos.isnot(None)).all():
+        if not url_fotos:
             continue
-        raw = i.url_fotos.strip()
+        raw = url_fotos.strip()
         # Try JSON parsing first
         if (raw.startswith('[') and raw.endswith(']')) or (raw.startswith('{') and raw.endswith('}')):
             try:
@@ -81,16 +85,16 @@ def collect_valid_files():
                 valid_files.add(fname)
 
     # 5. Motorcycle V5C Documents
-    for v in MotorcycleV5C.query.all():
-        fname = extract_clean_filename(v.url_arquivo)
+    for (url_arquivo,) in db.session.query(MotorcycleV5C.url_arquivo).all():
+        fname = extract_clean_filename(url_arquivo)
         if fname:
             valid_files.add(fname)
 
     # 6. Motorcycle GPS Trackers Photos
-    for t in MotorcycleTracker.query.all():
-        if not t.url_fotos:
+    for (url_fotos,) in db.session.query(MotorcycleTracker.url_fotos).filter(MotorcycleTracker.url_fotos.isnot(None)).all():
+        if not url_fotos:
             continue
-        raw = t.url_fotos.strip()
+        raw = url_fotos.strip()
         if (raw.startswith('[') and raw.endswith(']')) or (raw.startswith('{') and raw.endswith('}')):
             try:
                 parsed = json.loads(raw)

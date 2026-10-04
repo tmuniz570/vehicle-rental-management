@@ -231,12 +231,16 @@ def registrar_log(acao, entidade, entidade_id, descricao):
 
 # --- CSRF Protection & Security Headers ---
 def check_cron_auth():
-    """Verifica se a chamada ao cron veio com token secreto ou de um administrador autenticado."""
+    """Verifica se a chamada ao cron veio com token secreto, de um administrador autenticado ou de chamada local."""
     secret_key = os.environ.get('CRON_SECRET_KEY', 'ffmotors-internal-cron-key-2026')
     header_key = request.headers.get('X-Cron-Key') or request.args.get('cron_key')
     if header_key and hmac.compare_digest(str(header_key), str(secret_key)):
         return True
     if current_user.is_authenticated and current_user.pode_admin():
+        return True
+    # Chamadas internas originadas estritamente do próprio servidor (localhost / 127.0.0.1)
+    remote_ip = request.headers.get('X-Forwarded-For', request.remote_addr or '')
+    if remote_ip in ('127.0.0.1', '::1', 'localhost') and request.host.startswith(('127.0.0.1', 'localhost')):
         return True
     return False
 
@@ -5824,456 +5828,517 @@ def busca_rapida():
         'contratos': contratos_res
     })
 
-@app.route('/api/dashboard', methods=['GET'])
-def get_dashboard():
-    resp_data = {}
+def _compilar_dados_claims_dashboard():
+    hoje_claim = get_london_date()
+    todos_claims = Claim.query.filter(Claim.status == 'Em Aberto').all()
+    ind_vencidas = 0
+    stor_28d = 0
+    inv_vencidos = 0
+    inv_pendentes_envio = 0
 
-    # Dados do módulo de aluguéis: SOMENTE para quem possui permissão de aluguéis
-    pode_alugueis = current_user.is_authenticated and current_user.pode_alugueis()
+    for cl in todos_claims:
+        if cl.prazo_indicacao and cl.status_indicacao != 'Pago' and cl.prazo_indicacao < hoje_claim:
+            ind_vencidas += 1
+        if cl.prazo_liberacao_storage and cl.status_storage == 'No Pátio':
+            diff_d = (cl.prazo_liberacao_storage - hoje_claim).days
+            if diff_d <= 7: # Vence em 7 dias ou já venceu os 28 dias
+                stor_28d += 1
+        if cl.status_storage == 'Liberado' and not cl.data_envio_invoice:
+            inv_pendentes_envio += 1
+        if cl.prazo_pagamento_invoice and cl.status_pagamento_storage != 'Pago' and cl.prazo_pagamento_invoice < hoje_claim:
+            inv_vencidos += 1
 
-    if pode_alugueis:
-        motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
-        motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
-        motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
-        motos_pound = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound'])).count()
-        motos_vendidas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).count()
-        # Total Fleet = frota ativa operacional (disponíveis + alugadas + manutenção; exclui vendidas e pound)
-        total_motos = Motorcycle.query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound'])).count()
-        
-        # Detalhes das motos em manutenção (otimizado com batch query de contratos)
-        motos_manutencao_lista = []
-        manutencao_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).all()
-        if manutencao_objs:
-            placas_manut = [m.placa for m in manutencao_objs]
-            latest_contracts = db.session.query(Contract).options(joinedload(Contract.cliente)).filter(Contract.placa.in_(placas_manut)).order_by(Contract.id.desc()).all()
-            last_c_by_plate = {}
-            for c in latest_contracts:
-                if c.placa not in last_c_by_plate:
-                    last_c_by_plate[c.placa] = c
-            for m in manutencao_objs:
-                last_c = last_c_by_plate.get(m.placa)
-                cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
-                contrato_id = last_c.id if last_c else None
-                motos_manutencao_lista.append({
-                    'placa': m.placa,
-                    'modelo': m.modelo,
-                    'cor': m.cor or 'N/A',
-                    'status': m.status,
-                    'contrato_id': contrato_id,
-                    'cliente_nome': cliente_nome
-                })
-            
-        # Performance: Single query for active contracts with eager-loaded clients and inspections (reused in askMID compliance & pre-delivery checks)
-        contratos_ativos_objs = db.session.query(Contract).options(
-            joinedload(Contract.cliente),
-            selectinload(Contract.vistorias)
-        ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
-        contratos_ativos = len(contratos_ativos_objs)
-        receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_objs)
-        
-        # Breakdown of agreements by business model (Rental vs Financed/Rent-to-Buy vs Outright Sold)
-        motos_rental = 0
-        motos_financed = 0
-        motos_sold_outright = 0
-
-        sold_motos_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).all()
-        for m in sold_motos_objs:
-            c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
-            if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
-                motos_financed += 1
-            elif c and c.tipo_contrato in [ContractType.SALE_FULL.value, 'Sale_Full']:
-                motos_financed += 1
-            else:
-                motos_sold_outright += 1
-
-        rented_motos_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).all()
-        for m in rented_motos_objs:
-            c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
-            if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
-                motos_financed += 1
-            else:
-                motos_rental += 1
-
-        # Total Fleet = frota ativa operacional no nome da loja (disponíveis + alugadas + parceladas/vendas com contrato ativo + manutenção; exclui apenas vendidas com contrato completado e pound)
-        total_motos = motos_disponiveis + motos_rental + motos_financed + motos_manutencao
-
-        total_clientes = Client.query.count()
-        
-        # Performance: Direct SQL sum for pending revenue
-        receita_pendente = float(db.session.query(
-            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
-        ).filter(
-            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-            FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
-        ).scalar() or 0.0)
-        
-        # Performance: Direct SQL sum and count for overdue charges using London Time
-        agora_london = get_london_now()
-        inicio_hoje = agora_london.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-        inicio_semana = inicio_hoje - timedelta(days=agora_london.weekday())
-
-        collected_today = float(db.session.query(
-            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
-        ).filter(
-            FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
-            FinancialTransaction.data_pagamento >= inicio_hoje
-        ).scalar() or 0.0)
-
-        collected_this_week = float(db.session.query(
-            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
-        ).filter(
-            FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
-            FinancialTransaction.data_pagamento >= inicio_semana
-        ).scalar() or 0.0)
-
-        vencidas_q = db.session.query(
-            db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
-            db.func.count(FinancialTransaction.id)
-        ).filter(
-            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-            FinancialTransaction.data_vencimento < inicio_hoje
-        ).first()
-        receita_vencida = float(vencidas_q[0]) if vencidas_q else 0.0
-        total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
-        
-        # Performance: Pre-fetch transactions to prevent N+1 queries during deposit accounting
-        contratos_com_deposito = db.session.query(Contract).options(joinedload(Contract.transacoes)).filter(
-            Contract.status.in_([
-                ContractStatus.ACTIVE.value, 'Active', 'Ativo',
-                ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'
-            ]),
-            (Contract.tipo_contrato.is_(None) | Contract.tipo_contrato.in_([ContractType.RENT.value, 'Rent', 'Aluguel']))
-        ).all()
-        quarentenas_count = 0
-        quarentenas_valor = 0.0
-        depositos_ativos_valor = 0.0
-        total_depositos_retidos = 0.0
-
-        for c in contratos_com_deposito:
-            is_hold = c.status in [ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']
-            if is_hold:
-                quarentenas_count += 1
-            
-            dep_pago = 0.0
-            deducoes = 0.0
-            for t in c.transacoes:
-                if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
-                    if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
-                        dep_pago += float(t.valor)
-                    elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
-                        deducoes += float(t.valor)
-            saldo = max(0.0, dep_pago - deducoes)
-            total_depositos_retidos += saldo
-            if is_hold:
-                quarentenas_valor += saldo
-            else:
-                depositos_ativos_valor += saldo
-                    
-        # Últimas vistorias (eager-loaded)
-        recent_inspections = []
-        inspecoes = db.session.query(Inspection).options(
-            joinedload(Inspection.contrato).joinedload(Contract.cliente)
-        ).order_by(Inspection.id.desc()).limit(5).all()
-        for i in inspecoes:
-            placa = i.contrato.placa if i.contrato else '-'
-            cliente = i.contrato.cliente.nome if i.contrato and i.contrato.cliente else '-'
-            foto_count = len([f for f in (i.url_fotos or '').split(',') if f.strip()])
-            recent_inspections.append({
-                'id': i.id,
-                'contrato_id': i.id_contrato,
-                'placa': placa,
-                'cliente': cliente,
-                'tipo': i.tipo,
-                'data': i.data.strftime('%d/%m/%Y %H:%M') if i.data else '-',
-                'foto_count': foto_count,
-                'observacoes': i.observacoes or ''
-            })
-            
-        # Últimos contratos (eager-loaded)
-        recent_contracts = []
-        contratos = db.session.query(Contract).options(
-            joinedload(Contract.cliente)
-        ).order_by(Contract.id.desc()).limit(4).all()
-        for c in contratos:
-            recent_contracts.append({
-                'id': c.id,
-                'cliente': c.cliente.nome if c.cliente else 'N/A',
-                'placa': c.placa,
-                'status': c.status,
-                'valor_semanal': float(c.valor_aluguel_semanal),
-                'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
-            })
-        
-        # Alertas de Compliance: Road Tax (apenas frota ativa) e MOT (frota ativa + motos vendidas para prospecção de serviço na oficina)
-        hoje_date = get_london_date()
-        todas_motos = db.session.query(
-            Motorcycle.placa,
-            Motorcycle.status,
-            Motorcycle.vencimento_tax,
-            Motorcycle.vencimento_mot,
-            Motorcycle.tax_sorn
-        ).all()
-        tax_mot_warnings = 0
-        tax_warnings = 0
-        mot_warnings = 0
-        tax_mot_expired = 0
-        tax_mot_expiring_soon = 0
-        
-        placas_contratos_ativos = {ca.placa for ca in contratos_ativos_objs}
-        for m in todas_motos:
-            is_sold = (m.status in [MotoStatus.SOLD.value, 'Sold', 'Vendida'])
-            is_pound = (m.status in [MotoStatus.POUND.value, 'Pound'])
-
-            # Motos com status "Pound" estão fora de operação: NÃO emitem alerta de MOT e nem Road Tax
-            if is_pound:
-                continue
-
-            has_tax_w = False
-            has_mot_w = False
-            is_m_expired = False
-            
-            # Road Tax: checado apenas para frota ativa no nome da loja (apenas motos vendidas com contrato completado e motos SORN são isentas)
-            is_sorn = bool(getattr(m, 'tax_sorn', False))
-            is_truly_sold = is_sold and (m.placa not in placas_contratos_ativos)
-            if not is_truly_sold and not is_sorn and m.vencimento_tax:
-                diff_t = (m.vencimento_tax - hoje_date).days
-                if diff_t < 0:
-                    has_tax_w = True
-                    is_m_expired = True
-                elif diff_t <= 30:
-                    has_tax_w = True
-                    
-            # MOT: checado SEMPRE para todas as motos (inclusive vendidas),
-            # permitindo à oficina contatar proativamente o cliente da moto vendida para fazer revisão pré-MOT e faturar o serviço
-            if m.vencimento_mot:
-                diff_m = (m.vencimento_mot - hoje_date).days
-                if diff_m < 0:
-                    has_mot_w = True
-                    is_m_expired = True
-                elif diff_m <= 30:
-                    has_mot_w = True
-                    
-            if has_tax_w:
-                tax_warnings += 1
-            if has_mot_w:
-                mot_warnings += 1
-            if has_tax_w or has_mot_w:
-                tax_mot_warnings += 1
-                if is_m_expired:
-                    tax_mot_expired += 1
-                else:
-                    tax_mot_expiring_soon += 1
-                    
-        # Compliance: Checagem Quinzenal de Seguro no askMID (reaproveita contratos_ativos_objs carregados acima)
-        seguros_pendentes_count = 0
-        seguros_cancelados_count = 0
-        contratos_seguro_alerta = []
-        
-        for ca in contratos_ativos_objs:
-            # Não monitorar seguro quinzenal para motos vendidas (Sale_Full / Sale_Installment) nem compradas (Purchase)
-            tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
-            if tipo_ca in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment', ContractType.PURCHASE.value, 'Purchase', 'Compra']:
-                continue
-                
-            u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
-            dias_check = (hoje_date - u_check).days
-            cli_nome = ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}"
-            
-            if ca.status_seguro == 'Cancelled':
-                seguros_cancelados_count += 1
-                contratos_seguro_alerta.append({
-                    'id': ca.id,
-                    'placa': ca.placa,
-                    'cliente': cli_nome,
-                    'dias': dias_check,
-                    'status_seguro': 'Cancelled',
-                    'mensagem': f"ALARM: Vehicle {ca.placa} insurance was flagged CANCELLED/INVALID on askMID!"
-                })
-            elif dias_check >= 15:
-                seguros_pendentes_count += 1
-                contratos_seguro_alerta.append({
-                    'id': ca.id,
-                    'placa': ca.placa,
-                    'cliente': cli_nome,
-                    'dias': dias_check,
-                    'status_seguro': 'Check_Due',
-                    'mensagem': f"Contract #{ca.id} ({ca.placa} - {cli_nome}) due for 15-day askMID insurance check (last checked {dias_check} days ago)."
-                })
-        
-        # Pre-Delivery Compliance: Motorbikes Pending Check-out Inspection or Insurance Certificate before release
-        # Contratos de compra (Purchase) não requerem liberação para cliente (veículo adquirido pela loja)
-        contratos_pendentes_liberacao = []
-        for ca in contratos_ativos_objs:
-            tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
-            if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
-                continue
-            tem_checkout = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in (ca.vistorias or []))
-            tem_seguro = bool(ca.url_seguro)
-            if not tem_checkout or not tem_seguro:
-                pendencias = []
-                if not tem_checkout: pendencias.append('Check-out Inspection')
-                if not tem_seguro: pendencias.append('Insurance Certificate')
-                cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
-                contratos_pendentes_liberacao.append({
-                    'id': ca.id,
-                    'placa': ca.placa,
-                    'cliente': cli_nome,
-                    'tipo_contrato': getattr(ca, 'tipo_contrato', 'Rent') or 'Rent',
-                    'tem_checkout': tem_checkout,
-                    'tem_seguro': tem_seguro,
-                    'pendencias': pendencias,
-                    'pendencias_txt': " & ".join(pendencias)
-                })
-
-        # Compliance de Compras: Contratos de Compra pendentes de Logbook (V5C)
-        compras_pendentes_v5c = []
-        for ca in contratos_ativos_objs:
-            tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
-            if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
-                placa_limpa = (ca.moto_placa or ca.placa or '').strip().upper()
-                tem_v5c = (MotorcycleV5C.query.filter_by(placa=placa_limpa).first() is not None) if placa_limpa else False
-                if not tem_v5c:
-                    cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
-                    compras_pendentes_v5c.append({
-                        'id': ca.id,
-                        'placa': placa_limpa,
-                        'cliente': cli_nome,
-                        'valor_compra': float(ca.valor_compra_veiculo or 0.0),
-                        'data_retirada': ca.data_retirada.strftime('%d/%m/%Y') if ca.data_retirada else None
-                    })
-        compras_pendentes_v5c_count = len(compras_pendentes_v5c)
-
-        # Compliance: Motos sem Documento V5C (Logbook)
-        # Monitora todas as motos da empresa (inclusive vendidas, que necessitam do V5C arquivado para transferência e auditoria)
-        motos_sem_v5c_objs = db.session.query(Motorcycle).options(
-            selectinload(Motorcycle.v5c_arquivos)
-        ).order_by(Motorcycle.placa.asc()).all()
-
-        motos_sem_v5c = []
-        for mv in motos_sem_v5c_objs:
-            if not mv.v5c_arquivos or len(mv.v5c_arquivos) == 0:
-                motos_sem_v5c.append({
-                    'placa': mv.placa,
-                    'modelo': mv.modelo,
-                    'status': mv.status
-                })
-        motos_sem_v5c_count = len(motos_sem_v5c)
-
-        # Proactive Collections: Actual pending charges due today (Rent, Sales Installments, Deposits, Fines, etc.)
-        fim_hoje = inicio_hoje + timedelta(days=1)
-        transacoes_hoje_objs = db.session.query(FinancialTransaction).options(
-            joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
-        ).filter(
-            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
-            FinancialTransaction.data_vencimento >= inicio_hoje,
-            FinancialTransaction.data_vencimento < fim_hoje
-        ).order_by(FinancialTransaction.data_vencimento.asc()).all()
-
-        due_today_list = []
-        for t in transacoes_hoje_objs:
-            c = t.contrato
-            cli = c.cliente if c else None
-            cli_nome = cli.nome if cli else (c.cliente_nome if c else 'N/A')
-            cli_tel = cli.telefone if cli else (c.cliente_telefone if c else '')
-            placa = c.placa if c else '-'
-            c_id = c.id if c else None
-            due_today_list.append({
-                'transacao_id': t.id,
-                'id': t.id,
-                'contrato_id': c_id,
-                'placa': placa,
-                'cliente_nome': cli_nome,
-                'cliente_telefone': cli_tel,
-                'valor': float(t.valor),
-                'valor_semanal': float(t.valor),
-                'tipo': t.tipo,
-                'nota': t.nota or '',
-                'ultimo_lembrete': t.ultimo_lembrete.isoformat() if t.ultimo_lembrete else None,
-                'ultimo_lembrete_por': t.ultimo_lembrete_por or ''
-            })
-
-        due_today = {
-            'count': len(due_today_list),
-            'total_count': len(due_today_list),
-            'total': round(sum(d['valor'] for d in due_today_list), 2),
-            'total_amount': round(sum(d['valor'] for d in due_today_list), 2),
-            'itens': due_today_list,
-            'items': due_today_list
-        }
-
-        resp_data.update({
-            'total_motos': total_motos,
-            'motos_disponiveis': motos_disponiveis,
-            'motos_alugadas': motos_alugadas,
-            'motos_rental': motos_rental,
-            'motos_financed': motos_financed,
-            'motos_sold_outright': motos_sold_outright,
-            'motos_manutencao': motos_manutencao,
-            'motos_pound': motos_pound,
-            'motos_fora_operacao': motos_pound,
-            'motos_vendidas': motos_vendidas,
-            'motos_sem_v5c_count': motos_sem_v5c_count,
-            'motos_sem_v5c': motos_sem_v5c,
-            'motos_manutencao_lista': motos_manutencao_lista,
-            'tax_mot_warnings': tax_mot_warnings,
-            'tax_mot_expired': tax_mot_expired,
-            'tax_mot_expiring_soon': tax_mot_expiring_soon,
-            'tax_warnings': tax_warnings,
-            'mot_warnings': mot_warnings,
-            'seguros_pendentes_count': seguros_pendentes_count,
-            'seguros_cancelados_count': seguros_cancelados_count,
-            'contratos_seguro_alerta': contratos_seguro_alerta,
-            'pendentes_liberacao_count': len(contratos_pendentes_liberacao),
-            'contratos_pendentes_liberacao': contratos_pendentes_liberacao,
-            'compras_pendentes_v5c_count': compras_pendentes_v5c_count,
-            'compras_pendentes_v5c': compras_pendentes_v5c,
-            'contratos_ativos': contratos_ativos,
-            'total_clientes': total_clientes,
-            'receita_pendente': receita_pendente,
-            'receita_semanal': receita_semanal,
-            'receita_vencida': receita_vencida,
-            'total_vencidos': total_vencidos,
-            'collected_today': collected_today,
-            'collected_this_week': collected_this_week,
-            'due_today': due_today,
-            'quarentenas_count': quarentenas_count,
-            'quarentenas_valor': quarentenas_valor,
-            'depositos_ativos_valor': depositos_ativos_valor,
-            'total_depositos_retidos': total_depositos_retidos,
-            'recent_inspections': recent_inspections,
-            'recent_contracts': recent_contracts
-        })
-
-    # Cautela e Isolamento Total: Alertas de Claims somente para quem tem permissão
-    if current_user.is_authenticated and current_user.pode_claims():
-        hoje_claim = get_london_date()
-        todos_claims = Claim.query.filter(Claim.status == 'Em Aberto').all()
-        ind_vencidas = 0
-        stor_28d = 0
-        inv_vencidos = 0
-        inv_pendentes_envio = 0
-
-        for cl in todos_claims:
-            if cl.prazo_indicacao and cl.status_indicacao != 'Pago' and cl.prazo_indicacao < hoje_claim:
-                ind_vencidas += 1
-            if cl.prazo_liberacao_storage and cl.status_storage == 'No Pátio':
-                diff_d = (cl.prazo_liberacao_storage - hoje_claim).days
-                if diff_d <= 7: # Vence em 7 dias ou já venceu os 28 dias
-                    stor_28d += 1
-            if cl.status_storage == 'Liberado' and not cl.data_envio_invoice:
-                inv_pendentes_envio += 1
-            if cl.prazo_pagamento_invoice and cl.status_pagamento_storage != 'Pago' and cl.prazo_pagamento_invoice < hoje_claim:
-                inv_vencidos += 1
-
-        resp_data['claims_alerts'] = {
+    return {
+        'claims_alerts': {
             'indicacoes_vencidas': ind_vencidas,
             'storage_28d_vencendo': stor_28d,
             'invoices_vencidos': inv_vencidos,
             'invoices_pendentes_envio': inv_pendentes_envio,
             'total_alertas': ind_vencidas + stor_28d + inv_vencidos + inv_pendentes_envio
         }
+    }
+
+def _compilar_dados_dashboard(include_claims=False):
+    """
+    Compila todas as métricas essenciais de operação, frota, financeiro e conformidade do Dashboard.
+    Reutilizado pelo endpoint /api/dashboard e pela rotina de warm-up matinal /api/jobs/warmup.
+    """
+    resp_data = {}
+
+    motos_disponiveis = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.AVAILABLE.value, 'Available', 'Disponível'])).count()
+    motos_alugadas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).count()
+    motos_manutencao = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).count()
+    motos_pound = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.POUND.value, 'Pound'])).count()
+    motos_vendidas = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).count()
+    # Total Fleet = frota ativa operacional (disponíveis + alugadas + manutenção; exclui vendidas e pound)
+    total_motos = Motorcycle.query.filter(~Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida', MotoStatus.POUND.value, 'Pound'])).count()
+    
+    # Detalhes das motos em manutenção (otimizado com batch query de contratos)
+    motos_manutencao_lista = []
+    manutencao_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.MAINTENANCE.value, 'Maintenance', 'Manutenção', 'Manutencao'])).all()
+    if manutencao_objs:
+        placas_manut = [m.placa for m in manutencao_objs]
+        latest_contracts = db.session.query(Contract).options(joinedload(Contract.cliente)).filter(Contract.placa.in_(placas_manut)).order_by(Contract.id.desc()).all()
+        last_c_by_plate = {}
+        for c in latest_contracts:
+            if c.placa not in last_c_by_plate:
+                last_c_by_plate[c.placa] = c
+        for m in manutencao_objs:
+            last_c = last_c_by_plate.get(m.placa)
+            cliente_nome = last_c.cliente.nome if last_c and last_c.cliente else None
+            contrato_id = last_c.id if last_c else None
+            motos_manutencao_lista.append({
+                'placa': m.placa,
+                'modelo': m.modelo,
+                'cor': m.cor or 'N/A',
+                'status': m.status,
+                'contrato_id': contrato_id,
+                'cliente_nome': cliente_nome
+            })
+        
+    # Performance: Single query for active contracts with eager-loaded clients and inspections (reused in askMID compliance & pre-delivery checks)
+    contratos_ativos_objs = db.session.query(Contract).options(
+        joinedload(Contract.cliente),
+        selectinload(Contract.vistorias)
+    ).filter(Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])).all()
+    contratos_ativos = len(contratos_ativos_objs)
+    receita_semanal = sum(float(c.valor_aluguel_semanal) for c in contratos_ativos_objs)
+    
+    # Breakdown of agreements by business model (Rental vs Financed/Rent-to-Buy vs Outright Sold)
+    motos_rental = 0
+    motos_financed = 0
+    motos_sold_outright = 0
+
+    sold_motos_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.SOLD.value, 'Sold', 'Vendida'])).all()
+    for m in sold_motos_objs:
+        c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
+        if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
+            motos_financed += 1
+        elif c and c.tipo_contrato in [ContractType.SALE_FULL.value, 'Sale_Full']:
+            motos_financed += 1
+        else:
+            motos_sold_outright += 1
+
+    rented_motos_objs = Motorcycle.query.filter(Motorcycle.status.in_([MotoStatus.RENTED.value, 'Rented', 'Alugada'])).all()
+    for m in rented_motos_objs:
+        c = next((ca for ca in contratos_ativos_objs if ca.placa == m.placa), None)
+        if c and c.tipo_contrato in [ContractType.SALE_INSTALLMENT.value, 'Sale_Installment']:
+            motos_financed += 1
+        else:
+            motos_rental += 1
+
+    # Total Fleet = frota ativa operacional no nome da loja (disponíveis + alugadas + parceladas/vendas com contrato ativo + manutenção; exclui apenas vendidas com contrato completado e pound)
+    total_motos = motos_disponiveis + motos_rental + motos_financed + motos_manutencao
+
+    total_clientes = Client.query.count()
+    
+    # Performance: Direct SQL sum for pending revenue
+    receita_pendente = float(db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.tipo.in_([TransactionType.RENT.value, TransactionType.FINE.value, 'Rent', 'Fine', 'Aluguel', 'Multa'])
+    ).scalar() or 0.0)
+    
+    # Performance: Direct SQL sum and count for overdue charges using London Time
+    agora_london = get_london_now()
+    inicio_hoje = agora_london.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    inicio_semana = inicio_hoje - timedelta(days=agora_london.weekday())
+
+    collected_today = float(db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= inicio_hoje
+    ).scalar() or 0.0)
+
+    collected_this_week = float(db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PAID.value, 'Paid', 'Pago']),
+        FinancialTransaction.data_pagamento >= inicio_semana
+    ).scalar() or 0.0)
+
+    vencidas_q = db.session.query(
+        db.func.coalesce(db.func.sum(FinancialTransaction.valor), 0.0),
+        db.func.count(FinancialTransaction.id)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento < inicio_hoje
+    ).first()
+    receita_vencida = float(vencidas_q[0]) if vencidas_q else 0.0
+    total_vencidos = int(vencidas_q[1]) if vencidas_q else 0
+    
+    # Performance: Pre-fetch transactions to prevent N+1 queries during deposit accounting
+    contratos_com_deposito = db.session.query(Contract).options(selectinload(Contract.transacoes)).filter(
+        Contract.status.in_([
+            ContractStatus.ACTIVE.value, 'Active', 'Ativo',
+            ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'
+        ]),
+        (Contract.tipo_contrato.is_(None) | Contract.tipo_contrato.in_([ContractType.RENT.value, 'Rent', 'Aluguel']))
+    ).all()
+    quarentenas_count = 0
+    quarentenas_valor = 0.0
+    depositos_ativos_valor = 0.0
+    total_depositos_retidos = 0.0
+
+    for c in contratos_com_deposito:
+        is_hold = c.status in [ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']
+        if is_hold:
+            quarentenas_count += 1
+        
+        dep_pago = 0.0
+        deducoes = 0.0
+        for t in c.transacoes:
+            if t.status in [TransactionStatus.PAID.value, 'Paid', 'Pago']:
+                if t.tipo in [TransactionType.DEPOSIT.value, 'Deposit', 'Deposito', 'Depósito']:
+                    dep_pago += float(t.valor)
+                elif t.forma_pagamento and 'deposit' in t.forma_pagamento.lower():
+                    deducoes += float(t.valor)
+        saldo = max(0.0, dep_pago - deducoes)
+        total_depositos_retidos += saldo
+        if is_hold:
+            quarentenas_valor += saldo
+        else:
+            depositos_ativos_valor += saldo
+                
+    # Últimas vistorias (eager-loaded)
+    recent_inspections = []
+    inspecoes = db.session.query(Inspection).options(
+        joinedload(Inspection.contrato).joinedload(Contract.cliente)
+    ).order_by(Inspection.id.desc()).limit(5).all()
+    for i in inspecoes:
+        placa = i.contrato.placa if i.contrato else '-'
+        cliente = i.contrato.cliente.nome if i.contrato and i.contrato.cliente else '-'
+        foto_count = len([f for f in (i.url_fotos or '').split(',') if f.strip()])
+        recent_inspections.append({
+            'id': i.id,
+            'contrato_id': i.id_contrato,
+            'placa': placa,
+            'cliente': cliente,
+            'tipo': i.tipo,
+            'data': i.data.strftime('%d/%m/%Y %H:%M') if i.data else '-',
+            'foto_count': foto_count,
+            'observacoes': i.observacoes or ''
+        })
+        
+    # Últimos contratos (eager-loaded)
+    recent_contracts = []
+    contratos = db.session.query(Contract).options(
+        joinedload(Contract.cliente)
+    ).order_by(Contract.id.desc()).limit(4).all()
+    for c in contratos:
+        recent_contracts.append({
+            'id': c.id,
+            'cliente': c.cliente.nome if c.cliente else 'N/A',
+            'placa': c.placa,
+            'status': c.status,
+            'valor_semanal': float(c.valor_aluguel_semanal),
+            'data_retirada': c.data_retirada.strftime('%d/%m/%Y') if c.data_retirada else '-'
+        })
+    
+    # Alertas de Compliance: Road Tax (apenas frota ativa) e MOT (frota ativa + motos vendidas para prospecção de serviço na oficina)
+    hoje_date = get_london_date()
+    todas_motos = db.session.query(
+        Motorcycle.placa,
+        Motorcycle.status,
+        Motorcycle.vencimento_tax,
+        Motorcycle.vencimento_mot,
+        Motorcycle.tax_sorn
+    ).all()
+    tax_mot_warnings = 0
+    tax_warnings = 0
+    mot_warnings = 0
+    tax_mot_expired = 0
+    tax_mot_expiring_soon = 0
+    
+    placas_contratos_ativos = {ca.placa for ca in contratos_ativos_objs}
+    for m in todas_motos:
+        is_sold = (m.status in [MotoStatus.SOLD.value, 'Sold', 'Vendida'])
+        is_pound = (m.status in [MotoStatus.POUND.value, 'Pound'])
+
+        # Motos com status "Pound" estão fora de operação: NÃO emitem alerta de MOT e nem Road Tax
+        if is_pound:
+            continue
+
+        has_tax_w = False
+        has_mot_w = False
+        is_m_expired = False
+        
+        # Road Tax: checado apenas para frota ativa no nome da loja (apenas motos vendidas com contrato completado e motos SORN são isentas)
+        is_sorn = bool(getattr(m, 'tax_sorn', False))
+        is_truly_sold = is_sold and (m.placa not in placas_contratos_ativos)
+        if not is_truly_sold and not is_sorn and m.vencimento_tax:
+            diff_t = (m.vencimento_tax - hoje_date).days
+            if diff_t < 0:
+                has_tax_w = True
+                is_m_expired = True
+            elif diff_t <= 30:
+                has_tax_w = True
+                
+        # MOT: checado SEMPRE para todas as motos (inclusive vendidas),
+        # permitindo à oficina contatar proativamente o cliente da moto vendida para fazer revisão pré-MOT e faturar o serviço
+        if m.vencimento_mot:
+            diff_m = (m.vencimento_mot - hoje_date).days
+            if diff_m < 0:
+                has_mot_w = True
+                is_m_expired = True
+            elif diff_m <= 30:
+                has_mot_w = True
+                
+        if has_tax_w:
+            tax_warnings += 1
+        if has_mot_w:
+            mot_warnings += 1
+        if has_tax_w or has_mot_w:
+            tax_mot_warnings += 1
+            if is_m_expired:
+                tax_mot_expired += 1
+            else:
+                tax_mot_expiring_soon += 1
+                
+    # Compliance: Checagem Quinzenal de Seguro no askMID (reaproveita contratos_ativos_objs carregados acima)
+    seguros_pendentes_count = 0
+    seguros_cancelados_count = 0
+    contratos_seguro_alerta = []
+    
+    for ca in contratos_ativos_objs:
+        # Não monitorar seguro quinzenal para motos vendidas (Sale_Full / Sale_Installment) nem compradas (Purchase)
+        tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
+        if tipo_ca in [ContractType.SALE_FULL.value, ContractType.SALE_INSTALLMENT.value, 'Sale_Full', 'Sale_Installment', ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+            continue
+            
+        u_check = ca.data_ultima_checagem_seguro or (ca.data_retirada.date() if ca.data_retirada else hoje_date)
+        dias_check = (hoje_date - u_check).days
+        cli_nome = ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}"
+        
+        if ca.status_seguro == 'Cancelled':
+            seguros_cancelados_count += 1
+            contratos_seguro_alerta.append({
+                'id': ca.id,
+                'placa': ca.placa,
+                'cliente': cli_nome,
+                'dias': dias_check,
+                'status_seguro': 'Cancelled',
+                'mensagem': f"ALARM: Vehicle {ca.placa} insurance was flagged CANCELLED/INVALID on askMID!"
+            })
+        elif dias_check >= 15:
+            seguros_pendentes_count += 1
+            contratos_seguro_alerta.append({
+                'id': ca.id,
+                'placa': ca.placa,
+                'cliente': cli_nome,
+                'dias': dias_check,
+                'status_seguro': 'Check_Due',
+                'mensagem': f"Contract #{ca.id} ({ca.placa} - {cli_nome}) due for 15-day askMID insurance check (last checked {dias_check} days ago)."
+            })
+    
+    # Pre-Delivery Compliance: Motorbikes Pending Check-out Inspection or Insurance Certificate before release
+    # Contratos de compra (Purchase) não requerem liberação para cliente (veículo adquirido pela loja)
+    contratos_pendentes_liberacao = []
+    for ca in contratos_ativos_objs:
+        tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
+        if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+            continue
+        tem_checkout = any(v.tipo in [InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'] for v in (ca.vistorias or []))
+        tem_seguro = bool(ca.url_seguro)
+        if not tem_checkout or not tem_seguro:
+            pendencias = []
+            if not tem_checkout: pendencias.append('Check-out Inspection')
+            if not tem_seguro: pendencias.append('Insurance Certificate')
+            cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
+            contratos_pendentes_liberacao.append({
+                'id': ca.id,
+                'placa': ca.placa,
+                'cliente': cli_nome,
+                'tipo_contrato': getattr(ca, 'tipo_contrato', 'Rent') or 'Rent',
+                'tem_checkout': tem_checkout,
+                'tem_seguro': tem_seguro,
+                'pendencias': pendencias,
+                'pendencias_txt': " & ".join(pendencias)
+            })
+
+    # Compliance de Compras: Contratos de Compra pendentes de Logbook (V5C)
+    compras_pendentes_v5c = []
+    for ca in contratos_ativos_objs:
+        tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
+        if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+            placa_limpa = (ca.moto_placa or ca.placa or '').strip().upper()
+            tem_v5c = (MotorcycleV5C.query.filter_by(placa=placa_limpa).first() is not None) if placa_limpa else False
+            if not tem_v5c:
+                cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
+                compras_pendentes_v5c.append({
+                    'id': ca.id,
+                    'placa': placa_limpa,
+                    'cliente': cli_nome,
+                    'valor_compra': float(ca.valor_compra_veiculo or 0.0),
+                    'data_retirada': ca.data_retirada.strftime('%d/%m/%Y') if ca.data_retirada else None
+                })
+    compras_pendentes_v5c_count = len(compras_pendentes_v5c)
+
+    # Compliance: Motos sem Documento V5C (Logbook) - Otimizado com NOT EXISTS em SQL direto
+    motos_sem_v5c_objs = db.session.query(
+        Motorcycle.placa,
+        Motorcycle.modelo,
+        Motorcycle.status
+    ).filter(
+        ~Motorcycle.v5c_arquivos.any()
+    ).order_by(Motorcycle.placa.asc()).all()
+
+    motos_sem_v5c = [{
+        'placa': mv.placa,
+        'modelo': mv.modelo,
+        'status': mv.status
+    } for mv in motos_sem_v5c_objs]
+    motos_sem_v5c_count = len(motos_sem_v5c)
+
+    # Proactive Collections: Actual pending charges due today (Rent, Sales Installments, Deposits, Fines, etc.)
+    fim_hoje = inicio_hoje + timedelta(days=1)
+    transacoes_hoje_objs = db.session.query(FinancialTransaction).options(
+        joinedload(FinancialTransaction.contrato).joinedload(Contract.cliente)
+    ).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento >= inicio_hoje,
+        FinancialTransaction.data_vencimento < fim_hoje
+    ).order_by(FinancialTransaction.data_vencimento.asc()).all()
+
+    due_today_list = []
+    for t in transacoes_hoje_objs:
+        c = t.contrato
+        cli = c.cliente if c else None
+        cli_nome = cli.nome if cli else (c.cliente_nome if c else 'N/A')
+        cli_tel = cli.telefone if cli else (c.cliente_telefone if c else '')
+        placa = c.placa if c else '-'
+        c_id = c.id if c else None
+        due_today_list.append({
+            'transacao_id': t.id,
+            'id': t.id,
+            'contrato_id': c_id,
+            'placa': placa,
+            'cliente_nome': cli_nome,
+            'cliente_telefone': cli_tel,
+            'valor': float(t.valor),
+            'valor_semanal': float(t.valor),
+            'tipo': t.tipo,
+            'nota': t.nota or '',
+            'ultimo_lembrete': t.ultimo_lembrete.isoformat() if t.ultimo_lembrete else None,
+            'ultimo_lembrete_por': t.ultimo_lembrete_por or ''
+        })
+
+    due_today = {
+        'count': len(due_today_list),
+        'total_count': len(due_today_list),
+        'total': round(sum(d['valor'] for d in due_today_list), 2),
+        'total_amount': round(sum(d['valor'] for d in due_today_list), 2),
+        'itens': due_today_list,
+        'items': due_today_list
+    }
+
+    resp_data.update({
+        'total_motos': total_motos,
+        'motos_disponiveis': motos_disponiveis,
+        'motos_alugadas': motos_alugadas,
+        'motos_rental': motos_rental,
+        'motos_financed': motos_financed,
+        'motos_sold_outright': motos_sold_outright,
+        'motos_manutencao': motos_manutencao,
+        'motos_pound': motos_pound,
+        'motos_fora_operacao': motos_pound,
+        'motos_vendidas': motos_vendidas,
+        'motos_sem_v5c_count': motos_sem_v5c_count,
+        'motos_sem_v5c': motos_sem_v5c,
+        'motos_manutencao_lista': motos_manutencao_lista,
+        'tax_mot_warnings': tax_mot_warnings,
+        'tax_mot_expired': tax_mot_expired,
+        'tax_mot_expiring_soon': tax_mot_expiring_soon,
+        'tax_warnings': tax_warnings,
+        'mot_warnings': mot_warnings,
+        'seguros_pendentes_count': seguros_pendentes_count,
+        'seguros_cancelados_count': seguros_cancelados_count,
+        'contratos_seguro_alerta': contratos_seguro_alerta,
+        'pendentes_liberacao_count': len(contratos_pendentes_liberacao),
+        'contratos_pendentes_liberacao': contratos_pendentes_liberacao,
+        'compras_pendentes_v5c_count': compras_pendentes_v5c_count,
+        'compras_pendentes_v5c': compras_pendentes_v5c,
+        'contratos_ativos': contratos_ativos,
+        'total_clientes': total_clientes,
+        'receita_pendente': receita_pendente,
+        'receita_semanal': receita_semanal,
+        'receita_vencida': receita_vencida,
+        'total_vencidos': total_vencidos,
+        'collected_today': collected_today,
+        'collected_this_week': collected_this_week,
+        'due_today': due_today,
+        'quarentenas_count': quarentenas_count,
+        'quarentenas_valor': quarentenas_valor,
+        'depositos_ativos_valor': depositos_ativos_valor,
+        'total_depositos_retidos': total_depositos_retidos,
+        'recent_inspections': recent_inspections,
+        'recent_contracts': recent_contracts
+    })
+
+    if include_claims:
+        claims_data = _compilar_dados_claims_dashboard()
+        resp_data.update(claims_data)
+
+    return resp_data
+
+@app.route('/api/dashboard', methods=['GET'])
+def get_dashboard():
+    resp_data = {}
+
+    pode_alugueis = current_user.is_authenticated and current_user.pode_alugueis()
+    pode_claims = current_user.is_authenticated and current_user.pode_claims()
+
+    if pode_alugueis:
+        resp_data = _compilar_dados_dashboard(include_claims=pode_claims)
+    elif pode_claims:
+        resp_data = _compilar_dados_claims_dashboard()
 
     return jsonify(resp_data)
+
+@app.route('/api/jobs/warmup', methods=['GET', 'POST'])
+def api_warmup():
+    """
+    Endpoint de Warm-up Matinal (Aquecimento de Cache e Conexões).
+    Executado preferencialmente via cron às 08:00 AM (Londres),
+    1 hora antes da abertura da loja às 09:00 AM.
+    Garante que conexões com PostgreSQL estejam ativas e o cache
+    de dados quentes (Dashboard, Motos, Contratos) esteja na RAM.
+    """
+    if not check_cron_auth():
+        return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
+
+    start_time = time.time()
+    dados = _compilar_dados_dashboard(include_claims=True)
+
+    # Pré-carregar consultas frequentes de Clientes e Motos para preencher buffers
+    _ = db.session.query(Client.id, Client.nome, Client.telefone).limit(30).all()
+    _ = db.session.query(Motorcycle.placa, Motorcycle.status).limit(30).all()
+
+    elapsed_ms = round((time.time() - start_time) * 1000, 2)
+
+    try:
+        registrar_log(
+            'SYSTEM_WARMUP',
+            'System/Cron',
+            None,
+            f"Warm-up matinal executado com sucesso em {elapsed_ms}ms ({dados.get('total_motos')} motos ativas, {dados.get('contratos_ativos')} contratos ativos)."
+        )
+    except Exception:
+        pass
+
+    return jsonify({
+        'success': True,
+        'message': f'Sistema e cache aquecidos com sucesso em {elapsed_ms}ms.',
+        'warmed_at': get_london_now().isoformat(),
+        'duration_ms': elapsed_ms,
+        'summary': {
+            'total_motos': dados.get('total_motos'),
+            'contratos_ativos': dados.get('contratos_ativos'),
+            'due_today_count': dados.get('due_today', {}).get('count')
+        }
+    }), 200
 
 @app.route('/api/alertas', methods=['GET'])
 @alugueis_required

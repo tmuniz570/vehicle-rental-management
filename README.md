@@ -269,6 +269,7 @@ FF Motors APP/
 ├── Procfile                   # Cloud PaaS entrypoint (Render, Railway, Heroku)
 ├── cleanup_duplicate_charges.py# CLI audit and cleanup tool for duplicate pending weekly charges
 ├── cleanup_uploads.py         # Automated media orphan purger and disk space cleanup
+├── warmup.py                  # Morning cache pre-warmer and PostgreSQL connection reviver
 ├── database.py                # Database models (User, Clients, Motos, Contracts, Inspections, Claims, Transactions)
 ├── backup.py                  # Automated database & asset backup utility
 ├── restore.py                 # Restoration utility for backup archives

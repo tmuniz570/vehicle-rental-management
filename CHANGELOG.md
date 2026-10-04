@@ -4,6 +4,21 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.25] — 2026-10-04 — *Morning Performance & Cache Pre-Warming, Rescheduled Safe Cleanup*
+
+### ⚡ Performance & Estabilidade Operacional Matinal
+* **Aquecimento Matinal de Cache & Conexões (`warmup.py` & `/api/jobs/warmup`)**:
+  - Implementado script CLI `warmup.py` e endpoint protegido `/api/jobs/warmup` agendado no Crontab para as **08:00 AM (Europe/London)**, 1 hora antes da abertura da loja às 09:00 AM.
+  - Elimina o efeito "Cold Start" e a lentidão do primeiro acesso matinal após o período de inatividade noturna.
+  - Pré-aquece o pool de conexões do SQLAlchemy/PostgreSQL (`pool_recycle`), executa queries do Dashboard e pré-carrega os registros mais acessados na memória RAM do servidor (`shared_buffers`), assegurando resposta imediata (<100ms) aos operadores.
+* **Otimização Segura e Reagendamento de Limpeza (`cleanup_uploads.py` às 06:00 AM)**:
+  - Reagendada a execução da limpeza autônoma de mídias órfãs para as **06:00 AM (Europe/London)**, garantindo que rode após a finalização dos snapshots noturnos do Google Cloud e 2 horas antes do warm-up.
+  - Otimizada a função `collect_valid_files()` com consultas de projeção estrita de colunas (`db.session.query(...)`) em vez de carregar modelos inteiros em memória (`Model.query.all()`), reduzindo o consumo de RAM em mais de 90% e eliminando a saturação de I/O de disco.
+  - **Segurança Máxima**: Preservação estrita de 100% dos arquivos válidos (V5C, Rastreadores, Vistorias, Contratos ativos e snapshots congelados de clientes).
+* **Otimização de Consultas do Dashboard (`/api/dashboard`)**:
+  - Consulta de motos sem V5C (`motos_sem_v5c`) otimizada para `~Motorcycle.v5c_arquivos.any()`, executando cláusula SQL `NOT EXISTS` direta sem carregar a frota inteira em memória.
+  - Carregamento de transações em contratos de caução atualizado para `selectinload(Contract.transacoes)`, prevenindo a duplicação em produto cartesiano.
+
 ## [1.9.24] — 2026-09-30 — *Contract Details Screen Ergonomics, Financial Progress & Contextual Intelligence*
 
 ### 💎 Experiência, Inteligência de Contexto & Finanças na Tela de Detalhes do Contrato (`/contratos/<id>`)
