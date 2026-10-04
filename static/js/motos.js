@@ -74,13 +74,19 @@ function atualizarKpiCards(kpis) {
     if (elRe) elRe.textContent = kpis.rented !== undefined ? kpis.rented : '-';
     if (elMa) elMa.textContent = kpis.maintenance !== undefined ? kpis.maintenance : '-';
     if (elV5) elV5.textContent = kpis.missing_v5c !== undefined ? kpis.missing_v5c : '-';
+    const elV5Sub = document.getElementById('kpiSub_missing_v5c');
+    if (elV5Sub && kpis.awaiting_v5c !== undefined) {
+        elV5Sub.textContent = `${kpis.awaiting_v5c} slip / ${kpis.no_v5c_no_slip || 0} no slip`;
+    }
     if (elWa) elWa.textContent = kpis.tax_mot_warnings !== undefined ? kpis.tax_mot_warnings : '-';
 
     sincronizarKpiCardAtivo();
 }
 
 function sincronizarKpiCardAtivo() {
-    const currentFilter = v5cFiltro === 'missing' ? 'missing_v5c' : (statusFiltro || 'operational');
+    const currentFilter = (v5cFiltro === 'missing' || v5cFiltro === 'awaiting' || v5cFiltro === 'no_slip') 
+        ? 'missing_v5c' 
+        : (statusFiltro || 'operational');
     document.querySelectorAll('.kpi-card').forEach(card => {
         if (card.dataset.filter === currentFilter) {
             card.classList.add('active');
@@ -265,11 +271,14 @@ async function carregarMotos() {
 
             // V5C and Tracker Badges
             const v5cCount = m.v5c_count || 0;
+            const transferProofCount = m.transfer_proof_count || 0;
             const trackersCount = m.trackers_count || 0;
             
             let v5cBadge = '';
             if (v5cCount > 0) {
-                v5cBadge = `<span class="badge" style="background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3); font-size:0.75rem; cursor:pointer;" title="View ${v5cCount} V5C document(s)" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">📄 ${v5cCount} Doc${v5cCount > 1 ? 's' : ''}</span>`;
+                v5cBadge = `<span class="badge" style="background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3); font-size:0.75rem; cursor:pointer;" title="Official V5C Logbook on file (${v5cCount} doc(s))" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">📄 ${v5cCount} V5C</span>`;
+            } else if (transferProofCount > 0) {
+                v5cBadge = `<span class="badge" style="background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-size:0.75rem; cursor:pointer; font-weight:700;" title="⏳ Transfer Slip on file, awaiting postal V5C from DVLA" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">⏳ Slip OK (No V5C)</span>`;
             } else {
                 v5cBadge = `<span class="badge" style="background: rgba(239,68,68,0.16); color: #fca5a5; border: 1px solid rgba(239,68,68,0.38); font-size:0.75rem; cursor:pointer; font-weight:700;" title="⚠️ Missing V5C Logbook! Click to attach" onclick="abrirModalMoto('${escapeHtml(m.placa)}', 'tabV5C', motosCache['${escapeHtml(m.placa)}'])">⚠️ No V5C</span>`;
             }
@@ -402,6 +411,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (val === 'missing_v5c') {
                 statusFiltro = '';
                 v5cFiltro = 'missing';
+            } else if (val === 'awaiting_v5c') {
+                statusFiltro = '';
+                v5cFiltro = 'awaiting';
+            } else if (val === 'no_v5c_no_slip') {
+                statusFiltro = '';
+                v5cFiltro = 'no_slip';
             } else if (val === 'all') {
                 statusFiltro = 'all';
                 v5cFiltro = '';

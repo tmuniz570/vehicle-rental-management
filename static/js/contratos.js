@@ -215,7 +215,11 @@ async function carregarContratos() {
                 const tagStr = tags.length > 0 ? tags.join(' + ') : 'Pending';
                 pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Motorbike cannot be released until check-out photos and insurance certificate are registered">⚠️ Needs ${safeEscape(tagStr)}</span></div>`;
             } else if (c.needs_v5c) {
-                pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(6, 182, 212, 0.18); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement pending vehicle Logbook (V5C) attachment">📑 Needs V5C</span></div>`;
+                if (c.tem_transfer_proof || (c.transfer_proof_count > 0)) {
+                    pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement has provisional transfer slip on file, awaiting official postal V5C logbook">⏳ Needs V5C (Slip OK)</span></div>`;
+                } else {
+                    pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(6, 182, 212, 0.18); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement pending vehicle Logbook (V5C) attachment">📑 Needs V5C</span></div>`;
+                }
             }
 
             // Signature Status Pill

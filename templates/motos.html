@@ -43,7 +43,7 @@
     <div class="kpi-card" data-filter="missing_v5c" id="kpiCard_missing_v5c" title="Click to filter Bikes missing V5C logbook">
         <div class="kpi-title"><span>Missing V5C</span> <span>⚠️</span></div>
         <div class="kpi-value" style="color: #f87171;" id="kpiVal_missing_v5c">-</div>
-        <div class="kpi-sub">Logbook required</div>
+        <div class="kpi-sub" id="kpiSub_missing_v5c">Logbook required</div>
     </div>
     <div class="kpi-card" data-filter="warnings" id="kpiCard_warnings" title="Click to filter TAX & MOT expiry warnings (&le;30d)">
         <div class="kpi-title"><span>Compliance Alerts</span> <span>🛡️</span></div>
@@ -62,7 +62,9 @@
         <option value="Maintenance">Maintenance</option>
         <option value="Pound">🏛️ Pound (Outside Operation)</option>
         <option value="Sold">Sold</option>
-        <option value="missing_v5c">⚠️ Missing V5C</option>
+        <option value="missing_v5c">⚠️ Missing Official V5C (All)</option>
+        <option value="awaiting_v5c">⏳ Awaiting V5C (Slip on File)</option>
+        <option value="no_v5c_no_slip">🛑 No V5C &amp; No Slip</option>
         <option value="warnings">🛡️ TAX & MOT Alerts (&le;30d)</option>
         <option value="sorn">🛡️ SORN</option>
     </select>
@@ -192,6 +194,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/moto_modal_shared.js?v=6"></script>
-<script src="/static/js/motos.js?v=15"></script>
+<script src="/static/js/moto_modal_shared.js?v=7"></script>
+<script src="/static/js/motos.js?v=16"></script>
 {% endblock %}

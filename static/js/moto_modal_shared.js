@@ -4,6 +4,7 @@
  */
 
 let currentMotoPlaca = null;
+let currentContratoId = null;
 let selectedV5CFiles = []; // Accumulator for V5C document/page photos (camera + gallery)
 let selectedTrackerPhotos = []; // Accumulator for tracker photos (camera + gallery)
 
@@ -85,70 +86,146 @@ function alternarAba(tabId) {
     });
 }
 
-// Render V5C list
+// Helper to render individual V5C or Transfer Proof card
+function renderV5CCard(doc, idx) {
+    const isPdf = doc.tipo_arquivo === 'pdf';
+    const isTransfer = (doc.categoria_doc || 'v5c') === 'transfer_proof';
+    const dateStr = doc.data_criacao ? doc.data_criacao.substring(0, 10) : '';
+    const catBadge = isTransfer
+        ? `<span class="badge" style="background: rgba(245,158,11,0.18); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-size: 0.68rem; font-weight: 700;">📋 Transfer Slip (Provisional)</span>`
+        : `<span class="badge" style="background: rgba(6,182,212,0.18); color: #22d3ee; border: 1px solid rgba(6,182,212,0.4); font-size: 0.68rem; font-weight: 700;">✓ Official V5C Logbook</span>`;
+
+    const previewHtml = isPdf ? `
+        <div style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border-bottom: 1px solid var(--border-color);">
+            <span style="font-size: 2.5rem;">📑</span>
+            <span style="font-size: 0.75rem; font-weight: 700; color: #ef4444; margin-top: 4px;">PDF DOCUMENT</span>
+        </div>
+    ` : `
+        <div style="height: 120px; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', '${isTransfer ? 'Transfer Slip' : 'V5C'} - ${escapeHtml(doc.nome_original || 'Doc ' + (idx + 1))}')">
+            <img src="${escapeHtml(doc.url_arquivo)}" alt="Document Page" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        </div>
+    `;
+
+    const viewAction = isPdf ? `
+        <a href="${escapeHtml(doc.url_arquivo)}" target="_blank" rel="noopener" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+            <span>↗ Open</span>
+        </a>
+    ` : `
+        <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', '${isTransfer ? 'Transfer Slip' : 'V5C'} - ${escapeHtml(doc.nome_original || 'Doc ' + (idx + 1))}')">
+            <span>🔍 Zoom</span>
+        </button>
+    `;
+
+    return `
+        <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;">
+            ${previewHtml}
+            <div style="padding: 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="margin-bottom: 6px;">
+                        ${catBadge}
+                    </div>
+                    <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); word-break: break-all; margin-bottom: 4px;" title="${escapeHtml(doc.nome_original)}">
+                        ${escapeHtml(doc.nome_original || `Attachment #${doc.id}`)}
+                    </div>
+                    <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+                        <span>${dateStr ? `Added ${dateStr}` : ''} ${doc.criado_por_nome ? `by ${escapeHtml(doc.criado_por_nome)}` : ''}</span>
+                        ${doc.id_contrato ? `<span class="badge" style="background: rgba(255,255,255,0.06); color: #94a3b8; font-size: 0.68rem; padding: 1px 5px;">Deal #${doc.id_contrato}</span>` : ''}
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; pt: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                    ${viewAction}
+                    <button type="button" class="btn-danger" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; cursor: pointer; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); border-radius: 6px;" onclick="removerV5C(${doc.id})">
+                        <span>🗑️ Remove</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Render V5C & Transfer Proof documents list
 function renderV5CList(v5cList) {
     const container = document.getElementById('v5cListContainer');
     const countBadge = document.getElementById('badgeCountV5C');
-    if (countBadge) countBadge.textContent = v5cList.length;
+
+    const list = v5cList || [];
+    const transferSlips = list.filter(d => (d.categoria_doc || 'v5c') === 'transfer_proof');
+    const officialV5Cs = list.filter(d => (d.categoria_doc || 'v5c') === 'v5c');
+
+    if (countBadge) {
+        if (officialV5Cs.length > 0) {
+            countBadge.textContent = `${officialV5Cs.length} V5C`;
+            countBadge.style.background = 'rgba(6,182,212,0.2)';
+            countBadge.style.color = '#22d3ee';
+        } else if (transferSlips.length > 0) {
+            countBadge.textContent = `Slip (${transferSlips.length})`;
+            countBadge.style.background = 'rgba(245,158,11,0.2)';
+            countBadge.style.color = '#fbbf24';
+        } else {
+            countBadge.textContent = '0';
+            countBadge.style.background = 'rgba(239,68,68,0.2)';
+            countBadge.style.color = '#fca5a5';
+        }
+    }
 
     if (!container) return;
-    if (!v5cList || v5cList.length === 0) {
+
+    if (list.length === 0) {
         container.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; color: var(--text-secondary); padding: 2rem 1rem; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(255,255,255,0.01);">
+            <div style="text-align: center; color: var(--text-secondary); padding: 2rem 1rem; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(255,255,255,0.01);">
                 <div style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.7;">📄</div>
-                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">No V5C Documents Attached</div>
-                <div style="font-size: 0.8rem;">Attach photos of the V5C logbook pages or the digital PDF certificate above.</div>
+                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">No Registration Documents Attached</div>
+                <div style="font-size: 0.8rem;">Attach the provisional transfer slip (while waiting for DVLA) or the official V5C logbook above.</div>
             </div>
         `;
         return;
     }
 
-    container.innerHTML = v5cList.map((doc, idx) => {
-        const isPdf = doc.tipo_arquivo === 'pdf';
-        const dateStr = doc.data_criacao ? doc.data_criacao.substring(0, 10) : '';
-        const previewHtml = isPdf ? `
-            <div style="height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border-bottom: 1px solid var(--border-color);">
-                <span style="font-size: 2.5rem;">📑</span>
-                <span style="font-size: 0.75rem; font-weight: 700; color: #ef4444; margin-top: 4px;">PDF DOCUMENT</span>
+    container.innerHTML = `
+        <!-- Section 1: Transfer Proof (Provisional) -->
+        <div style="margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.4rem;">
+                <h4 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #fbbf24; display: flex; align-items: center; gap: 6px;">
+                    <span>📋</span> DVLA Transfer Slip / Proof (Provisional)
+                    <span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24; font-size: 0.72rem; padding: 1px 6px;">${transferSlips.length}</span>
+                </h4>
+                ${transferSlips.length > 0 
+                    ? `<span style="font-size: 0.74rem; color: #fbbf24; font-weight: 600; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); padding: 2px 8px; border-radius: 4px;">⏳ Proof on File - Waiting for Official V5C</span>` 
+                    : ''}
             </div>
-        ` : `
-            <div style="height: 120px; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', 'V5C - ${escapeHtml(doc.nome_original || 'Page ' + (idx + 1))}')">
-                <img src="${escapeHtml(doc.url_arquivo)}" alt="V5C Page" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-            </div>
-        `;
-
-        const viewAction = isPdf ? `
-            <a href="${escapeHtml(doc.url_arquivo)}" target="_blank" rel="noopener" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
-                <span>↗ Open</span>
-            </a>
-        ` : `
-            <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', 'V5C - ${escapeHtml(doc.nome_original || 'Page ' + (idx + 1))}')">
-                <span>🔍 Zoom</span>
-            </button>
-        `;
-
-        return `
-            <div style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;">
-                ${previewHtml}
-                <div style="padding: 0.75rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
-                    <div>
-                        <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary); word-break: break-all; margin-bottom: 4px;" title="${escapeHtml(doc.nome_original)}">
-                            ${escapeHtml(doc.nome_original || `V5C Attachment #${doc.id}`)}
-                        </div>
-                        <div style="font-size: 0.72rem; color: var(--text-secondary);">
-                            ${dateStr ? `Added ${dateStr}` : ''} ${doc.criado_por_nome ? `by ${escapeHtml(doc.criado_por_nome)}` : ''}
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; pt: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
-                        ${viewAction}
-                        <button type="button" class="btn-danger" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; cursor: pointer; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); border-radius: 6px;" onclick="removerV5C(${doc.id})">
-                            <span>🗑️ Remove</span>
-                        </button>
-                    </div>
+            ${transferSlips.length > 0 ? `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem;">
+                    ${transferSlips.map(renderV5CCard).join('')}
                 </div>
+            ` : `
+                <div style="padding: 0.75rem 1rem; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.78rem; color: var(--text-secondary); background: rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px;">
+                    <span>ℹ️</span> No provisional transfer slip attached. You can attach the New Keeper Slip (V5C/2) or DVLA confirmation above.
+                </div>
+            `}
+        </div>
+
+        <!-- Section 2: Official V5C Logbook (Final DVLA Document) -->
+        <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem; flex-wrap: wrap; gap: 0.4rem;">
+                <h4 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #22d3ee; display: flex; align-items: center; gap: 6px;">
+                    <span>📄</span> Official V5C Logbook (Final DVLA Document)
+                    <span class="badge" style="background: rgba(6,182,212,0.15); color: #22d3ee; font-size: 0.72rem; padding: 1px 6px;">${officialV5Cs.length}</span>
+                </h4>
+                ${officialV5Cs.length > 0 
+                    ? `<span style="font-size: 0.74rem; color: #4ade80; font-weight: 600; background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); padding: 2px 8px; border-radius: 4px;">✓ Logbook Received &amp; Verified</span>` 
+                    : `<span style="font-size: 0.74rem; color: #f87171; font-weight: 600; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); padding: 2px 8px; border-radius: 4px;">⚠️ Official Logbook Not on File</span>`}
             </div>
-        `;
-    }).join('');
+            ${officialV5Cs.length > 0 ? `
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem;">
+                    ${officialV5Cs.map(renderV5CCard).join('')}
+                </div>
+            ` : `
+                <div style="padding: 0.75rem 1rem; border: 1px dashed rgba(239,68,68,0.3); border-radius: 8px; font-size: 0.78rem; color: #fca5a5; background: rgba(239,68,68,0.06); display: flex; align-items: center; gap: 8px;">
+                    <span>⚠️</span> Official V5C Logbook not yet received from DVLA. Missing V5C alert remains active until uploaded.
+                </div>
+            `}
+        </div>
+    `;
 }
 
 // Render Trackers list
@@ -293,6 +370,7 @@ async function abrirModalMoto(placa, activeTab = 'tabInfo', initialData = null) 
     }
     
     currentMotoPlaca = placa;
+    currentContratoId = (initialData && initialData.id_contrato) ? initialData.id_contrato : null;
     
     // Fill basic details from initialData or cache if available
     const dispPlaca = document.getElementById('modalDisplayPlaca');
@@ -328,6 +406,9 @@ async function abrirModalMoto(placa, activeTab = 'tabInfo', initialData = null) 
     
     // Reset V5C staged accumulator
     selectedV5CFiles = [];
+    const radioV5C = document.getElementById('docTypeV5C');
+    if (radioV5C) radioV5C.checked = true;
+    updateV5CDocCategoryUI();
     renderV5CStagedPreview();
     const v5cStatus = document.getElementById('v5cUploadStatus');
     if (v5cStatus) v5cStatus.style.display = 'none';
@@ -403,6 +484,58 @@ function updateModalTaxSornState() {
     }
 }
 
+// Helper to get selected V5C / Transfer Proof document category
+function getSelectedV5CCategory() {
+    const radio = document.querySelector('input[name="v5cDocCategory"]:checked');
+    return radio ? radio.value : 'v5c';
+}
+
+function updateV5CDocCategoryUI() {
+    const isTransfer = getSelectedV5CCategory() === 'transfer_proof';
+    const lblV5C = document.getElementById('lblDocTypeV5C');
+    const lblTransfer = document.getElementById('lblDocTypeTransfer');
+    const hint = document.getElementById('v5cUploadHint');
+    const btnUpload = document.getElementById('btnUploadV5C');
+    const stagedTitle = document.getElementById('v5cStagedTitle');
+    const count = selectedV5CFiles.length;
+
+    if (lblV5C && lblTransfer) {
+        if (isTransfer) {
+            lblTransfer.style.borderColor = '#fbbf24';
+            lblTransfer.style.background = 'rgba(245,158,11,0.14)';
+            lblV5C.style.borderColor = 'rgba(255,255,255,0.1)';
+            lblV5C.style.background = 'rgba(255,255,255,0.02)';
+        } else {
+            lblV5C.style.borderColor = '#22d3ee';
+            lblV5C.style.background = 'rgba(6,182,212,0.12)';
+            lblTransfer.style.borderColor = 'rgba(255,255,255,0.1)';
+            lblTransfer.style.background = 'rgba(255,255,255,0.02)';
+        }
+    }
+
+    if (hint) {
+        if (isTransfer) {
+            hint.style.borderLeftColor = '#fbbf24';
+            hint.textContent = 'Attach photo of the Green New Keeper Slip (V5C/2) or DVLA Online Transfer PDF. The system stores proof of ownership while keeping the "Waiting for V5C" alert active until the postal logbook arrives.';
+        } else {
+            hint.style.borderLeftColor = '#22d3ee';
+            hint.textContent = 'Attach photos of the official V5C logbook pages or digital PDF certificate. Uploading this completes registration compliance and clears the missing V5C alert.';
+        }
+    }
+
+    if (stagedTitle) {
+        const docLabel = isTransfer ? 'Transfer Slip Files' : 'Official V5C Pages';
+        stagedTitle.innerHTML = `Queued ${docLabel} (<span id="v5cStagedCount">${count}</span>):`;
+    }
+
+    if (btnUpload) {
+        const docTarget = isTransfer ? 'Transfer Proof' : 'Official V5C';
+        btnUpload.innerHTML = count > 0 
+            ? `<span>⬆️</span> Upload to ${docTarget} (${count} file${count > 1 ? 's' : ''})`
+            : `<span>⬆️</span> Upload to ${docTarget} (0 files)`;
+    }
+}
+
 // Format bytes helper for V5C staged files
 function formatV5CFileSize(bytes) {
     if (!bytes || bytes === 0) return '0 B';
@@ -425,19 +558,22 @@ function renderV5CStagedPreview() {
     const count = selectedV5CFiles.length;
     if (stagedCount) stagedCount.textContent = count;
 
+    const isTransfer = getSelectedV5CCategory() === 'transfer_proof';
+    const docTarget = isTransfer ? 'Transfer Proof' : 'Official V5C';
+
     if (count === 0) {
         container.style.display = 'none';
         previewGrid.innerHTML = '';
         if (btnClear) btnClear.style.display = 'none';
         btnUpload.disabled = true;
-        btnUpload.innerHTML = '<span>⬆️</span> Upload to V5C (0 pages)';
+        btnUpload.innerHTML = `<span>⬆️</span> Upload to ${docTarget} (0 files)`;
         return;
     }
 
     container.style.display = 'block';
     if (btnClear) btnClear.style.display = 'inline-flex';
     btnUpload.disabled = false;
-    btnUpload.innerHTML = `<span>⬆️</span> Upload to V5C (${count} page${count > 1 ? 's' : ''})`;
+    btnUpload.innerHTML = `<span>⬆️</span> Upload to ${docTarget} (${count} file${count > 1 ? 's' : ''})`;
 
     previewGrid.innerHTML = selectedV5CFiles.map((file, idx) => {
         const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -505,9 +641,9 @@ async function removerTracker(trackerId, numero) {
     }
 }
 
-// Remove V5C
+// Remove V5C or Transfer Proof document
 async function removerV5C(v5cId) {
-    if (!confirm(`Are you sure you want to delete this V5C document from motorbike ${currentMotoPlaca}?`)) {
+    if (!confirm(`Are you sure you want to delete this document from motorbike ${currentMotoPlaca}?`)) {
         return;
     }
 
@@ -664,6 +800,14 @@ document.addEventListener('DOMContentLoaded', () => {
         btnClearV5CStaged.addEventListener('click', limparV5CStaged);
     }
 
+    // V5C Document Category radio selection listener
+    document.querySelectorAll('input[name="v5cDocCategory"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            updateV5CDocCategoryUI();
+            renderV5CStagedPreview();
+        });
+    });
+
     if (v5cUploadForm) {
         v5cUploadForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -671,19 +815,27 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!currentMotoPlaca) return;
 
             const count = selectedV5CFiles.length;
+            const catDoc = getSelectedV5CCategory();
+            const isTransfer = catDoc === 'transfer_proof';
+            const catLabel = isTransfer ? 'Transfer Slip' : 'Official V5C';
+
             const formData = new FormData();
+            formData.append('categoria_doc', catDoc);
+            if (currentContratoId) {
+                formData.append('id_contrato', currentContratoId);
+            }
             selectedV5CFiles.forEach(file => {
                 formData.append('v5c_arquivos', file);
             });
 
             if (btnUploadV5C) {
                 btnUploadV5C.disabled = true;
-                btnUploadV5C.innerHTML = `<span>⏳</span> Uploading ${count} page(s)...`;
+                btnUploadV5C.innerHTML = `<span>⏳</span> Uploading ${count} ${catLabel} page(s)...`;
             }
             if (v5cUploadStatus) {
                 v5cUploadStatus.style.display = 'block';
-                v5cUploadStatus.style.color = '#22d3ee';
-                v5cUploadStatus.textContent = `Uploading ${count} page(s) to motorbike ${currentMotoPlaca}...`;
+                v5cUploadStatus.style.color = isTransfer ? '#fbbf24' : '#22d3ee';
+                v5cUploadStatus.textContent = `Uploading ${count} ${catLabel} file(s) to motorbike ${currentMotoPlaca}...`;
             }
 
             try {
@@ -694,10 +846,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const result = await res.json();
                 if (res.ok) {
                     selectedV5CFiles = [];
+                    updateV5CDocCategoryUI();
                     renderV5CStagedPreview();
                     if (v5cUploadStatus) {
                         v5cUploadStatus.style.color = '#4ade80';
-                        v5cUploadStatus.textContent = result.message || result.mensagem || `${count} V5C page(s) uploaded successfully!`;
+                        v5cUploadStatus.textContent = result.message || result.mensagem || `${count} ${catLabel} file(s) uploaded successfully!`;
                         setTimeout(() => {
                             if (v5cUploadStatus) v5cUploadStatus.style.display = 'none';
                         }, 4000);
@@ -707,7 +860,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.onMotoModalUpdated(currentMotoPlaca);
                     }
                 } else {
-                    const errMsg = result.erro || result.error || 'Failed to upload V5C documents';
+                    const errMsg = result.erro || result.error || 'Failed to upload document(s)';
                     if (v5cUploadStatus) {
                         v5cUploadStatus.style.color = '#ef4444';
                         v5cUploadStatus.textContent = errMsg;
@@ -717,16 +870,18 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch(err) {
                 if (v5cUploadStatus) {
                     v5cUploadStatus.style.color = '#ef4444';
-                    v5cUploadStatus.textContent = 'Connection error uploading V5C files';
+                    v5cUploadStatus.textContent = 'Connection error uploading files';
                 }
-                alert('Connection error uploading V5C files');
+                alert('Connection error uploading files');
             } finally {
                 if (btnUploadV5C) {
                     const remaining = selectedV5CFiles.length;
+                    const curCat = getSelectedV5CCategory();
+                    const docTarget = curCat === 'transfer_proof' ? 'Transfer Proof' : 'Official V5C';
                     btnUploadV5C.disabled = remaining === 0;
                     btnUploadV5C.innerHTML = remaining > 0
-                        ? `<span>⬆️</span> Upload to V5C (${remaining} page${remaining > 1 ? 's' : ''})`
-                        : `<span>⬆️</span> Upload to V5C (0 pages)`;
+                        ? `<span>⬆️</span> Upload to ${docTarget} (${remaining} page${remaining > 1 ? 's' : ''})`
+                        : `<span>⬆️</span> Upload to ${docTarget} (0 files)`;
                 }
             }
         });

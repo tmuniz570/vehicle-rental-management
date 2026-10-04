@@ -22,7 +22,7 @@
                 <span>🛵 Details & Status</span>
             </button>
             <button type="button" class="tab-btn" data-tab="tabV5C" style="padding: 0.6rem 1rem; border: none; background: transparent; color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
-                <span>📄 V5C Logbook</span>
+                <span>📄 V5C &amp; Registration</span>
                 <span id="badgeCountV5C" class="badge" style="background: rgba(6,182,212,0.2); color: #22d3ee; font-size: 0.72rem; padding: 1px 6px;">0</span>
             </button>
             <button type="button" class="tab-btn" data-tab="tabTrackers" style="padding: 0.6rem 1rem; border: none; background: transparent; color: var(--text-secondary); font-weight: 500; font-size: 0.9rem; border-bottom: 2px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
@@ -91,14 +91,39 @@
                 </form>
             </div>
 
-            <!-- TAB 2: V5C LOGBOOK -->
+            <!-- TAB 2: V5C LOGBOOK & PROVISIONAL TRANSFER SLIP -->
             <div id="tabV5C" class="tab-pane" style="display: none;">
                 <div style="margin-bottom: 1.25rem; padding: 1rem; background: rgba(6,182,212,0.06); border: 1px solid rgba(6,182,212,0.25); border-radius: 12px;">
-                    <h4 style="margin: 0 0 0.4rem 0; font-size: 0.95rem; color: #22d3ee; display: flex; align-items: center; gap: 6px;">
-                        <span>📄</span> Attach V5C Document / Page Photos
-                    </h4>
-                    <p style="margin: 0 0 0.85rem 0; font-size: 0.82rem; color: var(--text-secondary);">
-                        Attach photos of the V5C logbook pages (e.g. Page 1, Page 2) or upload the complete digital PDF certificate.
+                    
+                    <!-- Document Category Selector -->
+                    <div style="margin-bottom: 0.85rem;">
+                        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.45rem;">
+                            Document Type to Attach:
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.6rem;">
+                            <label id="lblDocTypeV5C" style="display: flex; align-items: flex-start; gap: 8px; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1.5px solid #22d3ee; background: rgba(6,182,212,0.12); cursor: pointer; transition: all 0.2s;">
+                                <input type="radio" name="v5cDocCategory" id="docTypeV5C" value="v5c" checked style="margin-top: 2px; accent-color: #22d3ee;">
+                                <div>
+                                    <strong style="color: #22d3ee; font-size: 0.85rem; display: block;">📄 Official V5C Logbook (Final)</strong>
+                                    <span style="color: var(--text-secondary); font-size: 0.75rem; line-height: 1.3; display: block; margin-top: 2px;">
+                                        Complete DVLA logbook pages/PDF. Clears the missing V5C alert.
+                                    </span>
+                                </div>
+                            </label>
+                            <label id="lblDocTypeTransfer" style="display: flex; align-items: flex-start; gap: 8px; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1.5px solid rgba(245,158,11,0.3); background: rgba(245,158,11,0.04); cursor: pointer; transition: all 0.2s;">
+                                <input type="radio" name="v5cDocCategory" id="docTypeTransfer" value="transfer_proof" style="margin-top: 2px; accent-color: #fbbf24;">
+                                <div>
+                                    <strong style="color: #fbbf24; font-size: 0.85rem; display: block;">📋 Transfer Slip / Proof (Provisional)</strong>
+                                    <span style="color: var(--text-secondary); font-size: 0.75rem; line-height: 1.3; display: block; margin-top: 2px;">
+                                        New Keeper Slip (V5C/2) or DVLA online confirmation. Keeps V5C waiting alert active.
+                                    </span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <p id="v5cUploadHint" style="margin: 0 0 0.85rem 0; font-size: 0.82rem; color: var(--text-secondary); background: rgba(0,0,0,0.2); padding: 0.5rem 0.75rem; border-radius: 6px; border-left: 3px solid #22d3ee;">
+                        Attach photos of the official V5C logbook pages or digital PDF certificate.
                     </p>
                     
                     <form id="v5cUploadForm" style="display: flex; flex-direction: column; gap: 0.85rem;">
@@ -108,7 +133,7 @@
 
                         <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center;">
                             <button type="button" id="btnV5CCamera" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(34,211,238,0.4); color: #22d3ee; background: rgba(34,211,238,0.08); font-weight: 600;">
-                                <span>📸</span> Take Page Photo (Camera)
+                                <span>📸</span> Take Document Photo (Camera)
                             </button>
                             <button type="button" id="btnV5CGallery" class="btn-secondary" style="padding: 0.65rem 1.1rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 6px;">
                                 <span>📁</span> Photo Library / PDF
@@ -121,7 +146,7 @@
                         <!-- Staged preview container: displays thumbnails of captured pages before upload -->
                         <div id="v5cStagedContainer" style="display: none; background: rgba(0,0,0,0.25); border: 1px dashed rgba(34,211,238,0.35); border-radius: 10px; padding: 0.75rem;">
                             <div style="font-size: 0.78rem; font-weight: 600; color: #22d3ee; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                                <span>Queued Pages (<span id="v5cStagedCount">0</span>) - You can take more photos before uploading:</span>
+                                <span id="v5cStagedTitle">Queued Document Files (<span id="v5cStagedCount">0</span>):</span>
                             </div>
                             <div id="v5cStagedPreview" style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: flex-start;">
                                 <!-- Dynamic thumbnails with remove buttons -->
@@ -129,8 +154,8 @@
                         </div>
 
                         <div style="display: flex; justify-content: flex-end; align-items: center;">
-                            <button type="submit" id="btnUploadV5C" class="btn-primary" style="padding: 0.7rem 1.4rem; font-size: 0.88rem; width: 100%; max-width: 280px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" disabled>
-                                <span>⬆️</span> Upload to V5C (0 pages)
+                            <button type="submit" id="btnUploadV5C" class="btn-primary" style="padding: 0.7rem 1.4rem; font-size: 0.88rem; width: 100%; max-width: 340px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" disabled>
+                                <span>⬆️</span> Upload to Official V5C (0 files)
                             </button>
                         </div>
                     </form>
@@ -138,11 +163,8 @@
                 </div>
 
                 <div style="margin-top: 1rem;">
-                    <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--text-primary);">
-                        Attached V5C Documents &amp; Pages
-                    </h4>
-                    <div id="v5cListContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.85rem;">
-                        <!-- Injetado dinamicamente via JS -->
+                    <div id="v5cListContainer">
+                        <!-- Injetado dinamicamente via JS (seções separadas para Transfer Slip e Official V5C) -->
                     </div>
                 </div>
             </div>

@@ -4,6 +4,45 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.28] — 2026-10-04 — *Provisional Transfer Slip (V5C/2) & Official V5C Segregation with Persistent Compliance Alerts*
+
+### 📋 Segregação de Comprovante de Transferência Provisório vs. Logbook V5C Oficial
+* **Desafio Operacional do Padrão Britânico**:
+  - No Reino Unido, a transferência de titularidade de um veículo entrega de imediato ao comprador o *Green New Keeper Slip (V5C/2)* ou confirmação online da DVLA, enquanto o livrete oficial (*V5C Logbook*) leva de 2 a 4 semanas para ser entregue pelo correio.
+  - A FF Motors precisava armazenar o comprovante provisório sem que isso desativasse o alerta de falta de V5C no sistema, permitindo acompanhar quais motos ainda aguardam o documento físico final.
+* **Modelo de Dados & Migração Autônoma (`database.py`)**:
+  - Adicionada a coluna `categoria_doc VARCHAR(30) DEFAULT 'v5c' NOT NULL` e o índice `idx_moto_v5c_categoria` na tabela `moto_v5c`.
+  - Migração autônoma no `init_db(app)` compatível com PostgreSQL e SQLite (`ALTER TABLE moto_v5c ADD COLUMN categoria_doc...`).
+  - Segregação de categorias: `'transfer_proof'` (comprovante provisório) vs. `'v5c'` (livrete oficial definitivo).
+* **Alerta Inteligente de 3 Níveis (Persistent Compliance Alerting)**:
+  - 🔴 **No V5C** (`no_v5c_no_slip`): Nem comprovante nem V5C oficial anexados. Alerta vermelho urgente.
+  - 🟡 **Awaiting V5C / Slip on File** (`awaiting_v5c`): Comprovante provisório anexado. O alerta **permanece ativo** no Dashboard e na Frota, diferenciado visualmente com a tag âmbar `⏳ Slip OK`.
+  - 🟢 **V5C on File** (`has_v5c`): Logbook oficial definitivo anexado; o alerta de V5C é liberado e concluído.
+* **Regra Estrita de Finalização em Contratos de Compra (`Purchase`)**:
+  - Contratos do tipo `ContractType.PURCHASE` continuam exigindo obrigatoriamente o **V5C oficial definitivo** (`categoria_doc == 'v5c'`) e a assinatura do vendedor para conclusão automática (`Completed`).
+  - Upload de comprovante provisório mantém o contrato com status `Active` e alerta explícito de que o recibo está anexado aguardando o V5C dos correios.
+* **Interface & Modal de Gestão da Moto (`moto_manage_modal.html` & `moto_modal_shared.js`)**:
+  - Aba renomeada para **"V5C & Registration"**.
+  - Seletor com cards tipo rádio interativos entre *Official V5C Logbook* e *Transfer Slip / Proof*.
+  - Subseções separadas para visualização dos arquivos: área dedicada para comprovantes provisórios (`📋 Transfer Slip`) e área para páginas do logbook oficial (`✓ Official V5C`).
+  - Prefixação semântica de arquivos salvos em disco (`transfer_slip_...` vs `v5c_...`).
+* **Filtros e Visualização na Gestão de Frotas (`motos.html` & `motos.js`)**:
+  - Badges na tabela da frota: `📄 N V5C` (Ciano), `⏳ Slip OK (No V5C)` (Âmbar) ou `⚠️ No V5C` (Vermelho).
+  - Subtítulo dinâmico no card KPI: exibe a divisão em tempo real (ex: `N slip / M no slip`).
+  - Novos filtros no dropdown: `Missing Official V5C (All)`, `Awaiting V5C (Slip on File)` e `No V5C & No Slip`.
+* **Painel Principal & Contratos (`index.html`, `detalhe_contrato.js`, `contratos.js`)**:
+  - Dashboard: exibe badge `⏳ Slip OK` para motos com comprovante provisório na lista de motos sem V5C.
+  - Detalhe do Contrato & Lista: botão de atalho `#btnShortcutV5C` e badge de compliance assumem estado âmbar `⏳ Slip` caso haja comprovante em arquivo.
+* **Preservação de Histórico & Imunidade de Contratos na Recompra de Motos**:
+  - Resolução arquitetural para o ciclo de vida completo de veículos recomprados pela empresa (Compra #1 &rarr; Venda &rarr; Recompra #3).
+  - Adicionada coluna `id_contrato` em `moto_v5c` associando comprovantes e V5Cs diretamente ao contrato de compra correspondente com badge `Deal #X` no modal.
+  - Função `get_purchase_contract_v5c_docs` no backend isola o ciclo temporal de cada contrato, impedindo que uma recompra recente utilize inadvertidamente o V5C antigo de anos anteriores.
+  - Imunidade permanente em `sync_purchase_contract_status`: contratos de compra passados já concluídos (`Completed`) tornam-se imutáveis e **nunca são reabertos para Active**, mesmo se novos documentos forem adicionados ou removidos da moto.
+  - O cofre documental retém todo o histórico vitalício de transferências e V5Cs de todos os proprietários da moto.
+  - Sincronização de Filtros e Alertas: O filtro de compras pendentes de V5C (`status=pending_v5c` e KPI `Missing V5C`), os alertas do Dashboard (`compras_pendentes_v5c` e `motos_sem_v5c`) e os filtros de frota (`v5c=missing`, `v5c=awaiting`) agora isolam o ciclo ativo, garantindo que contratos e motos de recompra sem o V5C do ciclo atual apareçam imediatamente nos filtros e alertas com a indicação precisa de comprovante provisório anexado (`⏳ Slip on file`).
+* **Testes Automatizados**:
+  - Atualizado `tests/test_v5c_transfer_proof.py` com `run_repurchase_cycle_and_immunity_tests()` cobrindo o ciclo completo de recompra, isolamento de ciclo e blindagem de contratos históricos concluídos, e validação de exibição em filtros e alertas (100% aprovado).
+
 ## [1.9.27] — 2026-10-04 — *Root Administrator Account Protection, Instant Payments Due Today Reminders & Comprehensive Security/Privacy Audit*
 
 ### 👑 Proteção e Imunidade da Conta Mestre (Root Administrator `tmuniz570@gmail.com`)

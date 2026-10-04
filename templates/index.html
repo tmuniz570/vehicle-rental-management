@@ -1458,9 +1458,12 @@
                 const comprasPend = dashData.compras_pendentes_v5c || [];
                 let itemsComprasHtml = '';
                 comprasPend.forEach(cp => {
+                    const statusDesc = cp.has_transfer_proof
+                        ? '<span style="color:#fbbf24; font-weight:700;">⏳ Slip on file (Awaiting Official V5C)</span>'
+                        : '<span style="color:#22d3ee; font-weight:600;">Awaiting Logbook (V5C)</span>';
                     itemsComprasHtml += `
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px 10px; background:rgba(0,0,0,0.25); border-radius:6px; font-size:0.8rem; flex-wrap:wrap; gap:6px;">
-                            <span>📑 Contract #${cp.id} (<strong style="font-family:monospace; color:var(--text-primary);">${escapeHtml(cp.placa)}</strong> - ${escapeHtml(cp.cliente)}) • <span style="color:#22d3ee; font-weight:600;">Awaiting Logbook (V5C)</span></span>
+                            <span>📑 Contract #${cp.id} (<strong style="font-family:monospace; color:var(--text-primary);">${escapeHtml(cp.placa)}</strong> - ${escapeHtml(cp.cliente)}) • ${statusDesc}</span>
                             <a href="/contratos/${cp.id}" style="color:#22d3ee; text-decoration:none; font-weight:600; margin-left:auto; white-space:nowrap;">Attach V5C &rarr;</a>
                         </div>
                     `;
@@ -1492,11 +1495,18 @@
                 let itemsV5CHtml = '<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">';
                 const displayMotos = motosSemV5C.slice(0, 10);
                 displayMotos.forEach(m => {
+                    const hasSlip = !!m.has_transfer_proof;
+                    const badgeHtml = hasSlip 
+                        ? `<span class="badge" style="background:rgba(245,158,11,0.25); color:#fbbf24; font-size:0.68rem; padding:1px 5px; font-weight:700;" title="Transfer slip on file - awaiting postal V5C from DVLA">⏳ Slip OK</span>`
+                        : `<span class="badge" style="background:rgba(239,68,68,0.25); color:#f87171; font-size:0.68rem; padding:1px 5px;" title="No V5C or transfer slip on file">No V5C</span>`;
+                    const borderHover = hasSlip ? '#fbbf24' : '#f87171';
+                    const borderBase = hasSlip ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)';
+
                     itemsV5CHtml += `
-                        <a href="/motos?search=${encodeURIComponent(m.placa)}&status=all" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(0,0,0,0.3); border:1px solid rgba(239,68,68,0.35); padding:4px 8px; border-radius:6px; font-size:0.78rem; transition:all 0.2s;" onmouseover="this.style.borderColor='#f87171'" onmouseout="this.style.borderColor='rgba(239,68,68,0.35)'">
+                        <a href="/motos?search=${encodeURIComponent(m.placa)}&status=all" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:rgba(0,0,0,0.3); border:1px solid ${borderBase}; padding:4px 8px; border-radius:6px; font-size:0.78rem; transition:all 0.2s;" onmouseover="this.style.borderColor='${borderHover}'" onmouseout="this.style.borderColor='${borderBase}'">
                             <strong style="font-family:monospace; color:var(--text-primary);">${escapeHtml(m.placa)}</strong>
                             <span style="color:var(--text-secondary); font-size:0.72rem;">${escapeHtml(m.modelo || 'Moto')}</span>
-                            <span class="badge" style="background:rgba(239,68,68,0.25); color:#f87171; font-size:0.68rem; padding:1px 5px;">No V5C</span>
+                            ${badgeHtml}
                         </a>
                     `;
                 });
@@ -1516,7 +1526,7 @@
                         <span class="badge badge-danger" style="font-size: 0.75rem;">Registration Missing</span>
                     </div>
                     <p style="margin: 0; color: var(--text-primary); font-size: 0.85rem;">
-                        Motorbikes in the active fleet without any registration certificate (V5C) documents or photos on file.
+                        Motorbikes in the active fleet without the official physical V5C logbook on file. Bikes with a provisional transfer slip are marked with ⏳ Slip OK while awaiting postal delivery from DVLA.
                     </p>
                     ${itemsV5CHtml}
                     <div style="margin-top: 8px;">

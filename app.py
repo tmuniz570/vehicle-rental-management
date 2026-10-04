@@ -688,8 +688,17 @@ def relatorio_fleet_pdf():
             query = query.filter(Motorcycle.tax_sorn == True)
             filter_desc = "SORN (Statutory Off Road Notification)"
         elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
-            query = query.filter(~Motorcycle.v5c_arquivos.any())
+            query = query.filter(~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c'))
             filter_desc = "Missing V5C Logbook"
+        elif sf_lower in ['awaiting_v5c', 'slip_on_file', 'com_slip']:
+            query = query.filter(
+                Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'transfer_proof'),
+                ~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')
+            )
+            filter_desc = "Awaiting V5C (Slip on File)"
+        elif sf_lower in ['no_v5c_no_slip', 'sem_nada']:
+            query = query.filter(~Motorcycle.v5c_arquivos.any())
+            filter_desc = "No V5C & No Transfer Slip"
         elif sf_lower in ['warnings', 'tax_mot_warnings', 'alert', 'alerts']:
             trinta_dias = hoje_date + timedelta(days=30)
             query = query.filter(
@@ -2221,6 +2230,26 @@ def listar_motos():
 
     hoje_date = datetime.now(pytz.timezone('Europe/London')).date()
 
+    # Mapeamento de contratos de compra ativos para ciclo de V5C atualizado (recompras)
+    active_purchases = Contract.query.filter(
+        Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
+    ).all()
+    active_purchases_map = {}
+    repurchase_missing_plates = []
+    repurchase_awaiting_plates = []
+    for ap in active_purchases:
+        p = (ap.moto_placa or ap.placa or '').strip().upper()
+        if p:
+            active_purchases_map[p] = ap
+            docs_ap = get_purchase_contract_v5c_docs(ap)
+            has_v5c_ap = any((getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for v in docs_ap)
+            has_slip_ap = any((getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof' for v in docs_ap)
+            if not has_v5c_ap:
+                repurchase_missing_plates.append(p)
+                if has_slip_ap:
+                    repurchase_awaiting_plates.append(p)
+
     if status_filter:
         sf_lower = status_filter.lower()
         if sf_lower in ['operational', 'in_operation', 'operacao', 'ativa', 'ativas', 'active']:
@@ -2234,6 +2263,21 @@ def listar_motos():
         elif sf_lower == 'sorn':
             query = query.filter(Motorcycle.tax_sorn == True)
         elif sf_lower in ['missing_v5c', 'no_v5c', 'sem_v5c']:
+            f_missing = [~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')]
+            if repurchase_missing_plates:
+                f_missing.append(Motorcycle.placa.in_(repurchase_missing_plates))
+            query = query.filter(db.or_(*f_missing))
+        elif sf_lower in ['awaiting_v5c', 'slip_on_file', 'com_slip']:
+            f_awaiting = [
+                db.and_(
+                    Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'transfer_proof'),
+                    ~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')
+                )
+            ]
+            if repurchase_awaiting_plates:
+                f_awaiting.append(Motorcycle.placa.in_(repurchase_awaiting_plates))
+            query = query.filter(db.or_(*f_awaiting))
+        elif sf_lower in ['no_v5c_no_slip', 'sem_nada']:
             query = query.filter(~Motorcycle.v5c_arquivos.any())
         elif sf_lower in ['warnings', 'tax_mot_warnings', 'alert', 'alerts']:
             trinta_dias = hoje_date + timedelta(days=30)
@@ -2257,6 +2301,21 @@ def listar_motos():
             query = query.filter(Motorcycle.status.ilike(status_filter))
 
     if v5c_filter in ['missing', 'none', 'sem', '0']:
+        f_missing = [~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')]
+        if repurchase_missing_plates:
+            f_missing.append(Motorcycle.placa.in_(repurchase_missing_plates))
+        query = query.filter(db.or_(*f_missing))
+    elif v5c_filter in ['awaiting', 'slip']:
+        f_awaiting = [
+            db.and_(
+                Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'transfer_proof'),
+                ~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')
+            )
+        ]
+        if repurchase_awaiting_plates:
+            f_awaiting.append(Motorcycle.placa.in_(repurchase_awaiting_plates))
+        query = query.filter(db.or_(*f_awaiting))
+    elif v5c_filter in ['no_docs', 'no_slip']:
         query = query.filter(~Motorcycle.v5c_arquivos.any())
 
     if search:
@@ -2273,7 +2332,20 @@ def listar_motos():
         if search.strip().lower() == 'sorn':
             search_filters.append(Motorcycle.tax_sorn == True)
         elif search.strip().lower() in ['missing_v5c', 'missing v5c', 'no v5c', 'sem v5c']:
-            search_filters.append(~Motorcycle.v5c_arquivos.any())
+            f_missing_search = [~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')]
+            if repurchase_missing_plates:
+                f_missing_search.append(Motorcycle.placa.in_(repurchase_missing_plates))
+            search_filters.append(db.or_(*f_missing_search))
+        elif search.strip().lower() in ['awaiting_v5c', 'awaiting v5c', 'slip on file', 'slip']:
+            f_awaiting_search = [
+                db.and_(
+                    Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'transfer_proof'),
+                    ~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')
+                )
+            ]
+            if repurchase_awaiting_plates:
+                f_awaiting_search.append(Motorcycle.placa.in_(repurchase_awaiting_plates))
+            search_filters.append(db.or_(*f_awaiting_search))
         query = query.filter(db.or_(*search_filters))
         
     sort_map = {
@@ -2316,6 +2388,15 @@ def listar_motos():
         active_c = next((c for c in contratos_sorted if c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold']), None)
         last_c = contratos_sorted[0] if contratos_sorted else None
 
+        active_purchase = active_purchases_map.get(m.placa)
+        if active_purchase:
+            docs_ciclo = get_purchase_contract_v5c_docs(active_purchase)
+            v5c_oficiais = [v for v in docs_ciclo if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c']
+            transfer_slips = [v for v in docs_ciclo if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof']
+        else:
+            v5c_oficiais = [v for v in (m.v5c_arquivos or []) if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c']
+            transfer_slips = [v for v in (m.v5c_arquivos or []) if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof']
+
         itens.append({
             'placa': m.placa,
             'modelo': m.modelo,
@@ -2326,7 +2407,10 @@ def listar_motos():
             'vencimento_tax': m.vencimento_tax.strftime('%Y-%m-%d') if m.vencimento_tax else None,
             'tax_sorn': bool(getattr(m, 'tax_sorn', False)),
             'notas_internas': m.notas_internas,
-            'v5c_count': len(m.v5c_arquivos) if m.v5c_arquivos else 0,
+            'v5c_count': len(v5c_oficiais),
+            'transfer_proof_count': len(transfer_slips),
+            'has_v5c': len(v5c_oficiais) > 0,
+            'has_transfer_proof': len(transfer_slips) > 0,
             'trackers_count': len(m.trackers) if m.trackers else 0,
             'trackers_summary': [{
                 'id': tr.id,
@@ -2350,6 +2434,8 @@ def listar_motos():
     kpi_pound = 0
     kpi_sold = 0
     kpi_missing_v5c = 0
+    kpi_awaiting_v5c = 0
+    kpi_no_v5c_no_slip = 0
     kpi_tax_mot_warnings = 0
 
     for mk in todas_motos_kpi:
@@ -2372,8 +2458,21 @@ def listar_motos():
         elif is_s:
             kpi_sold += 1
 
-        if not mk.v5c_arquivos:
+        active_purchase = active_purchases_map.get(mk.placa)
+        if active_purchase:
+            docs_ciclo = get_purchase_contract_v5c_docs(active_purchase)
+            has_v5c_official = any((getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for v in docs_ciclo)
+            has_transfer_slip = any((getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof' for v in docs_ciclo)
+        else:
+            has_v5c_official = any((getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for v in (mk.v5c_arquivos or []))
+            has_transfer_slip = any((getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof' for v in (mk.v5c_arquivos or []))
+
+        if not has_v5c_official:
             kpi_missing_v5c += 1
+            if has_transfer_slip:
+                kpi_awaiting_v5c += 1
+            else:
+                kpi_no_v5c_no_slip += 1
 
         if not is_p:
             is_sorn = bool(getattr(mk, 'tax_sorn', False))
@@ -2403,6 +2502,8 @@ def listar_motos():
             'pound': kpi_pound,
             'sold': kpi_sold,
             'missing_v5c': kpi_missing_v5c,
+            'awaiting_v5c': kpi_awaiting_v5c,
+            'no_v5c_no_slip': kpi_no_v5c_no_slip,
             'tax_mot_warnings': kpi_tax_mot_warnings
         }
     })
@@ -2636,6 +2737,9 @@ def detalhes_moto(placa):
     if not moto:
         return jsonify({'error': 'Motorbike not found', 'erro': 'Moto não encontrada'}), 404
         
+    v5c_oficiais = [v for v in (moto.v5c_arquivos or []) if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c']
+    transfer_slips = [v for v in (moto.v5c_arquivos or []) if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof']
+
     return jsonify({
         'placa': moto.placa,
         'modelo': moto.modelo,
@@ -2646,11 +2750,17 @@ def detalhes_moto(placa):
         'vencimento_tax': moto.vencimento_tax.strftime('%Y-%m-%d') if moto.vencimento_tax else None,
         'tax_sorn': bool(getattr(moto, 'tax_sorn', False)),
         'notas_internas': moto.notas_internas,
+        'v5c_count': len(v5c_oficiais),
+        'transfer_proof_count': len(transfer_slips),
+        'has_v5c': len(v5c_oficiais) > 0,
+        'has_transfer_proof': len(transfer_slips) > 0,
         'v5c_arquivos': [{
             'id': v.id,
+            'id_contrato': getattr(v, 'id_contrato', None),
             'url_arquivo': v.url_arquivo,
             'nome_original': v.nome_original or f"V5C_{moto.placa}",
             'tipo_arquivo': v.tipo_arquivo,
+            'categoria_doc': getattr(v, 'categoria_doc', 'v5c') or 'v5c',
             'criado_por_nome': v.criado_por_nome or '',
             'data_criacao': v.data_criacao.strftime('%d/%m/%Y %H:%M') if v.data_criacao else None
         } for v in sorted(moto.v5c_arquivos, key=lambda x: x.id)],
@@ -2682,6 +2792,26 @@ def upload_v5c_moto(placa):
     if not arquivos:
         return jsonify({'error': 'No file uploaded', 'erro': 'Nenhum arquivo enviado'}), 400
         
+    cat_raw = (request.form.get('categoria_doc') or request.args.get('categoria') or 'v5c').strip().lower()
+    categoria_doc = 'transfer_proof' if ('transfer' in cat_raw or 'slip' in cat_raw or 'proof' in cat_raw) else 'v5c'
+
+    id_contrato_param = request.form.get('id_contrato') or request.args.get('id_contrato')
+    id_contrato = None
+    if id_contrato_param:
+        try:
+            id_contrato = int(id_contrato_param)
+        except (ValueError, TypeError):
+            id_contrato = None
+    if not id_contrato:
+        # Se não informado, vincula automaticamente ao contrato de compra ativo mais recente desta moto
+        active_purchase = Contract.query.filter(
+            db.or_(Contract.placa == placa_clean, Contract.moto_placa == placa_clean),
+            Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+            Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
+        ).order_by(Contract.id.desc()).first()
+        if active_purchase:
+            id_contrato = active_purchase.id
+
     salvos = []
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     
@@ -2693,8 +2823,9 @@ def upload_v5c_moto(placa):
             
         ext = f.filename.rsplit('.', 1)[1].lower() if '.' in f.filename else ''
         tipo_arq = 'pdf' if ext == 'pdf' else 'image'
-        safe_orig = werkzeug.utils.secure_filename(f.filename) or f"v5c_{placa_clean}.{ext}"
-        nome_final = f"{int(get_local_now().timestamp())}_v5c_{placa_clean}_{safe_orig}"
+        safe_orig = werkzeug.utils.secure_filename(f.filename) or f"{categoria_doc}_{placa_clean}.{ext}"
+        prefixo = "transfer_slip" if categoria_doc == 'transfer_proof' else "v5c"
+        nome_final = f"{int(get_local_now().timestamp())}_{prefixo}_{placa_clean}_{safe_orig}"
         
         if tipo_arq == 'pdf':
             caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_final)
@@ -2706,9 +2837,11 @@ def upload_v5c_moto(placa):
             
         v5c_rec = MotorcycleV5C(
             placa=moto.placa,
+            id_contrato=id_contrato,
             url_arquivo=url_arquivo,
             nome_original=safe_orig,
             tipo_arquivo=tipo_arq,
+            categoria_doc=categoria_doc,
             criado_por_nome=operador_atual
         )
         db.session.add(v5c_rec)
@@ -2718,24 +2851,38 @@ def upload_v5c_moto(placa):
         return jsonify({'error': 'No valid files processed', 'erro': 'Nenhum arquivo válido processado'}), 400
         
     db.session.commit()
-    registrar_log('MOTO_V5C_UPLOADED', 'Motorcycle', moto.placa, f"{len(salvos)} arquivo(s) de V5C anexados à moto {moto.placa} por {operador_atual}")
     
-    # Sincroniza status de contratos de compra da moto (finaliza se estiver assinado e agora possui V5C)
-    contratos_compra = Contract.query.filter(
-        Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
-        db.or_(Contract.placa == moto.placa, Contract.moto_placa == moto.placa)
-    ).all()
-    for cc in contratos_compra:
-        sync_purchase_contract_status(cc, auto_commit=True)
+    tipo_desc = "comprovante(s) de transferência" if categoria_doc == 'transfer_proof' else "arquivo(s) de V5C"
+    log_action = 'MOTO_TRANSFER_PROOF_UPLOADED' if categoria_doc == 'transfer_proof' else 'MOTO_V5C_UPLOADED'
+    registrar_log(log_action, 'Motorcycle', moto.placa, f"{len(salvos)} {tipo_desc} anexados à moto {moto.placa} por {operador_atual}")
     
+    # Sincroniza status de contratos de compra da moto somente se foi anexado o V5C oficial
+    if categoria_doc == 'v5c':
+        if id_contrato:
+            contrato_alvo = db.session.get(Contract, id_contrato)
+            if contrato_alvo:
+                sync_purchase_contract_status(contrato_alvo, auto_commit=True)
+        else:
+            contratos_compra = Contract.query.filter(
+                Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+                db.or_(Contract.placa == moto.placa, Contract.moto_placa == moto.placa)
+            ).all()
+            for cc in contratos_compra:
+                sync_purchase_contract_status(cc, auto_commit=True)
+    
+    label_resp = "Transfer proof" if categoria_doc == 'transfer_proof' else "V5C"
     return jsonify({
-        'message': f'{len(salvos)} V5C file(s) attached successfully',
-        'mensagem': f'{len(salvos)} arquivo(s) de V5C anexados com sucesso',
+        'message': f'{len(salvos)} {label_resp} document(s) attached successfully',
+        'mensagem': f'{len(salvos)} {tipo_desc} anexado(s) com sucesso',
+        'categoria_doc': categoria_doc,
+        'id_contrato': id_contrato,
         'v5c_arquivos': [{
             'id': v.id,
+            'id_contrato': getattr(v, 'id_contrato', None),
             'url_arquivo': v.url_arquivo,
             'nome_original': v.nome_original,
             'tipo_arquivo': v.tipo_arquivo,
+            'categoria_doc': v.categoria_doc,
             'data_criacao': v.data_criacao.strftime('%d/%m/%Y %H:%M')
         } for v in salvos]
     }), 201
@@ -2746,10 +2893,12 @@ def remover_v5c_moto(placa, v5c_id):
     placa_clean = str(placa).strip().replace(' ', '').upper()
     v5c = db.session.get(MotorcycleV5C, v5c_id)
     if not v5c or v5c.placa != placa_clean:
-        return jsonify({'error': 'V5C record not found', 'erro': 'Registro V5C não encontrado'}), 404
+        return jsonify({'error': 'Document record not found', 'erro': 'Registro de documento não encontrado'}), 404
         
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     nome_orig = v5c.nome_original or str(v5c.id)
+    is_official_v5c = (getattr(v5c, 'categoria_doc', 'v5c') == 'v5c')
+    tipo_desc = "Documento V5C" if is_official_v5c else "Comprovante de Transferência"
     
     try:
         if v5c.url_arquivo:
@@ -2762,17 +2911,18 @@ def remover_v5c_moto(placa, v5c_id):
         
     db.session.delete(v5c)
     db.session.commit()
-    registrar_log('MOTO_V5C_DELETED', 'Motorcycle', placa_clean, f"Documento V5C ({nome_orig}) da moto {placa_clean} excluído por {operador_atual}")
+    registrar_log('MOTO_V5C_DELETED', 'Motorcycle', placa_clean, f"{tipo_desc} ({nome_orig}) da moto {placa_clean} excluído por {operador_atual}")
     
-    # Sincroniza status de contratos de compra da moto (reabre para Active se não possui mais V5C)
-    contratos_compra = Contract.query.filter(
-        Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
-        db.or_(Contract.placa == placa_clean, Contract.moto_placa == placa_clean)
-    ).all()
-    for cc in contratos_compra:
-        sync_purchase_contract_status(cc, auto_commit=True)
+    # Se era V5C oficial, sincroniza status de contratos de compra da moto (reabre para Active se não possui mais V5C oficial)
+    if is_official_v5c:
+        contratos_compra = Contract.query.filter(
+            Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+            db.or_(Contract.placa == placa_clean, Contract.moto_placa == placa_clean)
+        ).all()
+        for cc in contratos_compra:
+            sync_purchase_contract_status(cc, auto_commit=True)
     
-    return jsonify({'message': 'V5C document deleted successfully', 'mensagem': 'Documento V5C excluído com sucesso'}), 200
+    return jsonify({'message': f'{tipo_desc} deleted successfully', 'mensagem': f'{tipo_desc} excluído com sucesso'}), 200
 
 @app.route('/api/motos/<placa>/trackers', methods=['POST'])
 @alugueis_required
@@ -2946,14 +3096,71 @@ def sync_sale_contract_status(contrato_id_or_obj, auto_commit=False):
         
     return alterou
 
+def get_purchase_contract_v5c_docs(contrato):
+    """
+    Retorna os documentos de V5C/Transferência válidos para o ciclo de um contrato de compra específico.
+    Resolve recompras de uma mesma moto:
+    - Prioridade 1: Documentos explicitamente vinculados a este contrato (id_contrato == contrato.id).
+    - Prioridade 2: Documentos da moto criados no ciclo temporal desta compra (após contratos anteriores não cancelados).
+    Documentos de compras anteriores concluídas pertencem ao histórico passado e nunca são reaproveitados para a recompra atual.
+    """
+    if not contrato:
+        return []
+        
+    placa_alvo = (contrato.moto_placa or contrato.placa or '').strip().upper()
+    if not placa_alvo:
+        return []
+        
+    # 1. Documentos explicitamente vinculados a este contrato
+    docs_diretos = MotorcycleV5C.query.filter_by(placa=placa_alvo, id_contrato=contrato.id).order_by(MotorcycleV5C.id.asc()).all()
+    
+    # 2. Busca contrato anterior não cancelado desta moto
+    prev_contract = Contract.query.filter(
+        db.or_(Contract.placa == placa_alvo, Contract.moto_placa == placa_alvo),
+        Contract.id < contrato.id,
+        Contract.status.notin_([ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
+    ).order_by(Contract.id.desc()).first()
+    
+    # Busca contrato posterior não cancelado desta moto (marca o fim do ciclo deste contrato)
+    next_contract = Contract.query.filter(
+        db.or_(Contract.placa == placa_alvo, Contract.moto_placa == placa_alvo),
+        Contract.id > contrato.id,
+        Contract.status.notin_([ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
+    ).order_by(Contract.id.asc()).first()
+    
+    q_ciclo = MotorcycleV5C.query.filter(
+        MotorcycleV5C.placa == placa_alvo,
+        db.or_(MotorcycleV5C.id_contrato == None, MotorcycleV5C.id_contrato == contrato.id)
+    )
+    
+    if prev_contract and prev_contract.data_retirada:
+        cutoff_inicio = prev_contract.data_devolucao or prev_contract.data_retirada
+        q_ciclo = q_ciclo.filter(MotorcycleV5C.data_criacao >= cutoff_inicio)
+        
+    if next_contract and next_contract.data_retirada:
+        cutoff_fim = next_contract.data_retirada
+        q_ciclo = q_ciclo.filter(MotorcycleV5C.data_criacao < cutoff_fim)
+        
+    docs_temporais = q_ciclo.order_by(MotorcycleV5C.id.asc()).all()
+    
+    vistos = set()
+    resultado = []
+    for d in (docs_diretos + docs_temporais):
+        if d.id not in vistos:
+            vistos.add(d.id)
+            resultado.append(d)
+            
+    return resultado
+
 def sync_purchase_contract_status(contrato_id_or_obj, auto_commit=False):
     """
     Sincroniza dinamicamente o status de contratos de compra (Purchase):
     - Um contrato de compra finaliza ('Completed') quando:
       1. Está assinado pelo vendedor (assinatura_cliente_inicial presente).
-      2. O documento de Logbook (V5C) do veículo está anexado no sistema (MotorcycleV5C).
+      2. O documento de Logbook (V5C) do veículo para este ciclo de compra está anexado no sistema (MotorcycleV5C).
     - Enquanto não possuir o Logbook (V5C) anexado, permanece 'Active' exibindo alerta.
-    - Se todos os V5Cs da moto forem excluídos, reabre o contrato para 'Active'.
+    - Se o V5C for excluído (e não houver contratos posteriores), reabre o contrato para 'Active'.
+    - Imunidade histórica: Contratos finalizados no passado com contratos posteriores NUNCA são reabertos!
     - Respeita contratos com status 'Cancelled'.
     Retorna True se houve alteração no status do contrato.
     """
@@ -2973,8 +3180,24 @@ def sync_purchase_contract_status(contrato_id_or_obj, auto_commit=False):
         return False
         
     placa_alvo = (contrato.moto_placa or contrato.placa or '').strip().upper()
-    v5c_count = MotorcycleV5C.query.filter_by(placa=placa_alvo).count() if placa_alvo else 0
-    tem_v5c = (v5c_count > 0)
+    if not placa_alvo:
+        return False
+
+    # Verifica se existem contratos posteriores não cancelados para esta mesma moto
+    has_subsequent_contracts = Contract.query.filter(
+        db.or_(Contract.placa == placa_alvo, Contract.moto_placa == placa_alvo),
+        Contract.id > contrato.id,
+        Contract.status.notin_([ContractStatus.CANCELLED.value, 'Cancelled', 'Cancelado'])
+    ).count() > 0
+
+    # Imunidade Histórica: contrato de compra finalizado no passado que já possui contratos posteriores
+    # NUNCA pode ser reaberto por alterações ou exclusões de ciclos futuros!
+    if has_subsequent_contracts and contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
+        return False
+
+    docs_ciclo = get_purchase_contract_v5c_docs(contrato)
+    v5c_oficiais = [d for d in docs_ciclo if getattr(d, 'categoria_doc', 'v5c') == 'v5c']
+    tem_v5c = (len(v5c_oficiais) > 0)
     tem_assinatura = bool(contrato.assinatura_cliente_inicial)
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
@@ -2991,8 +3214,8 @@ def sync_purchase_contract_status(contrato_id_or_obj, auto_commit=False):
             )
             alterou = True
     else:
-        # Se falta V5C ou assinatura e o contrato estava como Completed, reabre para Active
-        if contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
+        # Só pode reabrir se NÃO houver contratos posteriores
+        if not has_subsequent_contracts and contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
             contrato.status = ContractStatus.ACTIVE.value
             motivo = "ausência do documento de Logbook (V5C)" if not tem_v5c else "ausência de assinatura do vendedor"
             registrar_log(
@@ -3786,15 +4009,16 @@ def listar_contratos():
                 db.or_(Contract.url_seguro == None, ~checkout_subq)
             )
         elif status_filter.lower() in ['pending_v5c', 'needs_v5c']:
-            # Active purchase contracts missing V5C logbook
-            v5c_subq = db.session.query(MotorcycleV5C.id).filter(
-                MotorcycleV5C.placa == Contract.placa
-            ).exists()
-            query = query.filter(
+            # Active purchase contracts missing official V5C logbook for their current purchase cycle
+            cand_purchases = Contract.query.filter(
                 Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
-                Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
-                ~v5c_subq
-            )
+                Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
+            ).all()
+            pending_ids = [
+                cp.id for cp in cand_purchases 
+                if not any((getattr(d, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for d in get_purchase_contract_v5c_docs(cp))
+            ]
+            query = query.filter(Contract.id.in_(pending_ids))
         elif status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
             query = query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']))
         elif status_filter.lower() in ['active', 'ativo']:
@@ -3866,8 +4090,22 @@ def listar_contratos():
         pendente_liberacao = is_active and not is_purchase and (not tem_checkout or not tem_seguro)
         
         placa_limpa = (c.moto_placa or c.placa or '').strip().upper()
-        v5c_count = len(c.moto.v5c_arquivos) if (c.moto and hasattr(c.moto, 'v5c_arquivos') and c.moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=placa_limpa).count() if (is_purchase and placa_limpa) else 0)
+        if is_purchase:
+            docs_ciclo = get_purchase_contract_v5c_docs(c)
+            v5c_count = len([v for v in docs_ciclo if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c'])
+            transfer_proof_count = len([v for v in docs_ciclo if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof'])
+        elif c.moto and hasattr(c.moto, 'v5c_arquivos') and c.moto.v5c_arquivos:
+            v5c_count = len([v for v in c.moto.v5c_arquivos if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c'])
+            transfer_proof_count = len([v for v in c.moto.v5c_arquivos if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof'])
+        elif placa_limpa:
+            v5c_count = MotorcycleV5C.query.filter_by(placa=placa_limpa, categoria_doc='v5c').count()
+            transfer_proof_count = MotorcycleV5C.query.filter_by(placa=placa_limpa, categoria_doc='transfer_proof').count()
+        else:
+            v5c_count = 0
+            transfer_proof_count = 0
+
         tem_v5c = (v5c_count > 0)
+        tem_transfer_proof = (transfer_proof_count > 0)
         needs_v5c = bool(is_purchase and is_active and not tem_v5c)
 
         itens.append({
@@ -3900,8 +4138,10 @@ def listar_contratos():
             'tem_seguro': tem_seguro,
             'pendente_liberacao': pendente_liberacao,
             'tem_v5c': tem_v5c,
+            'tem_transfer_proof': tem_transfer_proof,
             'needs_v5c': needs_v5c,
             'v5c_count': v5c_count,
+            'transfer_proof_count': transfer_proof_count,
             'assinado': bool(c.assinatura_cliente_inicial),
             'data_assinatura_inicial': c.data_assinatura_inicial.isoformat() if c.data_assinatura_inicial else None,
             'notas_internas': c.notas_internas
@@ -3914,7 +4154,8 @@ def listar_contratos():
     ).exists()
 
     kpi_v5c_subq = db.session.query(MotorcycleV5C.id).filter(
-        MotorcycleV5C.placa == Contract.placa
+        MotorcycleV5C.placa == Contract.placa,
+        MotorcycleV5C.categoria_doc == 'v5c'
     ).exists()
 
     kpi_rentals = Contract.query.filter(
@@ -3937,11 +4178,14 @@ def listar_contratos():
         Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito'])
     ).count()
 
-    kpi_pending_v5c = Contract.query.filter(
+    cand_purchases_kpi = Contract.query.filter(
         Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
-        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
-        ~kpi_v5c_subq
-    ).count()
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo'])
+    ).all()
+    kpi_pending_v5c = sum(
+        1 for cp in cand_purchases_kpi 
+        if not any((getattr(d, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for d in get_purchase_contract_v5c_docs(cp))
+    )
     
     return jsonify({
         'itens': itens,
@@ -4054,6 +4298,24 @@ def detalhe_contrato(id):
     current_moto_modelo = (moto.modelo if moto and moto.modelo else c.moto_modelo) or '-'
     current_moto_cor = (moto.cor if moto and moto.cor else c.moto_cor) or '-'
 
+    placa_alvo_c = (current_moto_placa or '').strip().upper()
+    if is_purchase:
+        docs_ciclo = get_purchase_contract_v5c_docs(c)
+        num_v5c = len([v for v in docs_ciclo if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c'])
+        num_transfer = len([v for v in docs_ciclo if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof'])
+    elif moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos:
+        num_v5c = len([v for v in moto.v5c_arquivos if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'v5c'])
+        num_transfer = len([v for v in moto.v5c_arquivos if (getattr(v, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof'])
+    elif placa_alvo_c:
+        num_v5c = MotorcycleV5C.query.filter_by(placa=placa_alvo_c, categoria_doc='v5c').count()
+        num_transfer = MotorcycleV5C.query.filter_by(placa=placa_alvo_c, categoria_doc='transfer_proof').count()
+    else:
+        num_v5c = 0
+        num_transfer = 0
+    has_v5c_doc = (num_v5c > 0)
+    has_transfer_doc = (num_transfer > 0)
+    needs_v5c_doc = bool(is_purchase and c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'] and not has_v5c_doc)
+
     return jsonify({
         'id': c.id,
         'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
@@ -4102,9 +4364,11 @@ def detalhe_contrato(id):
         'milhagem_atual_moto': int(moto.milhagem_atual or 0) if moto else 0,
         'milhagem_inicial': c.milhagem_inicial if c.milhagem_inicial is not None else 0,
         'milhagem_final': c.milhagem_final,
-        'v5c_count': len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=(c.moto_placa or c.placa or '').strip().upper()).count() if (c.moto_placa or c.placa) else 0),
-        'tem_v5c': (len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=(c.moto_placa or c.placa or '').strip().upper()).count() if (c.moto_placa or c.placa) else 0)) > 0,
-        'needs_v5c': bool(is_purchase and c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'] and ((len(moto.v5c_arquivos) if (moto and hasattr(moto, 'v5c_arquivos') and moto.v5c_arquivos) else (MotorcycleV5C.query.filter_by(placa=(c.moto_placa or c.placa or '').strip().upper()).count() if (c.moto_placa or c.placa) else 0)) == 0)),
+        'v5c_count': num_v5c,
+        'transfer_proof_count': num_transfer,
+        'tem_v5c': has_v5c_doc,
+        'tem_transfer_proof': has_transfer_doc,
+        'needs_v5c': needs_v5c_doc,
         'trackers_count': len(moto.trackers) if (moto and hasattr(moto, 'trackers') and moto.trackers) else 0,
         'trackers_summary': [{
             'id': t.id,
@@ -6364,11 +6628,14 @@ def _compilar_dados_dashboard(include_claims=False):
 
     # Compliance de Compras: Contratos de Compra pendentes de Logbook (V5C)
     compras_pendentes_v5c = []
+    placas_repurchases_sem_v5c = {}
     for ca in contratos_ativos_objs:
         tipo_ca = getattr(ca, 'tipo_contrato', 'Rent') or 'Rent'
         if tipo_ca in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
             placa_limpa = (ca.moto_placa or ca.placa or '').strip().upper()
-            tem_v5c = (MotorcycleV5C.query.filter_by(placa=placa_limpa).first() is not None) if placa_limpa else False
+            docs_ciclo = get_purchase_contract_v5c_docs(ca)
+            tem_v5c = any((getattr(d, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for d in docs_ciclo)
+            tem_slip = any((getattr(d, 'categoria_doc', 'v5c') or 'v5c') == 'transfer_proof' for d in docs_ciclo)
             if not tem_v5c:
                 cli_nome = ca.cliente_nome or (ca.cliente.nome if ca.cliente else f"Client #{ca.id_cliente}")
                 compras_pendentes_v5c.append({
@@ -6376,24 +6643,53 @@ def _compilar_dados_dashboard(include_claims=False):
                     'placa': placa_limpa,
                     'cliente': cli_nome,
                     'valor_compra': float(ca.valor_compra_veiculo or 0.0),
-                    'data_retirada': ca.data_retirada.strftime('%d/%m/%Y') if ca.data_retirada else None
+                    'data_retirada': ca.data_retirada.strftime('%d/%m/%Y') if ca.data_retirada else None,
+                    'has_transfer_proof': tem_slip
                 })
+                if placa_limpa:
+                    placas_repurchases_sem_v5c[placa_limpa] = tem_slip
     compras_pendentes_v5c_count = len(compras_pendentes_v5c)
 
-    # Compliance: Motos sem Documento V5C (Logbook) - Otimizado com NOT EXISTS em SQL direto
+    # Compliance: Motos sem Documento V5C (Logbook) Oficial - Otimizado com NOT EXISTS em SQL direto
     motos_sem_v5c_objs = db.session.query(
         Motorcycle.placa,
         Motorcycle.modelo,
         Motorcycle.status
     ).filter(
-        ~Motorcycle.v5c_arquivos.any()
+        ~Motorcycle.v5c_arquivos.any(MotorcycleV5C.categoria_doc == 'v5c')
     ).order_by(Motorcycle.placa.asc()).all()
+
+    # Pre-carrega placas que já possuem comprovante de transferência em O(1)
+    placas_sem_v5c = [mv.placa for mv in motos_sem_v5c_objs]
+    placas_com_slip = set()
+    if placas_sem_v5c:
+        slips = db.session.query(MotorcycleV5C.placa).filter(
+            MotorcycleV5C.placa.in_(placas_sem_v5c),
+            MotorcycleV5C.categoria_doc == 'transfer_proof'
+        ).all()
+        placas_com_slip = {s[0] for s in slips}
 
     motos_sem_v5c = [{
         'placa': mv.placa,
         'modelo': mv.modelo,
-        'status': mv.status
+        'status': mv.status,
+        'has_transfer_proof': (mv.placa in placas_com_slip)
     } for mv in motos_sem_v5c_objs]
+
+    # Inclui motos de recompra com contrato de compra ativo aguardando V5C do ciclo atual
+    placas_motos_incluidas = {m['placa'] for m in motos_sem_v5c}
+    for p_rep, has_slip in placas_repurchases_sem_v5c.items():
+        if p_rep not in placas_motos_incluidas:
+            moto_obj = db.session.get(Motorcycle, p_rep)
+            if moto_obj:
+                motos_sem_v5c.append({
+                    'placa': moto_obj.placa,
+                    'modelo': moto_obj.modelo,
+                    'status': moto_obj.status,
+                    'has_transfer_proof': has_slip
+                })
+                placas_motos_incluidas.add(p_rep)
+
     motos_sem_v5c_count = len(motos_sem_v5c)
 
     # Proactive Collections: Actual pending charges due today (Rent, Sales Installments, Deposits, Fines, etc.)

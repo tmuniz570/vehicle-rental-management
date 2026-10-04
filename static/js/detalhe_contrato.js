@@ -426,38 +426,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         // V5C & GPS Trackers Shortcuts
-        function updateV5CButtonState(count) {
+        function updateV5CButtonState(v5cCount, transferCount) {
             const bV5C = document.getElementById('badge_v5c_count');
             const bBtn = document.getElementById('btnShortcutV5C');
-            const c = Number(count || 0);
+            const cV5C = Number(v5cCount || 0);
+            const cTransfer = Number(transferCount || 0);
+
             if (bV5C) {
-                bV5C.textContent = c;
-                if (c === 0) {
-                    bV5C.style.background = 'rgba(239, 68, 68, 0.35)';
-                    bV5C.style.color = '#fecaca';
-                    bV5C.style.border = '1px solid rgba(239, 68, 68, 0.5)';
-                } else {
+                if (cV5C > 0) {
+                    bV5C.textContent = cV5C;
                     bV5C.style.background = 'rgba(6, 182, 212, 0.25)';
                     bV5C.style.color = '#22d3ee';
                     bV5C.style.border = '1px solid rgba(6, 182, 212, 0.4)';
+                } else if (cTransfer > 0) {
+                    bV5C.textContent = '⏳ Slip';
+                    bV5C.style.background = 'rgba(245, 158, 11, 0.25)';
+                    bV5C.style.color = '#fbbf24';
+                    bV5C.style.border = '1px solid rgba(245, 158, 11, 0.5)';
+                } else {
+                    bV5C.textContent = '0';
+                    bV5C.style.background = 'rgba(239, 68, 68, 0.35)';
+                    bV5C.style.color = '#fecaca';
+                    bV5C.style.border = '1px solid rgba(239, 68, 68, 0.5)';
                 }
             }
             if (bBtn) {
-                if (c === 0) {
+                if (cV5C > 0) {
+                    bBtn.style.background = 'rgba(6, 182, 212, 0.12)';
+                    bBtn.style.borderColor = 'rgba(6, 182, 212, 0.35)';
+                    bBtn.style.color = '#22d3ee';
+                    bBtn.title = `Official V5C Logbook on file (${cV5C} page(s))`;
+                } else if (cTransfer > 0) {
+                    bBtn.style.background = 'rgba(245, 158, 11, 0.12)';
+                    bBtn.style.borderColor = 'rgba(245, 158, 11, 0.4)';
+                    bBtn.style.color = '#fbbf24';
+                    bBtn.title = '⏳ Transfer Slip on file - awaiting postal V5C from DVLA';
+                } else {
                     bBtn.style.background = 'rgba(239, 68, 68, 0.12)';
                     bBtn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
                     bBtn.style.color = '#fca5a5';
                     bBtn.title = '⚠️ Missing V5C Logbook! Click to attach';
-                } else {
-                    bBtn.style.background = 'rgba(6, 182, 212, 0.12)';
-                    bBtn.style.borderColor = 'rgba(6, 182, 212, 0.35)';
-                    bBtn.style.color = '#22d3ee';
-                    bBtn.title = 'View and manage V5C logbook documents for this vehicle';
                 }
             }
         }
 
-        updateV5CButtonState(data.v5c_count);
+        updateV5CButtonState(data.v5c_count, data.transfer_proof_count);
 
         const badgeTrk = document.getElementById('badge_trackers_count');
         if (badgeTrk) {
@@ -474,7 +487,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         milhagem_atual: data.milhagem_atual_moto || data.milhagem_final || data.milhagem_inicial,
                         vencimento_mot: data.vencimento_mot,
                         vencimento_tax: data.vencimento_tax,
-                        tax_sorn: data.tax_sorn
+                        tax_sorn: data.tax_sorn,
+                        id_contrato: (typeof CONTRATO_ID !== 'undefined' ? CONTRATO_ID : data.id)
                     });
                 } else if (!placaVal || placaVal === '-') {
                     alert('No vehicle registration plate linked to this contract.');
@@ -506,8 +520,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const res = await fetch(`/api/motos/${encodeURIComponent(placa)}/detalhes`);
                 if (res.ok) {
                     const d = await res.json();
-                    const v5cTotal = (d.v5c_arquivos || []).length;
-                    updateV5CButtonState(v5cTotal);
+                    updateV5CButtonState(d.v5c_count, d.transfer_proof_count);
                     const bTrk = document.getElementById('badge_trackers_count');
                     if (bTrk) bTrk.textContent = (d.trackers || []).length;
                 }
@@ -664,7 +677,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                                     LOGBOOK (V5C) REQUIRED: Purchase Agreement Incomplete
                                 </strong>
                                 <span style="color: var(--text-primary); font-size: 0.88rem; line-height: 1.4; display: block; margin-top: 2px;">
-                                    This purchase contract for vehicle <strong>(${escapeHtml(data.placa)})</strong> cannot be finalized until the vehicle Logbook (V5C) document is attached.
+                                    This purchase contract for vehicle <strong>(${escapeHtml(data.placa)})</strong> cannot be finalized until the official vehicle Logbook (V5C) document is attached.
+                                    ${Number(data.transfer_proof_count || 0) > 0 ? '<span style="display:block; margin-top:4px; font-size:0.8rem; color:#fbbf24; font-weight:600;">⏳ Transfer slip is on file. Awaiting official V5C logbook from DVLA to finalize purchase.</span>' : ''}
                                 </span>
                             </div>
                         </div>

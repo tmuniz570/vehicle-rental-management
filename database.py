@@ -185,9 +185,11 @@ class MotorcycleV5C(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     placa = db.Column(db.String(10), db.ForeignKey('motos.placa', ondelete='CASCADE'), nullable=False, index=True)
+    id_contrato = db.Column(db.Integer, db.ForeignKey('contratos.id', ondelete='SET NULL'), nullable=True, index=True)
     url_arquivo = db.Column(db.String(255), nullable=False)
     nome_original = db.Column(db.String(255), nullable=True)
     tipo_arquivo = db.Column(db.String(20), default='image', nullable=False) # 'image' or 'pdf'
+    categoria_doc = db.Column(db.String(30), default='v5c', nullable=False) # 'v5c' (Official Logbook) or 'transfer_proof' (Transfer Slip / New Keeper Slip)
     criado_por_nome = db.Column(db.String(100), nullable=True)
     data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
 
@@ -692,6 +694,16 @@ def init_db(app):
                     except Exception as e_heal:
                         pass
 
+                # Moto V5C / Documentos de Transferência
+                if 'moto_v5c' in existing_tables:
+                    cols_v5c = [col['name'] for col in inspector.get_columns('moto_v5c')]
+                    if 'categoria_doc' not in cols_v5c:
+                        conn.execute(db.text("ALTER TABLE moto_v5c ADD COLUMN categoria_doc VARCHAR(30) DEFAULT 'v5c'"))
+                        conn.commit()
+                    if 'id_contrato' not in cols_v5c:
+                        conn.execute(db.text("ALTER TABLE moto_v5c ADD COLUMN id_contrato INTEGER"))
+                        conn.commit()
+
                 # Performance: Auto-create essential indexes on existing database
                 indexes_to_create = [
                     ("idx_contratos_cliente", "contratos", "id_cliente"),
@@ -709,6 +721,8 @@ def init_db(app):
                     ("idx_motos_mot", "motos", "vencimento_mot"),
                     ("idx_motos_tax", "motos", "vencimento_tax"),
                     ("idx_motos_tax_sorn", "motos", "tax_sorn"),
+                    ("idx_moto_v5c_categoria", "moto_v5c", "categoria_doc"),
+                    ("idx_moto_v5c_contrato", "moto_v5c", "id_contrato"),
                     ("idx_clientes_nome", "clientes", "nome"),
                     ("idx_clientes_telefone", "clientes", "telefone"),
                     ("idx_claims_number", "claims", "claim_number"),
