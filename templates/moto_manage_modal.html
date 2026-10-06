@@ -252,11 +252,35 @@
     </div>
 </div>
 
-<!-- Image Lightbox Modal -->
-<div id="lightboxModal" class="modal-overlay" style="z-index: 1100;" role="dialog" aria-modal="true">
-    <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center;">
-        <button type="button" id="closeLightboxBtn" style="position: absolute; top: -40px; right: 0; background: transparent; border: none; color: white; font-size: 2rem; cursor: pointer;">&times;</button>
-        <img id="lightboxImg" src="" alt="Enlarged preview" style="max-width: 90vw; max-height: 80vh; object-fit: contain; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
-        <p id="lightboxCaption" style="color: white; margin-top: 0.5rem; font-size: 0.9rem; text-align: center;"></p>
+<!-- Image Lightbox Modal with Zoom & Full Size Open -->
+<div id="lightboxModal" class="modal-overlay" style="z-index: 1200; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);" role="dialog" aria-modal="true">
+    <div style="position: relative; width: 95vw; max-width: 1000px; max-height: 94vh; display: flex; flex-direction: column; align-items: center; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+        <!-- Header Bar -->
+        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px; max-width: calc(100% - 190px); overflow: hidden;">
+                <span style="font-size: 1.1rem;">🔍</span>
+                <span id="lightboxCaption" style="color: var(--text-primary); font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Document Preview</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <a id="lightboxOpenFullBtn" href="" target="_blank" rel="noopener noreferrer" class="btn-primary" style="padding: 0.4rem 0.85rem; font-size: 0.78rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: white; border-radius: 6px; font-weight: 600;" title="Open in original full resolution in new tab">
+                    <span>↗ Open Full Size</span>
+                </a>
+                <button type="button" id="lightboxToggleZoomBtn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px;" title="Toggle 2x Zoom">
+                    <span>🔎 Zoom 2x</span>
+                </button>
+                <button type="button" id="closeLightboxBtn" class="modal-close" style="background: transparent; border: none; color: var(--text-secondary); font-size: 1.6rem; cursor: pointer; line-height: 1; padding: 0 6px;" title="Close preview">&times;</button>
+            </div>
+        </div>
+        
+        <!-- Image Viewer Container with Pan/Zoom scroll -->
+        <div id="lightboxViewport" style="width: 100%; flex: 1; min-height: 250px; max-height: calc(88vh - 110px); overflow: auto; display: flex; align-items: center; justify-content: center; background: #000; position: relative; padding: 0.75rem; user-select: none;">
+            <img id="lightboxImg" src="" alt="Enlarged document preview" style="max-width: 100%; max-height: calc(82vh - 120px); object-fit: contain; border-radius: 6px; cursor: zoom-in; transition: width 0.2s ease, max-width 0.2s ease;" onclick="toggleLightboxZoom(event)" title="Click photo to toggle 2x zoom">
+        </div>
+
+        <!-- Footer Hint -->
+        <div style="width: 100%; padding: 0.5rem 1rem; background: rgba(0,0,0,0.5); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: var(--text-secondary);">
+            <span>💡 Click photo or "Zoom" to toggle 2x magnification • "Open Full Size" opens in new tab</span>
+            <span style="opacity: 0.8;">ESC to close</span>
+        </div>
     </div>
 </div>

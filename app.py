@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import secrets
 import hmac
@@ -156,7 +157,8 @@ def load_user(user_id):
 def unauthorized_callback():
     if request.path.startswith('/api/'):
         return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
-    return redirect(url_for('login', next=request.path))
+    target = request.full_path.rstrip('?') if request.query_string else request.path
+    return redirect(url_for('login', next=target))
 
 def admin_required(f):
     @wraps(f)
@@ -190,11 +192,28 @@ def claims_required(f):
         if not current_user.is_authenticated:
             if request.path.startswith('/api/'):
                 return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
-            return redirect(url_for('login', next=request.path))
+            target = request.full_path.rstrip('?') if request.query_string else request.path
+            return redirect(url_for('login', next=target))
         if not current_user.pode_claims():
             if request.path.startswith('/api/'):
                 return jsonify({"error": "Forbidden", "message": "Acesso restrito ao módulo de claims & storage"}), 403
             flash('Você não tem permissão para acessar o módulo de Claims & Storage.', 'warning')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def financeiro_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
+            target = request.full_path.rstrip('?') if request.query_string else request.path
+            return redirect(url_for('login', next=target))
+        if not current_user.pode_financeiro():
+            if request.path.startswith('/api/'):
+                return jsonify({"error": "Forbidden", "message": "Acesso restrito ao módulo financeiro"}), 403
+            flash('Você não tem permissão para acessar o módulo financeiro.', 'warning')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -340,7 +359,8 @@ def check_authentication():
                     "message": f"Sua sessão expirou por inatividade ({timeout_desc}). Faça login novamente."
                 }), 401
             flash(f'Sua sessão expirou por inatividade após {timeout_desc}. Por segurança, faça login novamente.', 'warning')
-            return redirect(url_for('login', next=request.path))
+            target = request.full_path.rstrip('?') if request.query_string else request.path
+            return redirect(url_for('login', next=target))
 
         # Atualiza o timestamp da última atividade do usuário
         session['last_activity'] = now
@@ -349,18 +369,23 @@ def check_authentication():
     if not current_user.is_authenticated:
         if request.path.startswith('/api/'):
             return jsonify({"error": "Unauthorized", "message": "Authentication required"}), 401
-        return redirect(url_for('login', next=request.path))
+        target = request.full_path.rstrip('?') if request.query_string else request.path
+        return redirect(url_for('login', next=target))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    next_page = (request.args.get('next') or request.form.get('next') or '').strip() or None
+
     if current_user.is_authenticated:
+        if next_page and is_safe_redirect_url(next_page) and not next_page.startswith('/login') and not next_page.startswith('/logout'):
+            return redirect(next_page)
         return redirect(url_for('index'))
         
     if request.method == 'POST':
         client_ip = request.remote_addr or 'unknown'
         if is_ip_rate_limited(client_ip):
             flash('Too many failed login attempts (maximum 10). For security, please wait 15 minutes before trying again.', 'danger')
-            return render_template('login.html', email=request.form.get('email', '')), 429
+            return render_template('login.html', email=request.form.get('email', ''), next_url=next_page), 429
 
         email = request.form.get('email', '').strip().lower()
         password = request.form.get('password', '')
@@ -370,24 +395,23 @@ def login():
         if user and user.check_password(password):
             if not user.ativo:
                 flash('Esta conta de acesso está inativa. Contate o administrador.', 'danger')
-                return render_template('login.html', email=email)
+                return render_template('login.html', email=email, next_url=next_page)
                 
             clear_failed_logins(client_ip)
             session.permanent = True
             login_user(user, remember=remember)
             registrar_log('LOGIN_SUCCESS', 'User', user.id, f"Usuário {user.nome} fez login no sistema.")
             session['last_activity'] = time.time()
-            next_page = request.args.get('next')
-            if not next_page or not is_safe_redirect_url(next_page):
+            if not next_page or not is_safe_redirect_url(next_page) or next_page.startswith('/login') or next_page.startswith('/logout'):
                 next_page = url_for('index')
             return redirect(next_page)
         else:
             record_failed_login(client_ip)
             registrar_log('LOGIN_FAILED', 'User', None, f"Tentativa de login falha para o email: {email} (IP: {client_ip})")
             flash('Credenciais inválidas. Verifique seu e-mail e senha.', 'danger')
-            return render_template('login.html', email=email)
+            return render_template('login.html', email=email, next_url=next_page)
             
-    return render_template('login.html')
+    return render_template('login.html', next_url=next_page)
 
 @app.route('/logout', methods=['GET', 'POST'])
 @login_required
@@ -498,6 +522,7 @@ def seed_default_admin():
                     is_admin=True,
                     perm_alugueis=True,
                     perm_claims=True,
+                    perm_financeiro=True,
                     ativo=True
                 )
                 admin.set_password(default_password)
@@ -505,12 +530,13 @@ def seed_default_admin():
                 db.session.commit()
                 print("[Auth] Master Admin 'Thiago Brandão' (tmuniz570@gmail.com) criado com sucesso.")
             else:
-                if not admin.is_admin or not admin.ativo or not admin.perm_alugueis or not admin.perm_claims or admin.role != 'admin':
+                if not admin.is_admin or not admin.ativo or not admin.perm_alugueis or not admin.perm_claims or not getattr(admin, 'perm_financeiro', True) or admin.role != 'admin':
                     admin.is_admin = True
                     admin.role = 'admin'
                     admin.ativo = True
                     admin.perm_alugueis = True
                     admin.perm_claims = True
+                    admin.perm_financeiro = True
                     db.session.commit()
                     print("[Auth] Master Admin 'Thiago Brandão' (tmuniz570@gmail.com) privilégios reafirmados.")
         except Exception as e:
@@ -612,7 +638,7 @@ def pagina_nova_vistoria():
     return render_template('vistoria.html')
 
 @app.route('/financeiro')
-@alugueis_required
+@financeiro_required
 def pagina_financeiro():
     return render_template('financeiro.html')
 
@@ -622,7 +648,7 @@ def pagina_vistorias_lista():
     return render_template('vistorias_lista.html')
 
 @app.route('/relatorios')
-@alugueis_required
+@financeiro_required
 def pagina_relatorios():
     return redirect('/financeiro')
 
@@ -1428,6 +1454,7 @@ def listar_usuarios():
             'role': u.role,
             'is_admin': bool(u.is_admin),
             'perm_alugueis': bool(u.perm_alugueis),
+            'perm_financeiro': bool(getattr(u, 'perm_financeiro', True)),
             'perm_claims': bool(u.perm_claims),
             'ativo': u.ativo,
             'data_criacao': u.data_criacao.strftime('%Y-%m-%d %H:%M:%S') if u.data_criacao else None
@@ -1446,6 +1473,7 @@ def criar_usuario():
     password = data.get('password', '')
     is_admin = bool(data.get('is_admin', False))
     perm_alugueis = bool(data.get('perm_alugueis', True))
+    perm_financeiro = bool(data.get('perm_financeiro', True))
     perm_claims = bool(data.get('perm_claims', False))
     
     if not nome or not email or not password:
@@ -1466,6 +1494,7 @@ def criar_usuario():
         role=role_desc,
         is_admin=is_admin,
         perm_alugueis=perm_alugueis,
+        perm_financeiro=perm_financeiro,
         perm_claims=perm_claims,
         ativo=True
     )
@@ -1477,6 +1506,7 @@ def criar_usuario():
     perm_textos = []
     if is_admin: perm_textos.append('Admin')
     if perm_alugueis: perm_textos.append('Aluguel / Venda')
+    if perm_financeiro: perm_textos.append('Financeiro')
     if perm_claims: perm_textos.append('Claims')
     registrar_log('USER_CREATE', 'User', novo_user.id, f"Novo usuário cadastrado: {novo_user.nome} ({novo_user.email}) com permissões: {', '.join(perm_textos)}")
 
@@ -1489,6 +1519,7 @@ def criar_usuario():
             'role': novo_user.role,
             'is_admin': novo_user.is_admin,
             'perm_alugueis': novo_user.perm_alugueis,
+            'perm_financeiro': novo_user.perm_financeiro,
             'perm_claims': novo_user.perm_claims,
             'ativo': novo_user.ativo
         }
@@ -1538,6 +1569,12 @@ def atualizar_usuario(user_id):
             alteracoes.append(f"aluguel_venda={'Ativado' if nova_perm_alug else 'Desativado'}")
             user.perm_alugueis = nova_perm_alug
 
+    if 'perm_financeiro' in data:
+        nova_perm_fin = bool(data['perm_financeiro'])
+        if user.perm_financeiro != nova_perm_fin:
+            alteracoes.append(f"financeiro={'Ativado' if nova_perm_fin else 'Desativado'}")
+            user.perm_financeiro = nova_perm_fin
+
     if 'perm_claims' in data:
         nova_perm_claims = bool(data['perm_claims'])
         if user.perm_claims != nova_perm_claims:
@@ -1570,6 +1607,7 @@ def atualizar_usuario(user_id):
         user.role = 'admin'
         user.ativo = True
         user.perm_alugueis = True
+        user.perm_financeiro = True
         user.perm_claims = True
 
     db.session.commit()
@@ -1586,6 +1624,7 @@ def atualizar_usuario(user_id):
             'role': user.role,
             'is_admin': user.is_admin,
             'perm_alugueis': user.perm_alugueis,
+            'perm_financeiro': user.perm_financeiro,
             'perm_claims': user.perm_claims,
             'ativo': user.ativo
         }
@@ -1900,6 +1939,11 @@ def exportar_auditoria_csv():
 
 # --- CRUD ROUTES ---
 
+def capitalize_words(text):
+    if not text:
+        return text
+    return re.sub(r'\b([a-zÀ-ÿ])', lambda m: m.group(1).upper(), str(text).strip())
+
 @app.route('/api/clientes', methods=['POST'])
 @alugueis_required
 def criar_cliente():
@@ -1911,9 +1955,9 @@ def criar_cliente():
     if not nome or not telefone:
         return jsonify({'error': 'Missing required fields (full name and phone are required)', 'erro': 'Dados incompletos (nome e telefone são obrigatórios)'}), 400
     
-    nome = nome.strip()
+    nome = capitalize_words(nome)
     telefone = telefone.strip()
-    endereco = endereco.strip() if endereco else None
+    endereco = capitalize_words(endereco) if endereco else None
 
     # Optional email: check uniqueness only if provided
     email_clean = email.strip() if (email and email.strip()) else None
@@ -2122,7 +2166,7 @@ def atualizar_cliente(id):
 
     if request.is_json:
         dados = request.get_json() or {}
-        if 'nome' in dados: cliente.nome = dados['nome'].strip() if dados['nome'] else cliente.nome
+        if 'nome' in dados: cliente.nome = capitalize_words(dados['nome']) if dados['nome'] else cliente.nome
         if 'telefone' in dados: cliente.telefone = dados['telefone'].strip() if dados['telefone'] else cliente.telefone
         if 'email' in dados:
             raw_email = dados['email']
@@ -2131,7 +2175,7 @@ def atualizar_cliente(id):
                 outro = Client.query.filter(db.func.lower(Client.email) == email_clean.lower(), Client.id != id).first()
                 if outro: return jsonify({'error': 'Email already registered for another customer', 'erro': 'Email já cadastrado por outro cliente'}), 400
             cliente.email = email_clean
-        if 'endereco' in dados: cliente.endereco = dados['endereco'].strip() if dados['endereco'] else None
+        if 'endereco' in dados: cliente.endereco = capitalize_words(dados['endereco']) if dados['endereco'] else None
         if 'notas_internas' in dados:
             cliente.notas_internas = str(dados['notas_internas']).strip() if (dados['notas_internas'] and str(dados['notas_internas']).strip()) else None
     else:
@@ -2142,9 +2186,9 @@ def atualizar_cliente(id):
                 if f and f.filename and not is_allowed_file(f.filename):
                     return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
 
-        if 'nome' in request.form: cliente.nome = request.form['nome'].strip()
+        if 'nome' in request.form: cliente.nome = capitalize_words(request.form['nome']) if request.form['nome'] else cliente.nome
         if 'telefone' in request.form: cliente.telefone = request.form['telefone'].strip()
-        if 'endereco' in request.form: cliente.endereco = request.form['endereco'].strip() if request.form['endereco'] else None
+        if 'endereco' in request.form: cliente.endereco = capitalize_words(request.form['endereco']) if request.form['endereco'] else None
         if 'notas_internas' in request.form:
             cliente.notas_internas = str(request.form['notas_internas']).strip() if (request.form['notas_internas'] and str(request.form['notas_internas']).strip()) else None
         if 'email' in request.form:
@@ -4772,7 +4816,7 @@ def listar_vistorias():
 # --- DASHBOARD & JOBS ---
 
 @app.route('/api/financeiro', methods=['GET'])
-@alugueis_required
+@financeiro_required
 def listar_financeiro():
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 20, type=int)
@@ -5062,7 +5106,7 @@ def pagar_transacoes_lote():
     }), 200
 
 @app.route('/api/financeiro/resumo', methods=['GET'])
-@alugueis_required
+@financeiro_required
 def financeiro_resumo():
     agora_london = get_london_now()
     hoje_inicio = agora_london.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
@@ -5136,7 +5180,7 @@ def financeiro_resumo():
     })
 
 @app.route('/api/financeiro/fechamento-caixa', methods=['GET'])
-@alugueis_required
+@financeiro_required
 def fechamento_caixa():
     data_str = request.args.get('data', '').strip()
     if data_str:
@@ -5251,7 +5295,7 @@ def fechamento_caixa():
 
 
 @app.route('/financeiro/fechamento-caixa/print', methods=['GET'])
-@alugueis_required
+@financeiro_required
 def relatorio_fechamento_caixa_print():
     data_str = request.args.get('data', '').strip()
     if data_str:
@@ -5443,7 +5487,7 @@ def criar_cobranca_avulsa():
     }), 201
 
 @app.route('/api/financeiro/exportar-csv', methods=['GET'])
-@alugueis_required
+@financeiro_required
 def exportar_financeiro_csv():
     import io
     import csv
@@ -5600,7 +5644,7 @@ def exportar_financeiro_csv():
     )
 
 @app.route('/financeiro/relatorio-pdf', methods=['GET'])
-@alugueis_required
+@financeiro_required
 def relatorio_financeiro_pdf():
     try:
         search = request.args.get('search', '', type=str)

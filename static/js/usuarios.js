@@ -296,7 +296,13 @@ function renderizarTabela(usuarios) {
             roleBadge = '<span class="badge" style="background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.3);">Administrator</span>';
         } else {
             const perms = [];
-            if (user.perm_alugueis) perms.push('Aluguel / Venda');
+            if (user.perm_alugueis) {
+                if (user.perm_financeiro !== false) {
+                    perms.push('Aluguel / Venda');
+                } else {
+                    perms.push('Aluguel (Sem Fin)');
+                }
+            }
             if (user.perm_claims) perms.push('Claims');
             const permText = perms.length > 0 ? perms.join(' + ') : 'Sem Acesso';
             roleBadge = `<span class="badge" style="background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);">${escapeHtml(permText)}</span>`;
@@ -370,6 +376,8 @@ function renderizarTabela(usuarios) {
 function abrirModalNovoUsuario() {
     document.getElementById('formNovoUsuario').reset();
     document.getElementById('novo_perm_alugueis').checked = true;
+    const chkFin = document.getElementById('novo_perm_financeiro');
+    if (chkFin) chkFin.checked = true;
     document.getElementById('novo_perm_claims').checked = false;
     document.getElementById('novo_is_admin').checked = false;
     const modal = document.getElementById('modalNewUser');
@@ -389,6 +397,8 @@ function abrirModalEditUsuario(userId) {
     document.getElementById('edit_nome').value = user.nome || '';
     document.getElementById('edit_email').value = user.email || '';
     document.getElementById('edit_perm_alugueis').checked = !!user.perm_alugueis;
+    const chkFin = document.getElementById('edit_perm_financeiro');
+    if (chkFin) chkFin.checked = user.perm_financeiro !== false;
     document.getElementById('edit_perm_claims').checked = !!user.perm_claims;
     document.getElementById('edit_is_admin').checked = !!user.is_admin;
     document.getElementById('edit_ativo').value = user.ativo ? 'true' : 'false';
@@ -406,6 +416,7 @@ function abrirModalEditUsuario(userId) {
         selectAtivo.disabled = true;
         chkAdmin.disabled = true;
         chkAlugueis.disabled = true;
+        if (chkFin) chkFin.disabled = true;
         chkClaims.disabled = true;
         if (inputEmail) inputEmail.disabled = true;
         document.getElementById('editUserSubtitle').innerHTML = '<span style="color:#fbbf24; font-weight:600;">👑 Root Administrator Account</span> — Protected against demotion, suspension, or deletion. You may update display name or password.';
@@ -413,6 +424,7 @@ function abrirModalEditUsuario(userId) {
         selectAtivo.disabled = true;
         chkAdmin.disabled = true;
         chkAlugueis.disabled = false;
+        if (chkFin) chkFin.disabled = false;
         chkClaims.disabled = false;
         if (inputEmail) inputEmail.disabled = false;
         document.getElementById('editUserSubtitle').textContent = 'Editing your own profile. (Status & Admin locked to prevent lockout)';
@@ -420,6 +432,7 @@ function abrirModalEditUsuario(userId) {
         selectAtivo.disabled = false;
         chkAdmin.disabled = false;
         chkAlugueis.disabled = false;
+        if (chkFin) chkFin.disabled = false;
         chkClaims.disabled = false;
         if (inputEmail) inputEmail.disabled = false;
         document.getElementById('editUserSubtitle').textContent = 'Modify permissions, modules, and credentials.';
@@ -440,10 +453,12 @@ async function handleNovoUsuarioSubmit(e) {
     const btn = document.getElementById('btnSalvarNovoUsuario');
     if (btn) btn.disabled = true;
 
+    const elFin = document.getElementById('novo_perm_financeiro');
     const payload = {
         nome: document.getElementById('novo_nome').value.trim(),
         email: document.getElementById('novo_email').value.trim().toLowerCase(),
         perm_alugueis: document.getElementById('novo_perm_alugueis').checked,
+        perm_financeiro: elFin ? elFin.checked : true,
         perm_claims: document.getElementById('novo_perm_claims').checked,
         is_admin: document.getElementById('novo_is_admin').checked,
         password: document.getElementById('novo_password').value
@@ -481,10 +496,12 @@ async function handleEditUsuarioSubmit(e) {
     const userId = parseInt(document.getElementById('edit_user_id').value, 10);
     const user = listaUsuarios.find(u => u.id === userId);
     const isMaster = user && user.email && user.email.toLowerCase() === MASTER_ADMIN_EMAIL;
+    const elFin = document.getElementById('edit_perm_financeiro');
 
     const payload = {
         nome: document.getElementById('edit_nome').value.trim(),
         perm_alugueis: isMaster ? true : document.getElementById('edit_perm_alugueis').checked,
+        perm_financeiro: isMaster ? true : (elFin ? elFin.checked : true),
         perm_claims: isMaster ? true : document.getElementById('edit_perm_claims').checked,
         is_admin: isMaster ? true : document.getElementById('edit_is_admin').checked,
         ativo: isMaster ? true : (document.getElementById('edit_ativo').value === 'true'),

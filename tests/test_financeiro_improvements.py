@@ -14,9 +14,13 @@ class TestFinanceiroImprovements(unittest.TestCase):
         self.client = app.test_client()
         
         # Ensure an admin user exists and log in
-        admin = User.query.filter_by(role='Admin').first()
+        admin = User.query.filter((User.is_admin == True) | (User.role.ilike('admin'))).first()
         if not admin:
             admin = User.query.first()
+        if admin:
+            admin.perm_financeiro = True
+            admin.perm_alugueis = True
+            db.session.commit()
             
         with self.client.session_transaction() as sess:
             sess['_user_id'] = str(admin.id)

@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.20--Weekly%20Billing%20Resilience%20%26%20Purchase%20V5C-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.29--Financial%20RBAC%2C%20Login%20Redirects%20%26%20Photo%20Zoom-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -51,15 +51,16 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **DVLA SORN (Statutory Off Road Notification) Support:** Native toggle for vehicles officially declared off-road (SORN) with DVLA. Automatically disables Road Tax expiry dates, displays a distinctive `🛡️ SORN` badge in the fleet list, supports quick search (`search=sorn`), and excludes off-road bikes from false-positive Road Tax dashboard alerts.
 * **Missing V5C Tracking & Alerts:** Fleet vehicles without V5C registration logbooks feature an eye-catching `⚠️ No V5C` badge in the fleet table, quick filtering (`/motos?v5c=missing`), and an amber alert badge on contract cards.
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
-* **V5C Logbook Multi-Page Management & Mobile Multi-Shot Camera:**
+* **V5C Logbook Multi-Page Management, Mobile Multi-Shot Camera & High-Res Zoom:**
   - Dedicated multi-shot camera accumulator (`capture="environment"` and gallery picker) allowing operators to photograph multi-page V5C logbooks (Page 1, Page 2, Page 3...) consecutively on iPhone/Safari without reloading or uploading one-by-one.
-  - Interactive preview grid with thumbnail, file size, and per-page discard button before batch uploading.
+  - Interactive preview grid with thumbnail, file size, click-to-zoom preview, and per-page discard button before batch uploading.
   - Single-click batch upload (`POST /api/motos/<placa>/v5c`) supporting image and digital PDF formats.
+  - **High-Resolution Photo Zoom (Driving Licence & Inspection Standard):** V5C cards and Tracker photo galleries feature `🔍 Enlarge` badges, direct `↗ Full` links for opening original full-resolution files in new tabs (`target="_blank"` with native pinch-to-zoom), and an interactive lightbox viewer with 2x zoom toggle, smooth pan/scroll, and ESC keyboard support.
 * **GPS Telematics & Tracker Duplicate Protection:**
   - Multiple GPS trackers per motorbike with ownership classification (`Company` vs `Customer`).
   - **Fleet-Wide Serial/IMEI Uniqueness:** Prevents duplicate tracker registration across vehicles, returning a descriptive error informing which plate currently holds the hardware.
   - **Mobile Numeric Keypad:** Input field equipped with `inputmode="numeric"` and `pattern="[0-9]*"` for effortless IMEI typing on iPhone and touchscreen devices.
-  - Serial / IMEI tracking and dedicated camera capture for device stickers and wiring installations.
+  - Serial / IMEI tracking, installation notes, and camera capture for device stickers and wiring with clickable zoom inspection.
 
 ### 👥 3. Customer Relationship Management
 * **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
@@ -142,10 +143,12 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - **API Shielding:** `DELETE /api/usuarios/<id>` and `PUT /api/usuarios/<id>` return `HTTP 403 Forbidden` if any operation attempts to delete the root user or remove admin privileges.
   - **Self-Healing Startup Seed (`seed_default_admin`):** Automatic boot-time verification that re-affirms master permissions and status on every server start.
   - **Frontend Safeguards:** Visual `👑 Root Administrator` and `ROOT` badges, locked privilege toggles in the edit modal, and replacement of the Delete button with a `🔒 Protected` disabled badge.
-* **Granular Modular Access Control:** True role separation allowing individual per-user permission toggles:
-  - **Rental Module (`perm_alugueis`):** Access to fleet, customers, contracts, inspections, financial transactions, and overdue reports. Non-rental users are strictly blocked at route and API levels.
+* **Granular Modular Access Control & Financial Sub-Permission:** True role separation allowing individual per-user permission toggles:
+  - **Rental Module (`perm_alugueis`):** Access to fleet, customers, contracts, inspections, and overdue reports. Non-rental users are strictly blocked at route and API levels.
+  - **Financial Module (`perm_financeiro`):** Granular sub-permission allowing administrators to isolate the General Financial Ledger (`/financeiro`, PDF closing sheets, cash register cashing-up, API summaries). Users without financial access are prevented from entering `/financeiro`, while retaining full operational capability on the Dashboard (cashflow cards, Payments Due Today), Overdue Reports, and day-to-day contract payment collection (`/contratos/<id>`).
   - **Claims Module (`perm_claims`):** Access to accident claims, yard storage monitoring, referral fees, and storage invoices.
   - **Administrator (`is_admin`):** Full privileges to manage accounts, audit logs, and system operations.
+* **Seamless Login Redirect Preservation (`?next=...`):** Opening direct links while logged out automatically preserves target URLs and query parameters through authentication with strict Open Redirect shielding, routing operators directly to their requested agreement or fleet resource upon login.
 * **Comprehensive Audit Trail:** 100% coverage of state-modifying actions (Login/Logout, Client updates, Transaction deletions, Contract alterations, WhatsApp payment reminders) capturing User, Timestamp, IP, and exact action details.
 * **Brute-force Protection & Rate Limiting:** Built-in IP-based login rate limiting, blocking users after consecutive failed attempts.
 * **Storage Optimization Script:** Standalone cleanup script to prune orphan file uploads generated from aborted registrations, preventing server bloat.

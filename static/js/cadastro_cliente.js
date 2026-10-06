@@ -5,6 +5,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const loader = submitBtn.querySelector('.loader');
     const feedbackMsg = document.getElementById('feedbackMessage');
 
+    const nomeInput = document.getElementById('nome');
+    const enderecoInput = document.getElementById('endereco');
+
+    function capitalizeWords(str) {
+        if (!str) return '';
+        return str.trim().replace(/\b([a-zÀ-ÿ])/g, char => char.toUpperCase());
+    }
+
+    if (nomeInput) {
+        nomeInput.addEventListener('blur', () => {
+            nomeInput.value = capitalizeWords(nomeInput.value);
+        });
+    }
+
+    if (enderecoInput) {
+        enderecoInput.addEventListener('blur', () => {
+            enderecoInput.value = capitalizeWords(enderecoInput.value);
+        });
+    }
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
@@ -19,10 +39,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Gather data via FormData
         const formData = new FormData();
-        formData.append('nome', document.getElementById('nome').value.trim());
+        const nomeVal = capitalizeWords(document.getElementById('nome').value);
+        const enderecoVal = capitalizeWords(document.getElementById('endereco').value);
+        formData.append('nome', nomeVal);
         formData.append('telefone', document.getElementById('telefone').value.trim());
         formData.append('email', document.getElementById('email').value.trim());
-        formData.append('endereco', document.getElementById('endereco').value.trim());
+        formData.append('endereco', enderecoVal);
         const txtNotas = document.getElementById('notas_internas');
         if (txtNotas) {
             formData.append('notas_internas', txtNotas.value.trim());

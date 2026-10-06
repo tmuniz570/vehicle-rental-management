@@ -4,6 +4,51 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.29] — 2026-10-06 — *Granular Financial Access RBAC, Seamless Login Redirects, Mobile iOS Name/Address Sanitization & V5C/Tracker Photo Zoom*
+
+### 🔍 Ampliação e Zoom de Fotos de V5C e Rastreadores GPS (Padrão Driving Licence & Vistorias)
+* **Visualização em Alta Resolução em Nova Aba (`↗ Full` / `target="_blank"`)**:
+  - Alinhado rigorosamente com o padrão de Driving Licence e Carrossel de Vistorias.
+  - Cards de V5C e Transfer Slip no modal de gestão veicular (`#tabV5C`) agora contam com o botão dedicado `↗ Full` para abrir a imagem original em alta resolução em nova aba com pinch-to-zoom nativo do navegador.
+* **Miniaturas Interativas com Selo de Zoom (`🔍 Enlarge`)**:
+  - Miniaturas de documentos V5C e fotos de rastreadores GPS (Trackers) receberam o selo visual `🔍 Enlarge` e `🔍`, com feedback em hover e cursor interativo.
+* **Lightbox Dinâmico com Magnificação 2x e Rolagem Bidirecional (Scroll/Pan)**:
+  - Header com título/legenda do documento, botão `↗ Open Full Size` para nova aba e botão de alternância `🔎 Zoom 2x` / `🔍 Fit Screen`.
+  - O clique ou toque direto na imagem alterna suavemente entre ajuste de tela (1x) e zoom ampliado (2x).
+  - O viewport scrollável permite navegar por detalhes microscópicos da imagem (números de chassi, referência DVLA, códigos de barra e serial de rastreadores).
+  - Fechamento intuitivo via botão `✕`, clique no backdrop escuro ou tecla `ESC`.
+* **Inspeção Prévia de Fotos Enfileiradas (Staged Preview)**:
+  - Fotos acumuladas pela câmera do celular ou da galeria antes do upload (staged preview) tornaram-se clicáveis para inspeção prévia no lightbox antes do envio ao servidor.
+
+### 🔐 Nível de Acesso Granular para Financeiro (`perm_financeiro` / RBAC)
+* **Nova Permissão Modular de Usuário**:
+  - Adicionada a coluna `perm_financeiro BOOLEAN DEFAULT True NOT NULL` na tabela `usuarios` com migração autônoma para Postgres e SQLite.
+  - Administradores podem ativar ou desativar o acesso financeiro granular por operador em `/usuarios`.
+* **Preservação Total da Operação de Pátio e Balcão**:
+  - **Dashboard Completo (`/`, `/api/dashboard`)**: Usuários sem permissão financeira continuam visualizando normalmente todos os cards de faturamento semanal, arrecadação realizada e a lista de "Payments Due Today" com disparo de lembretes WhatsApp.
+  - **Relatório de Inadimplência (`/relatorios/vencidos`)**: Permanece 100% liberado para acompanhamento operacional e cobrança direta dos locatários.
+  - **Gestão Contratual nos Detalhes do Contrato (`/contratos/<id>`)**: Dar baixa em pagamentos (`/api/financeiro/pagar/<id>`), reverter pagamentos (`/api/financeiro/<id>/reverter`), lançar cobrança avulsa (`/api/contratos/<id>/cobrancas`) e excluir cobranças pendentes continuam plenamente disponíveis para a equipe de locação (`perm_alugueis`).
+* **Bloqueio Estrito ao Livro-Caixa Geral (`/financeiro`)**:
+  - Rotas de navegação para `/financeiro`, `/relatorios`, `/financeiro/relatorio-pdf` e `/financeiro/fechamento-caixa/print` são bloqueadas e redirecionadas para o Dashboard com flash alert (`Access denied to Financial Management`).
+  - Endpoints de API (`/api/financeiro`, `/api/financeiro/resumo`, `/api/financeiro/fechamento-caixa`, `/api/financeiro/exportar-csv`) retornam estritamente `HTTP 403 Forbidden`.
+  - Links de navegação para "Finance" / "Financial" na barra lateral e no bottom nav mobile são ocultados dinamicamente para usuários sem permissão.
+
+### 🚀 Preservação Fluida do Destino no Login (`?next=[url]` & Defesa contra Open Redirect)
+* **Correção de Redirecionamento Pós-Autenticação**:
+  - Quando um operador deslogado abre links diretos de contratos, vistorias ou frotas (`/login?next=/contratos/14`), o destino e seus query parameters são preservados de ponta a ponta no formulário de login (`login.html`).
+  - Ao concluir a autenticação, o usuário é direcionado instantaneamente ao recurso solicitado em vez de ser jogado genericamente no Dashboard.
+  - Usuários já autenticados que acessam `/login?next=...` são encaminhados diretamente ao destino sem passar pela tela de login.
+  - Validação estrita via `is_safe_redirect_url()` neutralizando loops e tentativas de phishing/open redirect.
+
+### 📱 Desativação do Corretor iOS & Capitalização Padrão (Nome e Endereço)
+* **Prevenção de Erros do Teclado Virtual no iPhone**:
+  - Campos de Nome e Endereço de clientes (`#nome`, `#endereco`, `#edit_nome`, `#edit_endereco`) atualizados com `autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="off"`.
+  - Impede que o corretor ortográfico do iOS substitua nomes estrangeiros ou termos de endereços britânicos.
+  - Configura o teclado nativo para iniciar cada palavra em letra maiúscula (Title Case).
+* **Sanitização Bidirecional (Frontend & Backend)**:
+  - Formatação inteligente no evento `blur` e no envio do formulário.
+  - Função `capitalize_words()` no backend (`app.py`) padroniza o cadastro de clientes preservando caixas altas legítimas de postcodes UK (ex: `B14 7RL`, `B66 3EW`), siglas e nomes compostos como `O'Connor` e `McDonald`.
+
 ## [1.9.28] — 2026-10-04 — *Provisional Transfer Slip (V5C/2) & Official V5C Segregation with Persistent Compliance Alerts*
 
 ### 📋 Segregação de Comprovante de Transferência Provisório vs. Logbook V5C Oficial

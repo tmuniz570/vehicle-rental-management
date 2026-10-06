@@ -188,6 +188,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function capitalizeWords(str) {
+        if (!str) return '';
+        return str.trim().replace(/\b([a-zÀ-ÿ])/g, char => char.toUpperCase());
+    }
+
+    const editNomeInput = document.getElementById('edit_nome');
+    const editEndInput = document.getElementById('edit_endereco');
+
+    if (editNomeInput) {
+        editNomeInput.addEventListener('blur', () => {
+            editNomeInput.value = capitalizeWords(editNomeInput.value);
+        });
+    }
+
+    if (editEndInput) {
+        editEndInput.addEventListener('blur', () => {
+            editEndInput.value = capitalizeWords(editEndInput.value);
+        });
+    }
+
     const editForm = document.getElementById('editClientForm');
     if (editForm) {
         editForm.addEventListener('submit', async (e) => {
@@ -202,10 +222,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const data = new FormData();
-            data.append('nome', document.getElementById('edit_nome').value.trim());
+            const editNomeVal = capitalizeWords(document.getElementById('edit_nome').value);
+            const editEndVal = capitalizeWords(document.getElementById('edit_endereco').value);
+            data.append('nome', editNomeVal);
             data.append('telefone', document.getElementById('edit_telefone').value.trim());
             data.append('email', document.getElementById('edit_email').value.trim());
-            data.append('endereco', document.getElementById('edit_endereco').value.trim());
+            data.append('endereco', editEndVal);
             const txtNotas = document.getElementById('edit_notas_internas');
             if (txtNotas) {
                 data.append('notas_internas', txtNotas.value.trim());

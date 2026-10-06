@@ -34,6 +34,7 @@ class User(db.Model, UserMixin):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     perm_alugueis = db.Column(db.Boolean, default=True, nullable=False)
     perm_claims = db.Column(db.Boolean, default=False, nullable=False)
+    perm_financeiro = db.Column(db.Boolean, default=True, nullable=False)
     ativo = db.Column(db.Boolean, default=True, nullable=False)
     data_criacao = db.Column(db.DateTime, default=lambda: datetime.now(pytz.timezone('Europe/London')).replace(tzinfo=None), nullable=False)
 
@@ -52,6 +53,9 @@ class User(db.Model, UserMixin):
 
     def pode_claims(self):
         return bool(self.is_admin or self.perm_claims)
+
+    def pode_financeiro(self):
+        return bool(self.is_admin or (self.perm_alugueis and self.perm_financeiro))
 
     def pode_admin(self):
         return bool(self.is_admin)
@@ -75,6 +79,7 @@ def protect_root_admin_update(mapper, connection, target):
         target.ativo = True
         target.perm_alugueis = True
         target.perm_claims = True
+        target.perm_financeiro = True
 
 class MotoStatus(str, Enum):
     AVAILABLE = "Available"
@@ -660,6 +665,14 @@ def init_db(app):
                         conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN perm_claims BOOLEAN DEFAULT 0"))
                         conn.commit()
                         conn.execute(db.text("UPDATE usuarios SET perm_claims = 1 WHERE role = 'admin'"))
+                        conn.commit()
+                    if 'perm_financeiro' not in cols_u:
+                        if db.engine.dialect.name == 'postgresql':
+                            conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN perm_financeiro BOOLEAN DEFAULT TRUE"))
+                        else:
+                            conn.execute(db.text("ALTER TABLE usuarios ADD COLUMN perm_financeiro BOOLEAN DEFAULT 1"))
+                        conn.commit()
+                        conn.execute(db.text("UPDATE usuarios SET perm_financeiro = 1"))
                         conn.commit()
 
                 # Transações Financeiras: Suporte a Registro de Lembretes, Anexos e Vínculo com Vistoria

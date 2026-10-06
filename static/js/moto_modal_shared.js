@@ -45,19 +45,93 @@ window.copiarPlacaDVLA = window.copiarPlacaDVLA || function(event, placa) {
 };
 
 // Lightbox logic
+let lightboxIsZoomed = false;
+
 function abrirLightbox(url, caption = '') {
     const modal = document.getElementById('lightboxModal');
     const img = document.getElementById('lightboxImg');
+    const viewport = document.getElementById('lightboxViewport');
+    const openFullBtn = document.getElementById('lightboxOpenFullBtn');
     const cap = document.getElementById('lightboxCaption');
     if (!modal || !img) return;
+
     img.src = url;
-    if (cap) cap.textContent = caption;
+    if (openFullBtn) openFullBtn.href = url;
+    if (cap) cap.textContent = caption || 'Document Preview';
+
+    lightboxIsZoomed = false;
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = 'calc(82vh - 120px)';
+    img.style.width = 'auto';
+    img.style.height = 'auto';
+    img.style.cursor = 'zoom-in';
+
+    if (viewport) {
+        viewport.scrollTop = 0;
+        viewport.scrollLeft = 0;
+        viewport.style.alignItems = 'center';
+        viewport.style.justifyContent = 'center';
+    }
+
+    const zoomBtn = document.getElementById('lightboxToggleZoomBtn');
+    if (zoomBtn) zoomBtn.innerHTML = '<span>🔎 Zoom 2x</span>';
+
     modal.classList.add('active');
 }
 
 function fecharLightbox() {
     const modal = document.getElementById('lightboxModal');
     if (modal) modal.classList.remove('active');
+    const img = document.getElementById('lightboxImg');
+    const viewport = document.getElementById('lightboxViewport');
+    if (img) {
+        img.src = '';
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = 'calc(82vh - 120px)';
+        img.style.width = 'auto';
+        img.style.height = 'auto';
+    }
+    if (viewport) {
+        viewport.style.alignItems = 'center';
+        viewport.style.justifyContent = 'center';
+    }
+    lightboxIsZoomed = false;
+}
+
+function toggleLightboxZoom(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const img = document.getElementById('lightboxImg');
+    const viewport = document.getElementById('lightboxViewport');
+    const zoomBtn = document.getElementById('lightboxToggleZoomBtn');
+    if (!img) return;
+
+    lightboxIsZoomed = !lightboxIsZoomed;
+    if (lightboxIsZoomed) {
+        img.style.maxWidth = 'none';
+        img.style.maxHeight = 'none';
+        img.style.width = '180%';
+        img.style.height = 'auto';
+        img.style.cursor = 'zoom-out';
+        if (zoomBtn) zoomBtn.innerHTML = '<span>🔍 Fit Screen</span>';
+        if (viewport) {
+            viewport.style.alignItems = 'flex-start';
+            viewport.style.justifyContent = 'flex-start';
+        }
+    } else {
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = 'calc(82vh - 120px)';
+        img.style.width = 'auto';
+        img.style.height = 'auto';
+        img.style.cursor = 'zoom-in';
+        if (zoomBtn) zoomBtn.innerHTML = '<span>🔎 Zoom 2x</span>';
+        if (viewport) {
+            viewport.style.alignItems = 'center';
+            viewport.style.justifyContent = 'center';
+        }
+    }
 }
 
 // Tab navigation within Moto Manage Modal
@@ -101,19 +175,25 @@ function renderV5CCard(doc, idx) {
             <span style="font-size: 0.75rem; font-weight: 700; color: #ef4444; margin-top: 4px;">PDF DOCUMENT</span>
         </div>
     ` : `
-        <div style="height: 120px; overflow: hidden; background: #000; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', '${isTransfer ? 'Transfer Slip' : 'V5C'} - ${escapeHtml(doc.nome_original || 'Doc ' + (idx + 1))}')">
-            <img src="${escapeHtml(doc.url_arquivo)}" alt="Document Page" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <div style="height: 120px; overflow: hidden; background: #000; position: relative; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border-color); cursor: pointer;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', '${isTransfer ? 'Transfer Slip' : 'V5C Logbook'} - ${escapeHtml(doc.nome_original || 'Doc ' + (idx + 1))}')" title="Click to enlarge & zoom">
+            <img src="${escapeHtml(doc.url_arquivo)}" alt="Document Page" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s;" onmouseover="this.style.transform='scale(1.06)'" onmouseout="this.style.transform='scale(1)'">
+            <span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px); color: #fff; font-size: 0.7rem; font-weight: 600; padding: 2px 7px; border-radius: 999px; pointer-events: none; border: 1px solid rgba(255,255,255,0.25);">🔍 Enlarge</span>
         </div>
     `;
 
     const viewAction = isPdf ? `
-        <a href="${escapeHtml(doc.url_arquivo)}" target="_blank" rel="noopener" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+        <a href="${escapeHtml(doc.url_arquivo)}" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Open PDF in new tab">
             <span>↗ Open</span>
         </a>
     ` : `
-        <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', '${isTransfer ? 'Transfer Slip' : 'V5C'} - ${escapeHtml(doc.nome_original || 'Doc ' + (idx + 1))}')">
-            <span>🔍 Zoom</span>
-        </button>
+        <div style="display: inline-flex; gap: 4px;">
+            <button type="button" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" onclick="abrirLightbox('${escapeHtml(doc.url_arquivo)}', '${isTransfer ? 'Transfer Slip' : 'V5C Logbook'} - ${escapeHtml(doc.nome_original || 'Doc ' + (idx + 1))}')" title="Zoom & inspect inside modal">
+                <span>🔍 Zoom</span>
+            </button>
+            <a href="${escapeHtml(doc.url_arquivo)}" target="_blank" rel="noopener noreferrer" class="btn-secondary" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;" title="Open full resolution in new tab (pinch-to-zoom)">
+                <span>↗ Full</span>
+            </a>
+        </div>
     `;
 
     return `
@@ -273,8 +353,9 @@ function renderTrackersList(trackersList) {
                 </div>
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                     ${photos.map((pUrl, pIdx) => `
-                        <div style="position: relative; width: 75px; height: 75px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); cursor: pointer; background: #000;" onclick="abrirLightbox('${escapeHtml(pUrl)}', 'Tracker ${escapeHtml(t.numero)} - Photo ${pIdx + 1}')">
+                        <div style="position: relative; width: 75px; height: 75px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color); cursor: pointer; background: #000;" onclick="abrirLightbox('${escapeHtml(pUrl)}', 'Tracker ${escapeHtml(t.numero)} - Photo ${pIdx + 1}')" title="Click to enlarge & zoom photo">
                             <img src="${escapeHtml(pUrl)}" alt="Tracker Photo" style="width: 100%; height: 100%; object-fit: cover; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+                            <span style="position: absolute; bottom: 3px; right: 3px; background: rgba(0,0,0,0.75); backdrop-filter: blur(3px); color: #fff; font-size: 0.6rem; padding: 1px 4px; border-radius: 4px; pointer-events: none; border: 1px solid rgba(255,255,255,0.2);">🔍</span>
                         </div>
                     `).join('')}
                 </div>
@@ -452,9 +533,10 @@ function renderTrackerPhotosPreview() {
     container.innerHTML = selectedTrackerPhotos.map((file, idx) => {
         const tempUrl = URL.createObjectURL(file);
         return `
-            <div style="position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; border: 1px solid var(--accent);">
+            <div style="position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; border: 1px solid var(--accent); cursor: pointer;" onclick="abrirLightbox('${tempUrl}', 'Staged Tracker Photo ${idx + 1}')" title="Click to preview & zoom">
                 <img src="${tempUrl}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
-                <button type="button" onclick="removerFotoStaged(${idx})" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.75); color: #ef4444; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1;" title="Remove photo">&times;</button>
+                <span style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.75); color: #fff; font-size: 0.55rem; padding: 1px 3px; border-radius: 3px; pointer-events: none;">🔍</span>
+                <button type="button" onclick="event.stopPropagation(); removerFotoStaged(${idx});" style="position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.75); color: #ef4444; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; z-index: 2;" title="Remove photo">&times;</button>
             </div>
         `;
     }).join('');
@@ -587,8 +669,9 @@ function renderV5CStagedPreview() {
                 <span style="font-size: 0.65rem; font-weight: 700; color: #ef4444; margin-top: 2px;">PDF</span>
             </div>
         ` : `
-            <div style="width: 80px; height: 80px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--accent); position: relative;">
+            <div style="width: 80px; height: 80px; background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--accent); position: relative; cursor: pointer;" onclick="abrirLightbox('${tempUrl}', 'Staged ${escapeHtml(file.name)}')" title="Click to preview & zoom">
                 <img src="${tempUrl}" alt="${pageLabel}" style="width: 100%; height: 100%; object-fit: cover;">
+                <span style="position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.75); color: #fff; font-size: 0.55rem; padding: 1px 3px; border-radius: 3px; pointer-events: none;">🔍</span>
             </div>
         `;
 
@@ -670,6 +753,7 @@ window.abrirModalMoto = abrirModalMoto;
 window.fecharModalMoto = fecharModalMoto;
 window.abrirLightbox = abrirLightbox;
 window.fecharLightbox = fecharLightbox;
+window.toggleLightboxZoom = toggleLightboxZoom;
 window.alternarAba = alternarAba;
 window.removerV5C = removerV5C;
 window.removerTracker = removerTracker;
@@ -690,15 +774,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Lightbox Close
+    // Lightbox Controls
     const closeLightboxBtn = document.getElementById('closeLightboxBtn');
     const lightboxModal = document.getElementById('lightboxModal');
+    const zoomToggleBtn = document.getElementById('lightboxToggleZoomBtn');
+
     if (closeLightboxBtn) closeLightboxBtn.addEventListener('click', fecharLightbox);
+    if (zoomToggleBtn) zoomToggleBtn.addEventListener('click', toggleLightboxZoom);
     if (lightboxModal) {
         lightboxModal.addEventListener('click', (e) => {
             if (e.target === lightboxModal) fecharLightbox();
         });
     }
+
+    // Keyboard ESC listener for Lightbox
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+            const lb = document.getElementById('lightboxModal');
+            if (lb && lb.classList.contains('active')) {
+                fecharLightbox();
+            }
+        }
+    });
 
     // Tab Buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
