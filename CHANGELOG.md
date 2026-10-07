@@ -4,6 +4,41 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.30] — 2026-10-07 — *Compact Contracts Table, Overdue Debt Tracking, Financial Statement Overhaul & PostgreSQL Timezone Immunity*
+
+### 📊 Tabela de Contratos de Alta Densidade & Zero Scroll Horizontal (`/contratos`)
+* **Layout Ultra-Compacto Inspirado no Livro-Caixa Financeiro**:
+  - Espaçamento de células reduzido em >50% (`0.35rem 0.55rem`) com `line-height: 1.25` e tipografia técnica `0.82rem`, reduzindo a altura das linhas e dobrando a quantidade de contratos visíveis por tela.
+  - Cabeçalhos concisos (`#`, `Type`, `Customer`, `Vehicle`, `Collection`, `Due / Terms`, `Amount`, `Status`, `Actions`) economizando espaço horizontal para eliminar barras de rolagem em telas de notebooks e desktops comuns.
+  - Truncamento gracioso (`ellipsis`) para nomes de clientes e modelos de veículos com preservação de tooltips nativos.
+
+### 🔴 Indicadores Visuais de Pendências & Rastreamento de Débitos Vencidos
+* **Ponto de Status Colorido na Coluna `#`**:
+  - 🔴 **Débito em Atraso**: Ponto vermelho com tooltip detalhando quantidade de faturas em atraso e valor total vencido.
+  - 🟡 **Pendência Operacional/Documental**: Ponto amarelo indicando pendências de vistoria de saída, seguro, V5C ou assinatura.
+  - 🟢 **100% Em Dia (All Clear)**: Ponto verde com tooltip confirmando conformidade total.
+* **Destaque de Inadimplência na Coluna `Amount` (Economia de Espaço Vertical)**:
+  - Exibe `⚠️ Overdue: £...` em vermelho junto aos valores financeiros quando há atrasos, eliminando duplicidade na coluna de status e reduzindo a altura das linhas.
+* **Coluna `Status` Enxuta e Operacional**:
+  - Mantém badges estritamente operacionais (`Active`, `⚠️ Needs Insp/Ins`, `📑 Needs V5C`, `⏳ Unsigned`, `✓ All Clear`).
+* **Card Executivo de KPI & Filtros de Status**:
+  - Novo card `🔴 Overdue Debts` no topo com contagem em tempo real e clique para filtrar.
+  - Opções no filtro de status: `⚠️ With Pending Issues (Any)`, `🔴 Overdue Debts (Financial)` e `✓ Clean (No Issues / Up to Date)`.
+
+### 💳 Modernização do Extrato Financeiro nos Detalhes do Contrato (`/contratos/<id>`)
+* **Coluna `#` e Rastreabilidade de Saldos (`⚡ Bal #ID`)**:
+  - Adicionada coluna `#` com ID da transação clicável para filtro instantâneo por ID.
+  - Indicador `⚡ Bal #ID` identificando transações de saldo remanescente geradas por pagamentos parciais.
+* **Contador de Dias em Atraso & Lembrete WhatsApp Inline**:
+  - Contador `⚠️ Nd late` em transações vencidas para priorização de cobrança.
+  - Botão de WhatsApp direto na linha da cobrança (`💬 Remind`) com gravação de auditoria e indicador otimista `✓ Reminded`.
+* **Busca Instantânea & Rodapé com Totalizadores Dinâmicos**:
+  - Campo de filtro em tempo real no extrato e rodapé `Total in view` com totalizadores automáticos da visão filtrada.
+
+### 🛡️ Blindagem de Fuso Horário no PostgreSQL / SQLAlchemy
+* **Função Auxiliar `is_transaction_overdue(tx, hoje_date)`**:
+  - Previne a exceção `TypeError: can't compare offset-naive and offset-aware datetimes` ao lidar com instâncias do PostgreSQL em produção, garantindo suporte agnóstico a datetimes conscientes de fuso horário, ingênuos e objetos de data pura em relação ao horário de Londres.
+
 ## [1.9.29] — 2026-10-06 — *Granular Financial Access RBAC, Seamless Login Redirects, Mobile iOS Name/Address Sanitization & V5C/Tracker Photo Zoom*
 
 ### 🔍 Ampliação e Zoom de Fotos de V5C e Rastreadores GPS (Padrão Driving Licence & Vistorias)
