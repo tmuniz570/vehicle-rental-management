@@ -6,7 +6,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const feedbackMsg = document.getElementById('feedbackMessage');
 
     const nomeInput = document.getElementById('nome');
+    const telInput = document.getElementById('telefone');
+    const emailInput = document.getElementById('email');
     const enderecoInput = document.getElementById('endereco');
+
+    const dupBanner = document.getElementById('duplicateWarningBanner');
+    const dupText = document.getElementById('duplicateWarningText');
+    const dupViewLink = document.getElementById('duplicateViewLink');
+    const dupDealLink = document.getElementById('duplicateDealLink');
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
     function capitalizeWords(str) {
         if (!str) return '';
@@ -23,6 +40,58 @@ document.addEventListener('DOMContentLoaded', () => {
         enderecoInput.addEventListener('blur', () => {
             enderecoInput.value = capitalizeWords(enderecoInput.value);
         });
+    }
+
+    // Real-Time Duplicate Customer Detection (UK & International Phones)
+    let dupCheckTimeout = null;
+    async function checkDuplicate() {
+        const tel = telInput ? telInput.value.trim() : '';
+        const email = emailInput ? emailInput.value.trim() : '';
+
+        if (!tel && !email) {
+            if (dupBanner) dupBanner.classList.add('hidden');
+            return;
+        }
+
+        try {
+            const params = new URLSearchParams();
+            if (tel) params.append('telefone', tel);
+            if (email) params.append('email', email);
+
+            const res = await fetch(`/api/clientes/verificar-duplicado?${params.toString()}`);
+            const data = await res.json();
+
+            if (data.duplicate && data.client) {
+                const cl = data.client;
+                const matchReason = data.matched_by === 'phone' ? 'phone number' : 'email address';
+                if (dupText) {
+                    dupText.innerHTML = `Found existing profile for <strong>${escapeHtml(cl.nome)}</strong> (#${cl.id}) with this ${matchReason} (${escapeHtml(cl.telefone || cl.email)}).`;
+                }
+                if (dupViewLink) dupViewLink.href = `/clientes?search=${cl.id}`;
+                if (dupDealLink) dupDealLink.href = `/contratos/novo?cliente_id=${cl.id}`;
+                if (dupBanner) dupBanner.classList.remove('hidden');
+            } else {
+                if (dupBanner) dupBanner.classList.add('hidden');
+            }
+        } catch (e) {
+            console.warn('Duplicate check failed:', e);
+        }
+    }
+
+    if (telInput) {
+        telInput.addEventListener('input', () => {
+            clearTimeout(dupCheckTimeout);
+            dupCheckTimeout = setTimeout(checkDuplicate, 450);
+        });
+        telInput.addEventListener('blur', checkDuplicate);
+    }
+
+    if (emailInput) {
+        emailInput.addEventListener('input', () => {
+            clearTimeout(dupCheckTimeout);
+            dupCheckTimeout = setTimeout(checkDuplicate, 450);
+        });
+        emailInput.addEventListener('blur', checkDuplicate);
     }
 
     form.addEventListener('submit', async (e) => {
@@ -93,8 +162,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 showFeedback('Customer registered successfully!', 'success');
                 form.reset();
+                if (dupBanner) dupBanner.classList.add('hidden');
             } else {
                 showFeedback(result.error || result.erro || 'Error registering customer', 'error');
+                if (result.existing_client && dupBanner) {
+                    checkDuplicate();
+                }
             }
         } catch (error) {
             console.error('Error:', error);
@@ -113,5 +186,3 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackMsg.classList.add(`feedback-${type}`);
     }
 });
-
-

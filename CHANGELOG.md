@@ -4,6 +4,89 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.32] — 2026-10-07 — *Merge Duplicates Modal Trigger Fix & Cache Buster Bump*
+
+### 🐛 Correção no Modal "🔀 Merge Duplicates" (`/clientes`)
+* **Ativação Visual do Modal Overlay**:
+  - O elemento `.modal-overlay` requer a classe CSS `.active` para transicionar de `opacity: 0; visibility: hidden;` para `opacity: 1; visibility: visible;`. O método `abrirModalMerge` agora aplica a classe `.active` em conjunto com `display: flex`, garantindo abertura instantânea.
+  - Removido `style="display: none;"` estático no markup de [templates/clientes.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/clientes.html) e adicionado handler inline `onclick="abrirModalMerge()"` no botão `#btnOpenMergeModal`.
+  - Exposição de `window.abrirModalMerge` e `window.fecharModalMerge` no escopo global para garantir invocação síncrona sem dependência de tempo de inicialização.
+  - Incremento de cache buster para `/static/js/clientes.js?v=7` em [templates/clientes.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/clientes.html).
+  - Suporte ao fechamento do modal Merge via tecla `Escape`.
+
+## [1.9.31] — 2026-10-07 — *Customers Command Center Overhaul, Executive KPIs, High-Density Table, Document Lightbox & + Deal Shortcut*
+
+### 📊 Faixa de Mini-Cards / KPIs Executivos no Topo (`/clientes`)
+* **Cards Interativos com Click-to-Filter**:
+  - `Total Customers`: Base total de clientes cadastrados.
+  - `⚡ Active Deals`: Clientes com contratos ativos e motos na rua no momento.
+  - `🔴 Overdue Debts`: Clientes com débitos vencidos, total de devedores e montante total da dívida em £.
+  - `⚠️ Missing Documents`: Clientes com pendência de Driving Licence (Front/Back) ou Proof of Address.
+  - *Click-to-filter*: Clicar no card filtra instantaneamente a tabela e sincroniza o estado visual ativo.
+
+### 📋 Tabela de Alta Densidade & Zero Scroll Horizontal (`#clientesTable`)
+* **Layout Ultra-Compacto Inspirado em Contratos e Financeiro**:
+  - Redução de padding celular em 50% (`0.35rem 0.55rem`) com `line-height: 1.25` e tipografia técnica `0.82rem`.
+  - Cabeçalhos concisos (`#`, `Customer`, `Contact`, `Address`, `Active Deal`, `Financial Status`, `Documents`, `Actions`).
+  - Ponto de status colorido na coluna `#` (🔴 Débito em atraso, 🟡 Pendência documental, 🟢 All clear).
+  - Truncamento gracioso com `ellipsis` e tooltips nativos.
+
+### 🛵 Vínculo em Tempo Real com Frota e Contratos Ativos
+* **Identificação Operacional do Condutor**:
+  - Coluna `Active Deal` exibe a placa estilizada, modelo da moto, cor e link direto para o contrato (`Deal #ID ↗`).
+  - Clientes sem contrato ativo exibem referência neutra `— No active deal` com contagem histórica de acordos anteriores.
+* **Rastreamento de Inadimplência**:
+  - Destaque em vermelho `🔴 £... overdue (N late)` para clientes com parcelas vencidas ou `✓ Up to date` para clientes adimplentes.
+
+### 🪪 Miniaturas de Documentos com Lightbox & Zoom 2x (Padrão Britânico DVLA)
+* **Pills Documentais Inteligentes**:
+  - DVLA Driving Licence: `🪪 Licence (F)` e `🪪 Licence (B)` (ou alerta `⚠️ No Licence`).
+  - `📜 CBT` (Certificado CBT).
+  - `🏠 Proof` (Proof of Address ou alerta `⚠️ No Proof`).
+* **Visualizador Lightbox Integrado**:
+  - Clicar em qualquer documento abre o visualizador em alta resolução com alternância de zoom 2x (`🔎 Zoom 2x` / `🔍 Fit Screen`), rolagem/pan bidirecional e link `↗ Open Full Size` para nova aba.
+
+### ⚡ Ações Rápidas por Linha & Produtividade
+* **Atalho Direto `+ Deal`**:
+  - Botão de ação rápida que direciona para `/contratos/novo?cliente_id=<id>`, pré-selecionando o cliente no assistente de novo acordo.
+* **Micro-Botões de Cópia (`📋`)**:
+  - Botões para cópia instantânea no clipboard para Nome, Telefone, Email e Endereço com feedback visual esmeralda (`✓ Copied!`) (removido botão de ID redundante).
+* **Integração WhatsApp Internacional**:
+  - Formatação internacional E.164 (`+447...`, `+55...`, etc.) com saudação cordial britânica contextualizada.
+
+### 🛡️ Prevenção Ativa de Clientes Duplicados & Suporte Internacional (UK + País de Origem)
+* **Normalização Canônica de Telefones Internacionais (`normalize_phone_canonical`)**:
+  - Suporte completo a números de motoristas do Reino Unido (`07...` / `+44...`) e de seus países de origem (Brasil `+55`, Portugal `+351`, etc.).
+  - Extrai e normaliza dígitos canônicos agnósticos de formatações com espaços, traços ou parênteses, prevenindo duplicidades mesmo com digitações diferentes.
+* **Detecção em Tempo Real no Formulário (`/clientes/novo`)**:
+  - Endpoint `GET /api/clientes/verificar-duplicado` checa instantaneamente telefone e e-mail via debounce na digitação.
+  - Alerta imediato em banner visual dourado destacando o perfil já existente com nome, ID, link para o cadastro (`View Customer ↗`) e atalho direto para criar contrato (`+ Deal ↗`).
+* **Bloqueio no Backend (`POST /api/clientes`)**:
+  - Rejeita a tentativa de cadastrar clientes com o mesmo telefone internacional/UK com `HTTP 400 Bad Request` e mensagem descritiva do cadastro existente.
+
+### 🔍 Busca Inteligente & Detalhes do Cliente no Assistente de Contratos (`/contratos/novo`)
+* **Seletor de Clientes de Alta Resolução**:
+  - Formatação explicativa no `<select id="id_cliente">` exibindo Nome, Telefone (`📱 07...` ou `+55...`), ID (`#ID`), alerta de moto ativa na rua (`[⚡ On Road: REG]`) e dívidas vencidas (`[🔴 £XX.XX late]`).
+* **Filtro Rápido em Tempo Real (`#clienteSearchFilter`)**:
+  - Campo de busca instantânea com 0ms de latência que filtra a lista por qualquer termo: partes do nome, telefone (formato bruto ou canônico), e-mail ou `#ID`.
+  - Contador de clientes dinâmico e botão para limpar a busca (`✕`).
+* **Card de Pré-Visualização Dinâmica do Cliente (`#clienteSelectedCard`)**:
+  - Exibe dados cadastrais completos, atalho direto para WhatsApp (`💬 Chat`), status documental completo (Licence Front/Back, Proof of Address, CBT), alerta de contrato ativo em andamento e dívidas pendentes.
+
+### 🔀 Ferramenta Administrativa de Fusão de Clientes Duplicados (`POST /api/clientes/merge`)
+* **Endpoint de Fusão Segura no Backend**:
+  - Rota protegida `POST /api/clientes/merge` que recebe o cliente duplicado (`source_id`) e o cliente principal a ser mantido (`target_id`).
+  - Transfere atomicamente todos os contratos (`Contract.id_cliente`) do duplicado para o cadastro principal.
+  - Absorve documentos e dados cadastrais ausentes no perfil principal (Driving Licence Front/Back, CBT, Proof of Address, endereço e e-mail).
+  - Consolida as notas internas (`notas_internas`) com cabeçalho de auditoria e timestamp britânico (`Europe/London`).
+  - Exclui com segurança o registro duplicado (`source_id`) do banco de dados.
+  - Registra a ação detalhada na trilha de auditoria (`AuditLog` com ação `CLIENT_MERGE`).
+* **Modal Interativo em Clientes (`#modalMergeCliente` em `/clientes`)**:
+  - Acessível pelo botão executivo `🔀 Merge Duplicates` no cabeçalho da página de clientes.
+  - Interface com 2 colunas e busca instantânea para selecionar o cliente duplicado e o cliente principal.
+  - Pré-visualização em tempo real do impacto da fusão (quantos contratos serão transferidos, documentos consolidados e aviso de irreversibilidade).
+  - Bloqueio automático contra seleção do mesmo cliente em ambas as pontas e confirmação de segurança antes da execução.
+
 ## [1.9.30] — 2026-10-07 — *Compact Contracts Table, Overdue Debt Tracking, Financial Statement Overhaul & PostgreSQL Timezone Immunity*
 
 ### 📊 Tabela de Contratos de Alta Densidade & Zero Scroll Horizontal (`/contratos`)

@@ -57,10 +57,25 @@
 
         <div class="form-row">
             <div class="form-group half">
-                <label for="id_cliente">Customer *</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+                    <label for="id_cliente" style="margin-bottom: 0; font-weight: 700;">Customer *</label>
+                    <span id="clienteCountBadge" style="font-size: 0.72rem; color: var(--text-secondary); background: rgba(255, 255, 255, 0.06); padding: 2px 7px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08);">Loading...</span>
+                </div>
+                
+                <!-- Smart Customer Quick Search Input -->
+                <div style="position: relative; margin-bottom: 0.45rem;">
+                    <input type="text" id="clienteSearchFilter" placeholder="🔍 Search name, phone (07... / +55...) or #ID..." autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 0.65rem 2rem 0.65rem 0.85rem; border-radius: 10px; border: 1px solid var(--input-border); background: rgba(0, 0, 0, 0.25); color: var(--text-primary); font-size: 0.85rem; outline: none; transition: border-color 0.2s ease;">
+                    <button type="button" id="btnClearClienteFilter" style="display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: transparent; border: none; color: var(--text-secondary); font-size: 1.1rem; cursor: pointer; padding: 0 4px; line-height: 1;" title="Clear search">&times;</button>
+                </div>
+
                 <select id="id_cliente" name="id_cliente" required style="background: var(--input-bg); color: var(--text-primary); border: 1px solid var(--input-border); padding: 0.875rem 1rem; border-radius: 12px; width: 100%;">
                     <option value="">Loading customers...</option>
                 </select>
+
+                <!-- Real-time Selected Customer Info Card -->
+                <div id="clienteSelectedCard" style="display: none; margin-top: 0.65rem; padding: 0.75rem 0.9rem; background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; font-size: 0.82rem; backdrop-filter: blur(8px);">
+                    <!-- Dynamically populated -->
+                </div>
             </div>
             
             <div class="form-group half">

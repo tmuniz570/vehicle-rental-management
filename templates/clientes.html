@@ -3,30 +3,92 @@
 {% block title %}Customers{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>Customers</h1>
-    <a href="/clientes/novo" class="btn-primary" style="width: auto; display: inline-flex;">+ Add Customer</a>
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="margin: 0; font-size: 1.85rem;">Customers</h1>
+        <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 0.9rem;">Customer records, DVLA Driving Licences, active vehicle deals and communication</p>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+        <button type="button" id="btnOpenMergeModal" onclick="abrirModalMerge()" class="btn-secondary" style="width: auto; display: inline-flex; align-items: center; gap: 6px; padding: 0.65rem 1rem; border-radius: 12px; font-size: 0.88rem; cursor: pointer;" title="Merge duplicate customer accounts">
+            🔀 Merge Duplicates
+        </button>
+        <a href="/clientes/novo" class="btn-primary" style="width: auto; display: inline-flex; align-items: center; gap: 6px;">
+            + Add Customer
+        </a>
+    </div>
 </div>
 
-<div style="margin-bottom: 1.5rem;">
-    <input type="text" id="searchInput" placeholder="Search by name, phone, email or #ID..." style="width: 100%; padding: 0.875rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary);">
+<!-- Customers KPI Summary Strip (Click to Filter) -->
+<div class="clientes-kpis-grid" id="clientesKpisGrid">
+    <div class="kpi-card" data-filter-status="" id="kpiCard_all" title="Click to view all customers">
+        <div class="kpi-title"><span>Total Customers</span> <span>👥</span></div>
+        <div class="kpi-value" id="kpiVal_total">-</div>
+        <div class="kpi-sub">Registered customer base</div>
+    </div>
+    <div class="kpi-card" data-filter-status="active" id="kpiCard_active" title="Click to filter Active Deals (On Road)">
+        <div class="kpi-title"><span>Active Deals</span> <span>⚡</span></div>
+        <div class="kpi-value" style="color: #38bdf8;" id="kpiVal_active">-</div>
+        <div class="kpi-sub">Customers with bikes on road</div>
+    </div>
+    <div class="kpi-card" data-filter-status="overdue" id="kpiCard_overdue" title="Click to filter Customers with Overdue Debts">
+        <div class="kpi-title"><span>Overdue Debts</span> <span>🔴</span></div>
+        <div class="kpi-value" style="color: #f87171;" id="kpiVal_overdue">-</div>
+        <div class="kpi-sub" id="kpiSub_overdue">Late payments pending</div>
+    </div>
+    <div class="kpi-card" data-filter-status="missing_docs" id="kpiCard_missing_docs" title="Click to filter Missing Driving Licence or Proof">
+        <div class="kpi-title"><span>Missing Documents</span> <span>⚠️</span></div>
+        <div class="kpi-value" style="color: #fbbf24;" id="kpiVal_missing_docs">-</div>
+        <div class="kpi-sub">Needs Licence / Proof upload</div>
+    </div>
+</div>
+
+<!-- Advanced Search & Filter Toolbar -->
+<div style="margin-bottom: 1.5rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+    <input type="text" id="searchInput" placeholder="Search by name, phone, email, address or #ID..." style="flex: 2; min-width: 240px; padding: 0.8rem 1rem; border-radius: 12px; border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-primary); font-size: 0.9rem;">
+    
+    <div class="filter-pill-group">
+        <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Status:</span>
+        <select id="filterStatus" class="filter-select">
+            <option value="" selected>All Customers</option>
+            <option value="active">⚡ Active Deals (On Road)</option>
+            <option value="no_deal">⚪ Inactive / No Active Deal</option>
+            <option value="overdue" style="color: #f87171;">🔴 Overdue Debts</option>
+            <option value="missing_docs" style="color: #fbbf24;">⚠️ Missing Documents</option>
+            <option value="clean" style="color: #4ade80;">✓ Clean (Compliant & Up to date)</option>
+        </select>
+    </div>
+
+    <div class="filter-pill-group">
+        <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Show:</span>
+        <select id="filterLimit" class="filter-select">
+            <option value="20" selected>20 per page</option>
+            <option value="50">50 per page</option>
+            <option value="100">100 per page</option>
+            <option value="500">All (up to 500)</option>
+        </select>
+    </div>
+
+    <button type="button" id="btnClearFilters" class="btn-secondary" style="padding: 0.65rem 0.95rem; font-size: 0.82rem; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Reset search & filters">
+        <span>✕ Clear</span>
+    </button>
 </div>
 
 <div class="table-container">
     <table id="clientesTable">
         <thead>
             <tr>
-                <th data-sort-field="id" style="width: 70px;">ID</th>
-                <th data-sort-field="nome">Name</th>
-                <th data-sort-field="telefone">Phone</th>
-                <th data-sort-field="email">Email</th>
+                <th data-sort-field="id" style="width: 60px;">#</th>
+                <th data-sort-field="nome">Customer</th>
+                <th data-sort-field="telefone">Contact</th>
                 <th data-sort-field="endereco">Address</th>
+                <th>Active Deal</th>
+                <th>Financial Status</th>
                 <th>Documents</th>
-                <th>Actions</th>
+                <th style="text-align: right; width: 140px;">Actions</th>
             </tr>
         </thead>
         <tbody>
-            <tr><td colspan="7" style="text-align:center;">Loading...</td></tr>
+            <tr><td colspan="8" style="text-align:center;">Loading customers...</td></tr>
         </tbody>
     </table>
 </div>
@@ -36,9 +98,10 @@
     <span id="paginationInfo" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
     <button id="btnNextPage" class="btn-primary" style="padding: 10px 15px; width: auto; min-width: 100px;">Next &raquo;</button>
 </div>
-<!-- Edit Modal -->
+
+<!-- Edit Customer Modal -->
 <div id="editClientModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalEditClientTitle">
-    <div class="modal-card" style="max-width: 520px;">
+    <div class="modal-card" style="max-width: 540px;">
         <div class="modal-header">
             <h3 id="modalEditClientTitle">Edit Customer</h3>
             <button type="button" id="closeClientModal" class="modal-close" title="Close" aria-label="Close">&times;</button>
@@ -53,16 +116,16 @@
                 <div class="form-row">
                     <div class="form-group half">
                         <label>Phone</label>
-                        <input type="tel" id="edit_telefone" required>
+                        <input type="tel" id="edit_telefone" required placeholder="07... or +44...">
                     </div>
                     <div class="form-group half">
                         <label>Email <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:normal;">(Optional)</span></label>
-                        <input type="email" id="edit_email" placeholder="e.g. john@example.co.uk (optional)">
+                        <input type="email" id="edit_email" placeholder="e.g. john@example.co.uk">
                     </div>
                 </div>
                 <div class="form-group">
                     <label>Full Address</label>
-                    <input type="text" id="edit_endereco" required autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="off">
+                    <input type="text" id="edit_endereco" required autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="off" placeholder="Street, City, Postcode">
                 </div>
                 <div class="form-row">
                     <div class="form-group half">
@@ -95,8 +158,348 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Merge Clientes Duplicados -->
+<div id="modalMergeCliente" class="modal-overlay" style="z-index: 1100;" role="dialog" aria-modal="true">
+    <div class="modal-container" style="max-width: 680px; width: 95vw; background: var(--card-bg, #0f172a); border: 1px solid var(--border-color); border-radius: 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.3);">
+            <div>
+                <h3 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+                    <span>🔀</span> Merge Duplicate Customers
+                </h3>
+                <p style="margin: 2px 0 0 0; color: var(--text-secondary); font-size: 0.8rem;">Consolidate duplicate records into a primary profile. Contracts and documents will be safely transferred.</p>
+            </div>
+            <button type="button" id="btnCloseMergeModal" class="modal-close" style="background: transparent; border: none; font-size: 1.5rem; color: var(--text-secondary); cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        
+        <div class="modal-body" style="padding: 1.25rem; max-height: calc(85vh - 120px); overflow-y: auto;">
+            <div id="mergeFeedback" class="feedback-message hidden" style="margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem;"></div>
+
+            <!-- Step 1: Duplicate Account to Remove -->
+            <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <label style="font-weight: 700; color: #f87171; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                        <span>1. Duplicate Customer (To be merged & removed)</span>
+                    </label>
+                    <span id="mergeSourceBadge" style="font-size: 0.72rem; color: var(--text-secondary);">Select duplicate</span>
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <input type="text" id="mergeSourceSearch" placeholder="🔍 Filter duplicate by name, phone or #ID..." style="width: 100%; box-sizing: border-box; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.82rem;">
+                </div>
+                <select id="mergeSourceSelect" style="width: 100%; padding: 0.65rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #1a1a24); color: var(--text-primary); font-size: 0.85rem;">
+                    <option value="">-- Choose Duplicate Customer --</option>
+                </select>
+                <div id="mergeSourcePreview" style="display: none; margin-top: 0.6rem; padding: 0.6rem 0.8rem; background: rgba(0,0,0,0.35); border-radius: 8px; font-size: 0.78rem;"></div>
+            </div>
+
+            <!-- Transfer Flow Indicator -->
+            <div style="display: flex; align-items: center; justify-content: center; margin: 0.5rem 0; gap: 8px;">
+                <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+                <span style="font-size: 0.75rem; font-weight: 700; color: var(--accent); background: rgba(255,102,0,0.1); border: 1px solid rgba(255,102,0,0.25); border-radius: 12px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 4px;">
+                    ⬇️ TRANSFER TO PRIMARY RECORD ⬇️
+                </span>
+                <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+            </div>
+
+            <!-- Step 2: Primary Account to Keep -->
+            <div style="background: rgba(34, 197, 94, 0.05); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <label style="font-weight: 700; color: #4ade80; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                        <span>2. Primary Customer (To KEEP as main profile)</span>
+                    </label>
+                    <span id="mergeTargetBadge" style="font-size: 0.72rem; color: var(--text-secondary);">Select primary</span>
+                </div>
+                <div style="margin-bottom: 0.5rem;">
+                    <input type="text" id="mergeTargetSearch" placeholder="🔍 Filter primary by name, phone or #ID..." style="width: 100%; box-sizing: border-box; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.82rem;">
+                </div>
+                <select id="mergeTargetSelect" style="width: 100%; padding: 0.65rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--input-bg, #1a1a24); color: var(--text-primary); font-size: 0.85rem;">
+                    <option value="">-- Choose Primary Customer --</option>
+                </select>
+                <div id="mergeTargetPreview" style="display: none; margin-top: 0.6rem; padding: 0.6rem 0.8rem; background: rgba(0,0,0,0.35); border-radius: 8px; font-size: 0.78rem;"></div>
+            </div>
+
+            <!-- Optional Reason Note -->
+            <div style="margin-bottom: 0.75rem;">
+                <label style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Reason / Internal Note <span style="font-weight: normal; font-size: 0.74rem;">(Optional)</span></label>
+                <input type="text" id="mergeReason" placeholder="e.g. Registered twice with UK and Brazil (+55) numbers" style="width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.82rem;">
+            </div>
+
+            <!-- Impact Summary Banner -->
+            <div id="mergeImpactBanner" style="display: none; padding: 0.75rem 1rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; color: #f59e0b; font-size: 0.8rem;">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 1rem 1.25rem; border-top: 1px solid var(--border-color); background: rgba(0,0,0,0.3); display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" id="btnCancelMerge" class="btn-secondary" style="padding: 0.65rem 1.25rem; font-size: 0.88rem; cursor: pointer; border-radius: 8px;">Cancel</button>
+            <button type="button" id="btnConfirmMerge" class="btn-primary" style="padding: 0.65rem 1.25rem; font-size: 0.88rem; cursor: pointer; border-radius: 8px; font-weight: 700; background: #ef4444; border-color: #ef4444;" disabled>
+                <span class="btn-text">Confirm & Merge Customers</span>
+                <span class="loader hidden" style="display: none; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Image / Document Lightbox Viewer Modal with Zoom & Pan -->
+<div id="lightboxModal" class="modal-overlay" style="z-index: 1200; background: rgba(0, 0, 0, 0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);" role="dialog" aria-modal="true">
+    <div style="position: relative; width: 95vw; max-width: 1000px; max-height: 94vh; display: flex; flex-direction: column; align-items: center; background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.85); overflow: hidden;">
+        <!-- Header Bar -->
+        <div style="width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.5); flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px; max-width: calc(100% - 190px); overflow: hidden;">
+                <span style="font-size: 1.1rem;">🔍</span>
+                <span id="lightboxCaption" style="color: var(--text-primary); font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Document Preview</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <a id="lightboxOpenFullBtn" href="" target="_blank" rel="noopener noreferrer" class="btn-primary" style="padding: 0.4rem 0.85rem; font-size: 0.78rem; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; background: var(--accent); color: white; border-radius: 6px; font-weight: 600;" title="Open in original full resolution in new tab">
+                    <span>↗ Open Full Size</span>
+                </a>
+                <button type="button" id="lightboxToggleZoomBtn" class="btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; border-radius: 6px;" title="Toggle 2x Zoom">
+                    <span>🔎 Zoom 2x</span>
+                </button>
+                <button type="button" id="closeLightboxBtn" class="modal-close" style="background: transparent; border: none; color: var(--text-secondary); font-size: 1.6rem; cursor: pointer; line-height: 1; padding: 0 6px;" title="Close preview">&times;</button>
+            </div>
+        </div>
+        
+        <!-- Image Viewer Container with Pan/Zoom scroll -->
+        <div id="lightboxViewport" style="width: 100%; flex: 1; min-height: 250px; max-height: calc(88vh - 110px); overflow: auto; display: flex; align-items: center; justify-content: center; background: #000; position: relative; padding: 0.75rem; user-select: none;">
+            <img id="lightboxImg" src="" alt="Enlarged document preview" style="max-width: 100%; max-height: calc(82vh - 120px); object-fit: contain; border-radius: 6px; cursor: zoom-in; transition: width 0.2s ease, max-width 0.2s ease;" onclick="toggleLightboxZoom(event)" title="Click photo to toggle 2x zoom">
+        </div>
+
+        <!-- Footer Hint -->
+        <div style="width: 100%; padding: 0.5rem 1rem; background: rgba(0,0,0,0.5); border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: var(--text-secondary);">
+            <span>💡 Click photo or "Zoom 2x" to toggle magnification • "Open Full Size" opens in new tab</span>
+            <span style="opacity: 0.8;">ESC to close</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* High-density Customers Table */
+    #clientesTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+    #clientesTable th {
+        padding: 0.45rem 0.55rem !important;
+        font-size: 0.7rem !important;
+        letter-spacing: 0.04em !important;
+        font-weight: 700 !important;
+        white-space: nowrap !important;
+        border-bottom: 1px solid var(--border-color);
+        background: rgba(15, 23, 42, 0.75);
+    }
+    #clientesTable td {
+        padding: 0.35rem 0.55rem !important;
+        font-size: 0.82rem !important;
+        line-height: 1.25 !important;
+        vertical-align: middle !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    #clientesTable tr:hover td {
+        background: rgba(255, 255, 255, 0.035);
+    }
+    #clientesTable .badge {
+        padding: 1px 6px !important;
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        border-radius: 4px !important;
+        letter-spacing: 0.02em !important;
+    }
+    #clientesTable .badge-plate {
+        padding: 1px 5px !important;
+        font-size: 0.74rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.03em !important;
+        border-radius: 4px !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Action buttons in Customers table */
+    .btn-action-deal {
+        padding: 3px 8px !important;
+        font-size: 0.74rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        border-radius: 6px !important;
+        background: var(--accent, #f97316);
+        color: #ffffff !important;
+        text-decoration: none;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        transition: all 0.15s ease;
+        border: none;
+    }
+    .btn-action-deal:hover {
+        filter: brightness(1.15);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
+    }
+    .btn-action-edit {
+        padding: 2px 7px !important;
+        font-size: 0.74rem !important;
+        font-weight: 500 !important;
+        line-height: 1.2 !important;
+        border-radius: 6px !important;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--text-primary);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        transition: all 0.15s ease;
+    }
+    .btn-action-edit:hover {
+        background: rgba(255, 255, 255, 0.14);
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Clipboard Copy micro-button */
+    .btn-copy-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1px 3px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text-secondary);
+        font-size: 0.65rem;
+        cursor: pointer;
+        line-height: 1;
+        transition: all 0.15s ease;
+        vertical-align: middle;
+        margin-left: 3px;
+    }
+    .btn-copy-chip:hover {
+        background: rgba(255, 255, 255, 0.12);
+        color: var(--text-primary);
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* WhatsApp Link Chip */
+    .btn-wa-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 1px 5px;
+        border-radius: 5px;
+        background: rgba(34, 197, 94, 0.12);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        color: #4ade80;
+        text-decoration: none;
+        font-size: 0.75rem;
+        font-weight: 500;
+        transition: all 0.15s ease;
+    }
+    .btn-wa-chip:hover {
+        background: #22c55e;
+        color: #ffffff;
+        box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+    }
+
+    /* Document Pills */
+    .doc-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        line-height: 1.25;
+        white-space: nowrap;
+    }
+    .doc-chip:hover {
+        filter: brightness(1.2);
+        transform: translateY(-1px);
+    }
+
+    /* Customers KPI Grid */
+    .clientes-kpis-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+        margin-bottom: 1.5rem;
+    }
+    .kpi-card {
+        background: var(--card-bg, rgba(30, 41, 59, 0.7));
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+        border-radius: 12px;
+        padding: 0.9rem 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        user-select: none;
+    }
+    .kpi-card:hover {
+        transform: translateY(-2px);
+        border-color: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .kpi-card.active {
+        border-color: var(--accent, #f97316);
+        background: rgba(249, 115, 22, 0.08);
+        box-shadow: 0 0 0 1px var(--accent, #f97316);
+    }
+    .kpi-title {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary, #94a3b8);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .kpi-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary, #f8fafc);
+        line-height: 1.2;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: var(--text-secondary, #94a3b8);
+    }
+
+    /* Filter groups */
+    .filter-pill-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--card-bg);
+        padding: 0.35rem 0.75rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+    .filter-select {
+        padding: 0.5rem 0.5rem;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--text-primary);
+        font-weight: 500;
+        cursor: pointer;
+        outline: none;
+        font-size: 0.85rem;
+    }
+    .filter-select option {
+        background: #1e293b;
+        color: #f8fafc;
+    }
+</style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clientes.js?v=5"></script>
+<script src="/static/js/clientes.js?v=7"></script>
 {% endblock %}

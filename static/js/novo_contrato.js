@@ -20,14 +20,177 @@ document.addEventListener('DOMContentLoaded', async () => {
         const clientes = dataClientes.itens || [];
         const motos = dataMotos.itens || [];
         window._allMotos = motos;
+        window._allClientes = clientes;
 
-        selectCliente.innerHTML = '<option value="">-- Select Customer --</option>';
-        clientes.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c.id;
-            opt.textContent = `${c.nome} (ID: ${c.id})`;
-            selectCliente.appendChild(opt);
-        });
+        const clienteSearchFilter = document.getElementById('clienteSearchFilter');
+        const btnClearClienteFilter = document.getElementById('btnClearClienteFilter');
+        const clienteCountBadge = document.getElementById('clienteCountBadge');
+        const clienteSelectedCard = document.getElementById('clienteSelectedCard');
+
+        function renderClienteOptions(filteredList, preferredId = null) {
+            const currentSelected = preferredId !== null ? String(preferredId) : (selectCliente.value || '');
+            selectCliente.innerHTML = '';
+
+            const defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.textContent = filteredList.length > 0 
+                ? `-- Select Customer (${filteredList.length}) --` 
+                : '-- No matching customer found --';
+            selectCliente.appendChild(defaultOpt);
+
+            filteredList.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+
+                let tagParts = [];
+                if (c.telefone) tagParts.push(`📱 ${c.telefone}`);
+                if (c.has_active_deal && c.active_deal) {
+                    tagParts.push(`⚡ On Road: ${c.active_deal.placa}`);
+                }
+                if (c.overdue_count > 0) {
+                    tagParts.push(`🔴 £${parseFloat(c.overdue_amount || 0).toFixed(2)} late`);
+                }
+                const extraInfo = tagParts.length > 0 ? ` • ${tagParts.join(' | ')}` : '';
+                opt.textContent = `${c.nome}${extraInfo} (#${c.id})`;
+                selectCliente.appendChild(opt);
+            });
+
+            if (currentSelected && filteredList.some(c => String(c.id) === currentSelected)) {
+                selectCliente.value = currentSelected;
+            }
+
+            if (clienteCountBadge) {
+                clienteCountBadge.textContent = `${filteredList.length} customer${filteredList.length === 1 ? '' : 's'}`;
+            }
+        }
+
+        renderClienteOptions(clientes);
+
+        function updateClienteSelectedCard() {
+            if (!clienteSelectedCard) return;
+            const selectedId = parseInt(selectCliente.value);
+            if (!selectedId) {
+                clienteSelectedCard.style.display = 'none';
+                clienteSelectedCard.innerHTML = '';
+                return;
+            }
+
+            const c = clientes.find(item => item.id === selectedId);
+            if (!c) {
+                clienteSelectedCard.style.display = 'none';
+                return;
+            }
+
+            // WhatsApp link
+            let waLinkHtml = '';
+            if (c.telefone) {
+                const waFormatted = (typeof window.formatWhatsAppNumber === 'function') 
+                    ? window.formatWhatsAppNumber(c.telefone) 
+                    : String(c.telefone).replace(/\D/g, '');
+                if (waFormatted) {
+                    const waText = encodeURIComponent(`Hi ${c.nome.split(' ')[0]}, regarding your agreement with FF Motors...`);
+                    waLinkHtml = `<a href="https://wa.me/${waFormatted}?text=${waText}" target="_blank" rel="noopener noreferrer" style="color:#4ade80; text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.3); border-radius:6px; padding:2px 6px; font-size:0.75rem; font-weight:600;" title="Open WhatsApp chat">💬 Chat</a>`;
+                }
+            }
+
+            // Document status tags
+            const docLicenceFront = c.has_licence_front ? '<span style="color:#4ade80;">✓ Front</span>' : '<span style="color:#f87171;">⚠️ Missing Front</span>';
+            const docLicenceBack = c.has_licence_back ? '<span style="color:#4ade80;">✓ Back</span>' : '<span style="color:#f87171;">⚠️ Missing Back</span>';
+            const docProof = c.has_proof_address ? '<span style="color:#4ade80;">✓ Proof</span>' : '<span style="color:#f87171;">⚠️ Missing Proof</span>';
+            const docCbt = c.has_cbt ? '<span style="color:#38bdf8;">✓ CBT</span>' : '<span style="color:var(--text-secondary); opacity:0.8;">— CBT (Opt)</span>';
+
+            // Active Deal Alert
+            let activeDealBanner = '';
+            if (c.has_active_deal && c.active_deal) {
+                activeDealBanner = `
+                    <div style="margin-top:6px; padding:5px 8px; background:rgba(56, 189, 248, 0.1); border:1px solid rgba(56, 189, 248, 0.25); border-radius:6px; color:#38bdf8; font-size:0.78rem; display:flex; align-items:center; gap:6px;">
+                        <span>⚡</span>
+                        <span><strong>Active Agreement:</strong> Currently on bike <strong>${escapeHtml(c.active_deal.placa)}</strong> (${escapeHtml(c.active_deal.moto_modelo || '')})</span>
+                    </div>
+                `;
+            }
+
+            // Overdue Debt Alert
+            let overdueBanner = '';
+            if (c.overdue_count > 0) {
+                overdueBanner = `
+                    <div style="margin-top:6px; padding:5px 8px; background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.25); border-radius:6px; color:#f87171; font-size:0.78rem; display:flex; align-items:center; gap:6px;">
+                        <span>🔴</span>
+                        <span><strong>Outstanding Debt:</strong> £${parseFloat(c.overdue_amount || 0).toFixed(2)} (${c.overdue_count} overdue invoice${c.overdue_count > 1 ? 's' : ''})</span>
+                    </div>
+                `;
+            }
+
+            clienteSelectedCard.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:6px;">
+                    <div>
+                        <div style="font-weight:700; color:var(--text-primary); font-size:0.88rem; display:flex; align-items:center; gap:6px;">
+                            <span>👤 ${escapeHtml(c.nome)}</span>
+                            <span style="color:var(--accent); font-size:0.76rem; font-weight:700;">#${c.id}</span>
+                        </div>
+                        <div style="color:var(--text-secondary); font-size:0.78rem; margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                            <span>📱 ${escapeHtml(c.telefone || 'No phone')}</span>
+                            ${waLinkHtml}
+                            ${c.email ? `<span>✉️ ${escapeHtml(c.email)}</span>` : ''}
+                        </div>
+                        ${c.endereco ? `<div style="color:var(--text-secondary); font-size:0.75rem; margin-top:2px;">🏠 ${escapeHtml(c.endereco)}</div>` : ''}
+                    </div>
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+                        <div style="font-size:0.74rem; color:var(--text-secondary);">Documents:</div>
+                        <div style="display:flex; gap:6px; font-size:0.74rem; font-weight:600;">
+                            ${docLicenceFront} ${docLicenceBack} ${docProof} ${docCbt}
+                        </div>
+                    </div>
+                </div>
+                ${activeDealBanner}
+                ${overdueBanner}
+            `;
+            clienteSelectedCard.style.display = 'block';
+        }
+
+        selectCliente.addEventListener('change', updateClienteSelectedCard);
+
+        // Smart search filter for customer
+        if (clienteSearchFilter) {
+            clienteSearchFilter.addEventListener('input', () => {
+                const term = clienteSearchFilter.value.trim().toLowerCase();
+                const termDigits = term.replace(/\D/g, '');
+
+                if (!term) {
+                    renderClienteOptions(clientes);
+                    if (btnClearClienteFilter) btnClearClienteFilter.style.display = 'none';
+                    return;
+                }
+
+                if (btnClearClienteFilter) btnClearClienteFilter.style.display = 'block';
+
+                const matches = clientes.filter(c => {
+                    const nome = (c.nome || '').toLowerCase();
+                    const tel = (c.telefone || '').toLowerCase();
+                    const telDigits = (c.telefone || '').replace(/\D/g, '');
+                    const email = (c.email || '').toLowerCase();
+                    const idStr = String(c.id);
+
+                    if (nome.includes(term)) return true;
+                    if (tel.includes(term)) return true;
+                    if (termDigits && telDigits.includes(termDigits)) return true;
+                    if (email.includes(term)) return true;
+                    if (idStr === term.replace('#', '')) return true;
+                    return false;
+                });
+
+                renderClienteOptions(matches);
+            });
+        }
+
+        if (btnClearClienteFilter) {
+            btnClearClienteFilter.addEventListener('click', () => {
+                clienteSearchFilter.value = '';
+                btnClearClienteFilter.style.display = 'none';
+                renderClienteOptions(clientes);
+                clienteSearchFilter.focus();
+            });
+        }
 
         function populateSelectMotos(currentType) {
             const currentVal = selectMoto.value;
@@ -62,12 +225,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.populateSelectMotos = populateSelectMotos;
         populateSelectMotos(getSelectedContractType());
 
-        // Auto-select motorbike from URL query parameters (e.g. from Fleet "+ Rent" button)
+        // Auto-select motorbike or customer from URL query parameters (e.g. from Fleet or Customer "+ Deal" button)
         const urlParams = new URLSearchParams(window.location.search);
         const preSelectedPlaca = urlParams.get('moto_placa') || urlParams.get('placa');
         if (preSelectedPlaca && selectMoto) {
             selectMoto.value = preSelectedPlaca;
             selectMoto.dispatchEvent(new Event('change'));
+        }
+
+        const preSelectedCliente = urlParams.get('cliente_id') || urlParams.get('client_id');
+        if (preSelectedCliente && selectCliente) {
+            selectCliente.value = preSelectedCliente;
+            selectCliente.dispatchEvent(new Event('change'));
         }
 
         // Preencher milhagem inicial e cor ao selecionar a moto

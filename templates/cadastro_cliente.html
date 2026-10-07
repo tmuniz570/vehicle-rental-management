@@ -19,10 +19,23 @@
             <input type="text" id="nome" name="nome" placeholder="e.g. John Smith" required autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="off">
         </div>
         
+        <!-- Real-Time Duplicate Warning Banner -->
+        <div id="duplicateWarningBanner" class="hidden" style="margin-bottom: 1.25rem; padding: 0.9rem 1.1rem; border-radius: 12px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.4); color: #fbbf24; font-size: 0.88rem; display: flex; align-items: flex-start; gap: 10px;">
+            <span style="font-size: 1.25rem; line-height: 1;">⚠️</span>
+            <div style="flex: 1;">
+                <div style="font-weight: 700; margin-bottom: 2px;">Customer Already Registered!</div>
+                <div id="duplicateWarningText" style="color: var(--text-primary); margin-bottom: 6px; font-size: 0.84rem;"></div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <a id="duplicateViewLink" href="#" class="btn-secondary" style="padding: 3px 8px; font-size: 0.75rem; border-radius: 6px; text-decoration: none;" target="_blank">View Customer ↗</a>
+                    <a id="duplicateDealLink" href="#" class="btn-primary" style="padding: 3px 8px; font-size: 0.75rem; border-radius: 6px; text-decoration: none;" target="_blank">+ Deal ↗</a>
+                </div>
+            </div>
+        </div>
+
         <div class="form-row">
             <div class="form-group half">
-                <label for="telefone">Phone / WhatsApp</label>
-                <input type="tel" id="telefone" name="telefone" placeholder="+44 7911 123456" required>
+                <label for="telefone">Phone / WhatsApp <span style="font-size:0.72rem; color:var(--text-secondary); font-weight:normal;">(UK: 07... or Intl: +55...)</span></label>
+                <input type="tel" id="telefone" name="telefone" placeholder="e.g. 07911 123456 or +55 11 99999-9999" required>
             </div>
             
             <div class="form-group half">
@@ -76,5 +89,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/cadastro_cliente.js?v=3"></script>
+<script src="/static/js/cadastro_cliente.js?v=4"></script>
 {% endblock %}

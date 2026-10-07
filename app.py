@@ -1962,6 +1962,90 @@ def capitalize_words(text):
         return text
     return re.sub(r'\b([a-zÀ-ÿ])', lambda m: m.group(1).upper(), str(text).strip())
 
+def normalize_phone_canonical(phone):
+    """
+    Normalizes UK and International phone numbers to canonical digits:
+    - If starts with '+': international country code (e.g. +55 11 98765-4321 -> 5511987654321, +351 -> 351...)
+    - If starts with '00': international dialing prefix (e.g. 0055 11... -> 5511...)
+    - If starts with UK '07...' (11 digits): converts to UK international '447...'
+    - If starts with UK '7...' (10 digits): converts to UK international '447...'
+    - If typed as +4407...: strips redundant UK 0 -> 447...
+    - Strips all formatting spaces, dashes, parentheses and non-digit characters.
+    """
+    if not phone:
+        return ""
+    raw = str(phone).strip()
+    if not raw:
+        return ""
+    if raw.startswith('+'):
+        digits = re.sub(r'\D', '', raw)
+        if digits.startswith('440') and len(digits) >= 12:
+            digits = '44' + digits[3:]
+        return digits
+    if raw.startswith('00'):
+        digits = re.sub(r'\D', '', raw[2:])
+        if digits.startswith('440') and len(digits) >= 12:
+            digits = '44' + digits[3:]
+        return digits
+    digits = re.sub(r'\D', '', raw)
+    if not digits:
+        return ""
+    if digits.startswith('0') and (len(digits) == 11 or digits.startswith('07')):
+        return '44' + digits[1:]
+    if digits.startswith('7') and len(digits) == 10:
+        return '44' + digits
+    if digits.startswith('44'):
+        if digits.startswith('440') and len(digits) >= 12:
+            digits = '44' + digits[3:]
+        return digits
+    return digits
+
+@app.route('/api/clientes/verificar-duplicado', methods=['GET'])
+@alugueis_required
+def verificar_cliente_duplicado():
+    telefone = request.args.get('telefone', '').strip()
+    email = request.args.get('email', '').strip()
+    exclude_id = request.args.get('exclude_id', type=int)
+
+    # 1. Check Phone (International & UK Canonical Match)
+    if telefone:
+        norm_tel = normalize_phone_canonical(telefone)
+        if norm_tel and len(norm_tel) >= 7:
+            last7 = norm_tel[-7:]
+            candidates = Client.query.filter(Client.telefone.ilike(f"%{last7}%")).all()
+            for cand in candidates:
+                if exclude_id and cand.id == exclude_id:
+                    continue
+                if normalize_phone_canonical(cand.telefone) == norm_tel:
+                    return jsonify({
+                        'duplicate': True,
+                        'matched_by': 'phone',
+                        'client': {
+                            'id': cand.id,
+                            'nome': cand.nome,
+                            'telefone': cand.telefone,
+                            'email': cand.email
+                        }
+                    })
+
+    # 2. Check Email
+    if email:
+        email_clean = email.strip()
+        email_cand = Client.query.filter(db.func.lower(Client.email) == email_clean.lower()).first()
+        if email_cand and (not exclude_id or email_cand.id != exclude_id):
+            return jsonify({
+                'duplicate': True,
+                'matched_by': 'email',
+                'client': {
+                    'id': email_cand.id,
+                    'nome': email_cand.nome,
+                    'telefone': email_cand.telefone,
+                    'email': email_cand.email
+                }
+            })
+
+    return jsonify({'duplicate': False})
+
 @app.route('/api/clientes', methods=['POST'])
 @alugueis_required
 def criar_cliente():
@@ -1969,6 +2053,7 @@ def criar_cliente():
     telefone = request.form.get('telefone')
     email = request.form.get('email')
     endereco = request.form.get('endereco')
+    allow_dup = request.form.get('allow_duplicate') == 'true' or (request.is_json and (request.get_json() or {}).get('allow_duplicate'))
     
     if not nome or not telefone:
         return jsonify({'error': 'Missing required fields (full name and phone are required)', 'erro': 'Dados incompletos (nome e telefone são obrigatórios)'}), 400
@@ -1977,11 +2062,33 @@ def criar_cliente():
     telefone = telefone.strip()
     endereco = capitalize_words(endereco) if endereco else None
 
+    # Canonical phone duplicate check
+    norm_tel = normalize_phone_canonical(telefone)
+    if not allow_dup and norm_tel and len(norm_tel) >= 7:
+        last7 = norm_tel[-7:]
+        candidates = Client.query.filter(Client.telefone.ilike(f"%{last7}%")).all()
+        for cand in candidates:
+            if normalize_phone_canonical(cand.telefone) == norm_tel:
+                return jsonify({
+                    'error': f"A customer with this phone number is already registered: {cand.nome} (#{cand.id}).",
+                    'erro': f"Um cliente com este telefone já está cadastrado: {cand.nome} (#{cand.id}).",
+                    'existing_client': {
+                        'id': cand.id,
+                        'nome': cand.nome,
+                        'telefone': cand.telefone,
+                        'email': cand.email
+                    }
+                }), 400
+
     # Optional email: check uniqueness only if provided
     email_clean = email.strip() if (email and email.strip()) else None
     if email_clean:
-        if Client.query.filter(db.func.lower(Client.email) == email_clean.lower()).first():
-            return jsonify({'error': 'Email already registered', 'erro': 'Email já cadastrado'}), 400
+        outro_email = Client.query.filter(db.func.lower(Client.email) == email_clean.lower()).first()
+        if outro_email:
+            return jsonify({
+                'error': f"Email already registered for another customer: {outro_email.nome} (#{outro_email.id})",
+                'erro': f"Email já cadastrado por outro cliente: {outro_email.nome} (#{outro_email.id})"
+            }), 400
         
     # Security: Validate upload file extensions
     for campo_file in ['habilitacao', 'habilitacao_verso', 'cbt', 'comprovante_endereco']:
@@ -2108,9 +2215,10 @@ def criar_moto():
 @alugueis_required
 def listar_clientes():
     page = request.args.get('page', 1, type=int)
-    limit = request.args.get('limit', 50, type=int)
+    limit = request.args.get('limit', 20, type=int)
     search = request.args.get('search', '', type=str).strip()
     client_id = request.args.get('id', None, type=int)
+    status_filter = request.args.get('status', '', type=str).strip().lower()
     sort_by = request.args.get('sort_by', 'id', type=str).strip().lower()
     sort_order = request.args.get('sort_order', 'desc', type=str).strip().lower()
     
@@ -2122,13 +2230,53 @@ def listar_clientes():
         search_conds = [
             Client.nome.ilike(search_term),
             Client.telefone.ilike(search_term),
-            Client.email.ilike(search_term)
+            Client.email.ilike(search_term),
+            Client.endereco.ilike(search_term)
         ]
         clean_num = search.lstrip('#').strip()
         if clean_num.isdigit():
             search_conds.append(Client.id == int(clean_num))
         query = query.filter(db.or_(*search_conds))
     
+    # Subqueries for status filters & compliance evaluation
+    london_now_kpi = get_london_now()
+    hoje_zero_kpi = london_now_kpi.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    
+    active_contract_subq = db.session.query(Contract.id).filter(
+        Contract.id_cliente == Client.id,
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold'])
+    ).exists()
+
+    overdue_tx_subq = db.session.query(FinancialTransaction.id).join(
+        Contract, FinancialTransaction.id_contrato == Contract.id
+    ).filter(
+        Contract.id_cliente == Client.id,
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento < hoje_zero_kpi,
+        ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+    ).exists()
+
+    missing_docs_cond = db.or_(
+        Client.url_habilitacao == None,
+        Client.url_habilitacao == '',
+        Client.url_habilitacao_verso == None,
+        Client.url_habilitacao_verso == '',
+        Client.url_comprovante_endereco == None,
+        Client.url_comprovante_endereco == ''
+    )
+
+    if status_filter:
+        if status_filter in ['active', 'active_deals', 'active_drivers', 'active_hirers']:
+            query = query.filter(active_contract_subq)
+        elif status_filter in ['no_deal', 'inactive']:
+            query = query.filter(~active_contract_subq)
+        elif status_filter in ['overdue', 'debts', 'late']:
+            query = query.filter(overdue_tx_subq)
+        elif status_filter in ['missing_docs', 'missing_licence', 'incomplete']:
+            query = query.filter(missing_docs_cond)
+        elif status_filter in ['clean', 'compliant']:
+            query = query.filter(~overdue_tx_subq, ~missing_docs_cond)
+
     sort_map = {
         'id': Client.id,
         'nome': Client.nome,
@@ -2147,22 +2295,154 @@ def listar_clientes():
         if clean_num.isdigit():
             order_clauses.append(db.case((Client.id == int(clean_num), 0), else_=1))
     order_clauses.append(order_func)
+    
     paginated = query.order_by(*order_clauses).paginate(page=page, per_page=limit, error_out=False)
     
-    itens = [{
-        'id': c.id, 'nome': c.nome, 'telefone': c.telefone, 'email': c.email, 'endereco': c.endereco,
-        'url_habilitacao': c.url_habilitacao,
-        'url_habilitacao_verso': c.url_habilitacao_verso,
-        'url_cbt': c.url_cbt,
-        'url_comprovante_endereco': c.url_comprovante_endereco,
-        'notas_internas': c.notas_internas
-    } for c in paginated.items]
+    client_ids = [c.id for c in paginated.items]
+
+    # Batch load active deals for clients in current page
+    active_contracts_map = {}
+    if client_ids:
+        active_deals = Contract.query.options(
+            selectinload(Contract.moto)
+        ).filter(
+            Contract.id_cliente.in_(client_ids),
+            Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold'])
+        ).order_by(Contract.id.desc()).all()
+        for deal in active_deals:
+            if deal.id_cliente not in active_contracts_map:
+                active_contracts_map[deal.id_cliente] = []
+            active_contracts_map[deal.id_cliente].append({
+                'id': deal.id,
+                'tipo': deal.tipo_contrato or 'Rent',
+                'status': deal.status,
+                'placa': deal.placa or (deal.moto.placa if deal.moto else None),
+                'moto_modelo': deal.moto_modelo or (deal.moto.modelo if deal.moto else None),
+                'moto_cor': deal.moto_cor or (deal.moto.cor if deal.moto else None)
+            })
+
+    # Batch load overdue stats for clients in current page
+    overdue_stats_map = {}
+    if client_ids:
+        overdue_rows = db.session.query(
+            Contract.id_cliente,
+            db.func.count(FinancialTransaction.id).label('qtd_vencidas'),
+            db.func.sum(FinancialTransaction.valor).label('total_vencido')
+        ).join(Contract, FinancialTransaction.id_contrato == Contract.id).filter(
+            Contract.id_cliente.in_(client_ids),
+            FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+            FinancialTransaction.data_vencimento < hoje_zero_kpi,
+            ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+        ).group_by(Contract.id_cliente).all()
+        for row in overdue_rows:
+            overdue_stats_map[row.id_cliente] = {
+                'qtd_vencidas': int(row.qtd_vencidas or 0),
+                'total_vencido': round(float(row.total_vencido or 0.0), 2)
+            }
+
+    # Batch load total lifetime deals count per client in current page
+    deals_count_map = {}
+    if client_ids:
+        deals_rows = db.session.query(
+            Contract.id_cliente,
+            db.func.count(Contract.id)
+        ).filter(Contract.id_cliente.in_(client_ids)).group_by(Contract.id_cliente).all()
+        deals_count_map = dict(deals_rows)
+
+    itens = []
+    for c in paginated.items:
+        acts = active_contracts_map.get(c.id, [])
+        has_active_deal = len(acts) > 0
+        active_deal = acts[0] if has_active_deal else None
+        
+        ov = overdue_stats_map.get(c.id, {'qtd_vencidas': 0, 'total_vencido': 0.0})
+        has_overdue = ov['qtd_vencidas'] > 0
+        
+        has_licence_front = bool(c.url_habilitacao)
+        has_licence_back = bool(c.url_habilitacao_verso)
+        has_cbt = bool(c.url_cbt)
+        has_proof_address = bool(c.url_comprovante_endereco)
+        
+        missing_docs = []
+        if not has_licence_front: missing_docs.append('Licence Front')
+        if not has_licence_back: missing_docs.append('Licence Back')
+        if not has_proof_address: missing_docs.append('Proof of Address')
+        
+        if has_overdue:
+            status_dot = 'danger'
+            status_dot_title = f"{ov['qtd_vencidas']} overdue payment{'s' if ov['qtd_vencidas'] > 1 else ''} (£{ov['total_vencido']:.2f})"
+        elif missing_docs:
+            status_dot = 'warning'
+            status_dot_title = f"Missing: {', '.join(missing_docs)}"
+        else:
+            status_dot = 'success'
+            status_dot_title = "All clear / Up to date"
+
+        itens.append({
+            'id': c.id,
+            'nome': c.nome,
+            'telefone': c.telefone,
+            'email': c.email,
+            'endereco': c.endereco,
+            'url_habilitacao': c.url_habilitacao,
+            'url_habilitacao_verso': c.url_habilitacao_verso,
+            'url_cbt': c.url_cbt,
+            'url_comprovante_endereco': c.url_comprovante_endereco,
+            'has_licence_front': has_licence_front,
+            'has_licence_back': has_licence_back,
+            'has_cbt': has_cbt,
+            'has_proof_address': has_proof_address,
+            'missing_docs': missing_docs,
+            'notas_internas': c.notas_internas,
+            'status_dot': status_dot,
+            'status_dot_title': status_dot_title,
+            'has_active_deal': has_active_deal,
+            'active_deals_count': len(acts),
+            'active_deal': active_deal,
+            'total_deals': deals_count_map.get(c.id, 0),
+            'overdue_count': ov['qtd_vencidas'],
+            'overdue_amount': ov['total_vencido']
+        })
     
+    # Executive KPIs for top summary strip
+    kpi_total_customers = Client.query.count()
+
+    kpi_active_hirers_subq = db.session.query(Contract.id_cliente).filter(
+        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo', ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold'])
+    ).distinct().subquery()
+    kpi_active_hirers = db.session.query(db.func.count()).select_from(kpi_active_hirers_subq).scalar() or 0
+
+    overdue_clients_subq = db.session.query(
+        Contract.id_cliente,
+        db.func.sum(FinancialTransaction.valor).label('tot_venc')
+    ).join(Contract, FinancialTransaction.id_contrato == Contract.id).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento < hoje_zero_kpi,
+        ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+    ).group_by(Contract.id_cliente).subquery()
+
+    overdue_stats = db.session.query(
+        db.func.count().label('count'),
+        db.func.sum(overdue_clients_subq.c.tot_venc).label('sum_tot')
+    ).select_from(overdue_clients_subq).first()
+
+    kpi_overdue_count = overdue_stats.count if overdue_stats else 0
+    kpi_overdue_amount = round(float(overdue_stats.sum_tot or 0.0), 2) if overdue_stats else 0.0
+
+    kpi_missing_docs = Client.query.filter(missing_docs_cond).count()
+
     return jsonify({
         'itens': itens,
         'total': paginated.total,
         'paginas': paginated.pages,
-        'pagina_atual': paginated.page
+        'pagina_atual': paginated.page,
+        'kpis': {
+            'total': kpi_total_customers,
+            'active_hirers': kpi_active_hirers,
+            'overdue_count': kpi_overdue_count,
+            'overdue_amount': kpi_overdue_amount,
+            'missing_docs': kpi_missing_docs
+        }
     })
 
 @app.route('/api/clientes/<int:id>', methods=['PUT'])
@@ -2272,6 +2552,127 @@ def atualizar_cliente(id):
     registrar_log('CLIENT_UPDATE', 'Client', cliente.id, detalhes_log)
 
     return jsonify({'message': 'Customer updated successfully', 'mensagem': 'Cliente atualizado com sucesso'}), 200
+
+@app.route('/api/clientes/merge', methods=['POST'])
+@alugueis_required
+def mesclar_clientes():
+    dados = request.get_json() or {}
+    source_id = dados.get('source_id')
+    target_id = dados.get('target_id')
+    motivo = (dados.get('motivo') or '').strip()
+
+    if not source_id or not target_id:
+        return jsonify({
+            'error': 'Both source (duplicate) and target (primary) customer IDs are required',
+            'erro': 'IDs do cliente duplicado e principal são obrigatórios'
+        }), 400
+
+    try:
+        source_id = int(source_id)
+        target_id = int(target_id)
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid customer IDs', 'erro': 'IDs de cliente inválidos'}), 400
+
+    if source_id == target_id:
+        return jsonify({
+            'error': 'Cannot merge a customer into itself. Source and target must be different.',
+            'erro': 'Não é possível fundir um cliente nele mesmo. Origem e destino devem ser distintos.'
+        }), 400
+
+    source = db.session.get(Client, source_id)
+    target = db.session.get(Client, target_id)
+
+    if not source:
+        return jsonify({'error': f'Duplicate customer #{source_id} not found', 'erro': f'Cliente duplicado #{source_id} não encontrado'}), 404
+    if not target:
+        return jsonify({'error': f'Primary customer #{target_id} not found', 'erro': f'Cliente principal #{target_id} não encontrado'}), 404
+
+    source_nome = source.nome
+    source_tel = source.telefone
+    source_email = source.email
+    target_nome = target.nome
+    target_tel = target.telefone
+
+    # 1. Transfer all contracts
+    contratos = Contract.query.filter_by(id_cliente=source_id).all()
+    qtd_contratos = len(contratos)
+    for c in contratos:
+        c.id_cliente = target_id
+        c.cliente = target
+    source.contratos = []
+    db.session.flush()
+
+    # 2. Enrich target client with missing documents / fields
+    docs_merged = []
+    if not target.url_habilitacao and source.url_habilitacao:
+        target.url_habilitacao = source.url_habilitacao
+        docs_merged.append('Driving Licence (Front)')
+    if not target.url_habilitacao_verso and source.url_habilitacao_verso:
+        target.url_habilitacao_verso = source.url_habilitacao_verso
+        docs_merged.append('Driving Licence (Back)')
+    if not target.url_cbt and source.url_cbt:
+        target.url_cbt = source.url_cbt
+        docs_merged.append('CBT Certificate')
+    if not target.url_comprovante_endereco and source.url_comprovante_endereco:
+        target.url_comprovante_endereco = source.url_comprovante_endereco
+        docs_merged.append('Proof of Address')
+    if not target.endereco and source.endereco:
+        target.endereco = source.endereco
+
+    # Safely transfer email if target doesn't have one and source does
+    if not target.email and source.email:
+        existing_email_owner = Client.query.filter(
+            db.func.lower(Client.email) == source.email.lower(),
+            Client.id != source_id,
+            Client.id != target_id
+        ).first()
+        if not existing_email_owner:
+            target.email = source.email
+
+    # Append internal notes
+    now_london_str = get_london_now().strftime('%d/%m/%Y %H:%M')
+    merge_note_header = f"[MERGED from Customer #{source_id} ({source_nome}, Tel: {source_tel}) on {now_london_str}]"
+    if motivo:
+        merge_note_header += f" Reason: {motivo}."
+    
+    source_notes = (source.notas_internas or '').strip()
+    if source_notes:
+        full_note_addition = f"{merge_note_header}\nNotes from #{source_id}:\n{source_notes}"
+    else:
+        full_note_addition = f"{merge_note_header} (No prior internal notes)"
+
+    if target.notas_internas:
+        target.notas_internas = f"{target.notas_internas}\n\n{full_note_addition}"
+    else:
+        target.notas_internas = full_note_addition
+
+    # 3. Delete source client
+    db.session.delete(source)
+    db.session.commit()
+
+    # 4. Audit Log
+    operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
+    desc_audit = (
+        f"Fusão de clientes realizada por {operador_atual}: "
+        f"Cliente duplicado #{source_id} ({source_nome}, Tel: {source_tel}) fundido no Cliente principal #{target_id} ({target_nome}, Tel: {target_tel}). "
+        f"{qtd_contratos} contrato(s) transferido(s)."
+    )
+    if docs_merged:
+        desc_audit += f" Documentos consolidados: {', '.join(docs_merged)}."
+    if motivo:
+        desc_audit += f" Motivo: {motivo}."
+
+    registrar_log('CLIENT_MERGE', 'Client', str(target_id), desc_audit)
+
+    return jsonify({
+        'message': f'Customer #{source_id} ({source_nome}) successfully merged into #{target_id} ({target_nome})',
+        'mensagem': f'Cliente #{source_id} ({source_nome}) fundido com sucesso no Cliente #{target_id} ({target_nome})',
+        'target_id': target_id,
+        'target_nome': target_nome,
+        'source_id': source_id,
+        'transferred_contracts': qtd_contratos,
+        'docs_merged': docs_merged
+    }), 200
 
 @app.route('/api/motos', methods=['GET'])
 @alugueis_required
