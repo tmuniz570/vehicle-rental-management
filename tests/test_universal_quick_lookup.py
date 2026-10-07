@@ -67,6 +67,8 @@ class TestUniversalQuickLookup(unittest.TestCase):
             '/contratos',
             '/vistorias',
             '/financeiro',
+            '/claims',
+            '/usuarios',
             '/contratos/novo',
             '/clientes/novo',
             '/motos/nova',
@@ -89,37 +91,22 @@ class TestUniversalQuickLookup(unittest.TestCase):
 
             # Topbar is completely gone
             self.assertNotIn('class="app-topbar"', html, f"app-topbar should NOT exist on {path}")
-        print("\n✓ Universal Quick Lookup verified in fixed sidebar menu and Command Palette modal across all operational pages.")
-
-    def test_quick_lookup_excluded_on_claims_and_users(self):
-        self.login_admin()
-
-        excluded_pages = ['/claims', '/usuarios']
-
-        for path in excluded_pages:
-            resp = self.client.get(path)
-            self.assertEqual(resp.status_code, 200, f"Page {path} should return 200")
-            html = resp.data.decode('utf-8')
-
-            # Quick lookup modal and sidebar trigger must NOT be rendered on claims or users
-            self.assertNotIn('id="dashQuickSearch"', html, f"Quick lookup must NOT be on {path}")
-            self.assertNotIn('id="quickLookupModal"', html, f"quickLookupModal must NOT be on {path}")
-            self.assertNotIn('id="sidebarSearchTrigger"', html, f"sidebarSearchTrigger must NOT be on {path}")
-        print("✓ Quick Lookup correctly excluded from /claims and /usuarios.")
+        print("\n✓ Universal Quick Lookup verified in fixed sidebar menu and Command Palette modal across ALL pages (including /claims and /usuarios).")
 
     def test_quick_lookup_excluded_for_claims_only_user(self):
         self.login_claims_only()
 
-        # Accessing /claims as claims user
+        # Accessing /claims as claims-only user without rental permission
         resp = self.client.get('/claims')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
-        self.assertNotIn('id="dashQuickSearch"', html, "Quick lookup must NOT be on claims page")
+        self.assertNotIn('id="dashQuickSearch"', html, "Quick lookup must NOT be rendered for user without perm_alugueis")
+        self.assertNotIn('id="sidebarSearchTrigger"', html, "Sidebar search trigger must NOT be rendered for user without perm_alugueis")
 
         # Trying to access /api/busca-rapida should return 403 Forbidden
         api_resp = self.client.get('/api/busca-rapida?q=XX10')
         self.assertEqual(api_resp.status_code, 403, "/api/busca-rapida must be forbidden for claims-only user")
-        print("✓ Quick Lookup permissions enforced: claims-only user cannot access search API or UI.")
+        print("✓ Quick Lookup permissions enforced: user without rental permission cannot access search API or UI.")
 
 if __name__ == '__main__':
     unittest.main()

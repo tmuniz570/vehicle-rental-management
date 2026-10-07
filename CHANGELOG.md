@@ -4,6 +4,17 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.36] — 2026-10-07 — *Global Sidebar Quick Search across All Views*
+
+### 🔍 Disponibilidade Irrestrita no Menu Lateral
+* **Remoção de Exclusão de Páginas (`layout.html` & `quick_lookup.html`)**:
+  - Com a integração definitiva do gatilho no menu lateral fixo (`.sidebar`) e o comportamento não invasivo de modal Command Palette (`Ctrl+K`), removeu-se a restrição de ocultamento nas telas de **Claims & Storage** (`/claims`) e **Users** (`/usuarios`).
+  - O operador agora desfruta de uma experiência totalmente consistente em todo o sistema: o botão de busca permanece no mesmo lugar do menu e os atalhos de teclado funcionam globalmente.
+* **Governança de Permissões Mantida**:
+  - Mantida a proteção estrita baseada em permissão de módulo (`current_user.pode_alugueis()`). Usuários restritos ao módulo de Claims continuam sem acesso ao botão na sidebar e são bloqueados na API `/api/busca-rapida` (HTTP 403 Forbidden).
+* **Testes Automatizados Atualizados**:
+  - Testes em [tests/test_universal_quick_lookup.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_universal_quick_lookup.py) atualizados para cobrir a renderização da busca em todas as rotas do sistema (incluindo `/claims` e `/usuarios`). 74 testes passando com 100% de sucesso.
+
 ## [1.9.35] — 2026-10-07 — *Native APScheduler Morning Warm-up & Boot Catch-up*
 
 ### ⚡ Aquecimento Matinal Nativo (`APScheduler` & `wsgi.py`)

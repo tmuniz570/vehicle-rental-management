@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.35--Universal%20Command%20Palette%20%26%20Native%20Warmup-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.36--Universal%20Command%20Palette%20%26%20Global%20Sidebar-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -28,7 +28,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 ## ✨ Key Features
 
 ### 📊 1. Executive Dashboard & Fleet Allocation
-* **Universal Command Palette & Fixed Sidebar Search:** Omni-search modal (`/api/busca-rapida`) triggered directly from the fixed persistent sidebar (`.sidebar`), mobile header, or global keyboard shortcuts (`Ctrl+K`, `Cmd+K`, `/`). Instant search across plates, models, customers, and agreements with Raycast-style backdrop blur, two-line preview cards, keyboard navigation, and strict exclusion on Claims & Storage and User Management pages.
+* **Universal Command Palette & Fixed Sidebar Search:** Omni-search modal (`/api/busca-rapida`) triggered directly from the fixed persistent sidebar (`.sidebar`), mobile header, or global keyboard shortcuts (`Ctrl+K`, `Cmd+K`, `/`). Instant search across plates, models, customers, and agreements with Raycast-style backdrop blur, two-line preview cards, and keyboard navigation seamlessly accessible from every view in the application.
 * **iPhone Action Grid:** Mobile-optimized 2-column action cluster ensuring all 5 key buttons (`+ New Contract`, `Add Bike`, `New Inspection`, `Add Customer`, `Overdue Report`) are visible on iPhone portrait mode without horizontal scrolling or rotation.
 * **Proactive "Payments Due Today":** Real-time list of all charges due on the current date based on pending financial ledger transactions across Rent, Sale Installments, Deposits, and PCNs, with one-tap customized WhatsApp reminders.
 * **Realized Cashflow Tracking:** Weekly Revenue card tracks expected rent alongside actual payments collected in the current week (`Collected this week: £X,XXX.XX (Today: £XXX.XX)`).

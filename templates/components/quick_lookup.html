@@ -1,4 +1,4 @@
-{% if current_user.is_authenticated and current_user.pode_alugueis() and not ('claims' in request.path or 'usuario' in request.path) %}
+{% if current_user.is_authenticated and current_user.pode_alugueis() %}
 <!-- Universal Quick Lookup Command Palette Modal (Fixed Menu & Ctrl+K) -->
 <div id="quickLookupModal" class="quick-lookup-modal-backdrop" onclick="handleQuickLookupBackdropClick(event)" style="display: none;">
     <div class="quick-lookup-modal-dialog" role="dialog" aria-modal="true" aria-label="OmniSearch Command Palette">
