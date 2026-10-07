@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.31--Customers%20Command%20Center%2C%20KPIs%20%26%20Document%20Lightbox-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.35--Universal%20Command%20Palette%20%26%20Native%20Warmup-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -28,7 +28,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 ## ✨ Key Features
 
 ### 📊 1. Executive Dashboard & Fleet Allocation
-* **Universal Quick Lookup Bar:** Omni-search bar in the dashboard header (`/api/busca-rapida`) with instant lookup across plates, bike models, customers, and agreements, keyboard shortcuts (`Ctrl+K` / `/`), vector SVG iconography, and responsive two-line cards.
+* **Universal Command Palette & Fixed Sidebar Search:** Omni-search modal (`/api/busca-rapida`) triggered directly from the fixed persistent sidebar (`.sidebar`), mobile header, or global keyboard shortcuts (`Ctrl+K`, `Cmd+K`, `/`). Instant search across plates, models, customers, and agreements with Raycast-style backdrop blur, two-line preview cards, keyboard navigation, and strict exclusion on Claims & Storage and User Management pages.
 * **iPhone Action Grid:** Mobile-optimized 2-column action cluster ensuring all 5 key buttons (`+ New Contract`, `Add Bike`, `New Inspection`, `Add Customer`, `Overdue Report`) are visible on iPhone portrait mode without horizontal scrolling or rotation.
 * **Proactive "Payments Due Today":** Real-time list of all charges due on the current date based on pending financial ledger transactions across Rent, Sale Installments, Deposits, and PCNs, with one-tap customized WhatsApp reminders.
 * **Realized Cashflow Tracking:** Weekly Revenue card tracks expected rent alongside actual payments collected in the current week (`Collected this week: £X,XXX.XX (Today: £XXX.XX)`).
@@ -176,6 +176,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **SQLite WAL Mode & Concurrency:** Database connection configured with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, 30s busy timeout, and enforced relational integrity (`foreign_keys = ON`) for lock-free concurrent reads during background writes.
 * **Strategic Database Indexes:** Foreign keys, filter columns (`id_cliente`, `placa`, `status`, `data_vencimento`, `vencimento_mot`, `vencimento_tax`), and claim indexes (`claim_number`, `empresa_parceira`, `placa`) are pre-indexed for high scalability.
 * **Multi-Worker Concurrency & Scheduler Isolation:** Multi-worker process isolation via `fcntl.flock` on `.scheduler.lock` combined with database-backed atomic conditional update locks (`JobExecutionLock`) ensuring background billing executes exactly once per day across multiple WSGI workers at **01:00 AM London Time**.
+* **Native Morning Cache Warm-Up & Boot Catch-Up Engine:** Autonomous background task registered in `APScheduler` (`morning_warmup_job` in `wsgi.py`) scheduled daily at **08:00 AM Europe/London** (1 hour prior to store opening). Pre-warms the PostgreSQL connection pool (`pool_recycle`) and loads high-frequency dashboard, fleet, and contract data into server RAM buffers (`shared_buffers`), eliminating cold-start latency (<100ms response). Features automatic boot catch-up during morning restarts (08:00–12:00) and structured audit logging (`SYSTEM_WARMUP` with execution origin and runtime duration).
 * **Financial Deduplication & Audit Tool:** Standalone CLI tool (`cleanup_duplicate_charges.py`) and administrative endpoint to detect, inspect (dry-run), and safely clean up duplicate pending weekly charges without ever affecting paid transactions or deposits.
 * **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (GCP, AWS, Render, Railway).
 * **Point-in-Time Backups & Disaster Recovery:** Automated utilities for snapshot archives (`backup.py`), database restore (`restore.py`), and demo data seeding (`seed_data.py`).
@@ -322,6 +323,8 @@ FF Motors APP/
 │   ├── uploads/               # Stored inspection photos & client documents (.gitkeep)
 │   └── manifest.json          # PWA progressive web app configuration
 └── templates/
+    ├── components/
+    │   └── quick_lookup.html  # Universal Command Palette modal & omni-search dialog
     ├── layout.html            # Base master layout with modular permissions sidebar
     ├── login.html             # Glassmorphism dark authentication screen
     ├── index.html             # Executive operational dashboard (filtered by module access)
