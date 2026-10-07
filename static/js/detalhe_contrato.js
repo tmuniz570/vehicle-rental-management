@@ -123,6 +123,12 @@ function sortExtrato(transacoes, field, order) {
     now.setHours(0, 0, 0, 0);
 
     list.sort((a, b) => {
+        if (field === 'id') {
+            const idA = parseInt(a.id, 10) || 0;
+            const idB = parseInt(b.id, 10) || 0;
+            return (idA - idB) * mult;
+        }
+
         if (field === 'valor') {
             const vA = parseFloat(a.valor) || 0;
             const vB = parseFloat(b.valor) || 0;
@@ -1552,8 +1558,64 @@ document.addEventListener('DOMContentLoaded', async () => {
             sortField: 'data_vencimento',
             sortOrder: 'desc',
             currentPage: 1,
-            pageSize: 10
+            pageSize: 10,
+            filterStatus: 'all',
+            searchTerm: ''
         };
+
+        function getFilteredExtrato() {
+            let filtered = (extratoState.transacoes || []).slice();
+            const statusF = extratoState.filterStatus || 'all';
+            const term = (extratoState.searchTerm || '').trim().toLowerCase();
+            const nowCheck = new Date();
+            nowCheck.setHours(0, 0, 0, 0);
+
+            if (statusF !== 'all') {
+                filtered = filtered.filter(t => {
+                    const s = (t.status || '').toLowerCase();
+                    const isPaid = s === 'paid' || s === 'pago';
+                    const isPending = s === 'pending' || s === 'pendente';
+                    const isCancelled = s === 'cancelled' || s === 'cancelado';
+                    const dV = t.data_vencimento ? new Date(t.data_vencimento) : null;
+                    const dVZero = dV ? new Date(dV.getFullYear(), dV.getMonth(), dV.getDate()) : null;
+                    const isOverdue = isPending && dVZero && dVZero < nowCheck;
+
+                    if (statusF === 'pending') return isPending;
+                    if (statusF === 'overdue') return isOverdue;
+                    if (statusF === 'paid') return isPaid;
+                    if (statusF === 'cancelled') return isCancelled;
+                    return true;
+                });
+            }
+
+            if (term) {
+                filtered = filtered.filter(t => {
+                    const idStr = String(t.id || '');
+                    const tipoStr = String(t.tipo || '').toLowerCase();
+                    const descStr = String(t.descricao || '').toLowerCase();
+                    const notaStr = String(t.nota || '').toLowerCase();
+                    const notaPagStr = String(t.nota_pagamento || '').toLowerCase();
+                    const formaStr = String(t.forma_pagamento || '').toLowerCase();
+                    const statusStr = String(t.status || '').toLowerCase();
+                    const staffStr = String(t.registrado_por_nome || '').toLowerCase();
+                    const valorStr = String(t.valor || '');
+                    const origStr = String(t.id_transacao_origem || '');
+
+                    return idStr.includes(term) ||
+                           tipoStr.includes(term) ||
+                           descStr.includes(term) ||
+                           notaStr.includes(term) ||
+                           notaPagStr.includes(term) ||
+                           formaStr.includes(term) ||
+                           statusStr.includes(term) ||
+                           staffStr.includes(term) ||
+                           valorStr.includes(term) ||
+                           (origStr && origStr.includes(term));
+                });
+            }
+
+            return filtered;
+        }
 
         // Compute overall financial totals across all transactions
         let totalPendente = 0;
@@ -1748,21 +1810,45 @@ document.addEventListener('DOMContentLoaded', async () => {
             const paginationInfo = document.getElementById('extratoPaginationInfo');
             const btnPrev = document.getElementById('btnExtratoPrev');
             const btnNext = document.getElementById('btnExtratoNext');
+            const tfoot = document.getElementById('extratoTableFooter');
+            const elFooterCount = document.getElementById('extratoFooterCountText');
+            const elFooterAmount = document.getElementById('extratoFooterTotalAmount');
+            const elFooterSummary = document.getElementById('extratoFooterSummaryText');
+            const btnClearFilter = document.getElementById('btnExtratoClearFilter');
+
+            const statusF = extratoState.filterStatus || 'all';
+            const term = (extratoState.searchTerm || '').trim().toLowerCase();
+            const isFilterActive = (statusF !== 'all' || term.length > 0);
+
+            if (btnClearFilter) {
+                btnClearFilter.style.display = isFilterActive ? 'inline-block' : 'none';
+            }
 
             if (!extratoState.transacoes || extratoState.transacoes.length === 0) {
                 if (isPurchaseContrato) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);"><span style="color:#22d3ee; font-weight:700;">🤝 Used Vehicle Purchase:</span> Vehicle acquisition payment was settled upon agreement completion as agreed. No ongoing rental or sales charges.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-secondary);"><span style="color:#22d3ee; font-weight:700;">🤝 Used Vehicle Purchase:</span> Vehicle acquisition payment was settled upon agreement completion as agreed. No ongoing rental or sales charges.</td></tr>';
                 } else {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges recorded for this contract.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges recorded for this contract.</td></tr>';
                 }
                 if (paginationContainer) paginationContainer.style.display = 'none';
+                if (tfoot) tfoot.style.display = 'none';
+                return;
+            }
+
+            // 1. Filter transactions
+            const filtered = getFilteredExtrato();
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--text-secondary);">No charges match the selected filter.</td></tr>';
+                if (paginationContainer) paginationContainer.style.display = 'none';
+                if (tfoot) tfoot.style.display = 'none';
                 return;
             }
 
             if (paginationContainer) paginationContainer.style.display = 'flex';
 
-            // 1. Sort transactions
-            const sorted = sortExtrato(extratoState.transacoes, extratoState.sortField, extratoState.sortOrder);
+            // 2. Sort transactions
+            const sorted = sortExtrato(filtered, extratoState.sortField, extratoState.sortOrder);
 
             // Update Header sort indicators
             const headers = document.querySelectorAll('#extratoTable thead th[data-sort-field]');
@@ -1779,7 +1865,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-            // 2. Paginate transactions
+            // 3. Paginate transactions
             const totalItems = sorted.length;
             const pageSizeNum = extratoState.pageSize === 'all' ? totalItems : parseInt(extratoState.pageSize, 10);
             const totalPages = Math.max(1, Math.ceil(totalItems / pageSizeNum));
@@ -1799,7 +1885,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (btnPrev) btnPrev.disabled = (extratoState.currentPage <= 1);
             if (btnNext) btnNext.disabled = (extratoState.currentPage >= totalPages);
 
-            // 3. Render rows for current page
+            // 4. Update Footer Summary (tfoot)
+            if (tfoot) {
+                tfoot.style.display = '';
+                let somaFiltrada = 0;
+                let paidCount = 0;
+                let pendingCount = 0;
+                filtered.forEach(item => {
+                    somaFiltrada += (parseFloat(item.valor) || 0);
+                    const s = (item.status || '').toLowerCase();
+                    if (s === 'paid' || s === 'pago') paidCount++;
+                    else if (s === 'pending' || s === 'pendente') pendingCount++;
+                });
+                if (elFooterAmount) elFooterAmount.textContent = formatoMoeda.format(somaFiltrada);
+                if (elFooterCount) {
+                    elFooterCount.textContent = `Showing ${filtered.length} charges (${paidCount} paid, ${pendingCount} pending)`;
+                }
+                if (elFooterSummary) {
+                    elFooterSummary.textContent = isFilterActive ? 'Filtered View Sum' : 'Current View Sum';
+                }
+            }
+
+            // 5. Render rows for current page
             pageItems.forEach(t => {
                 const tr = document.createElement('tr');
 
@@ -1830,7 +1937,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 else if (tipoLower === 'fine' || tipoLower === 'multa') tipoBadge = '<span class="badge badge-danger">Fine</span>';
                 else if (tipoLower === 'damage' || tipoLower === 'dano') tipoBadge = '<span class="badge badge-warning">Damage</span>';
                 else if (tipoLower === 'deposit_refund' || tipoLower === 'devolucao_deposito') tipoBadge = '<span class="badge badge-success">Deposit Refund</span>';
-                else tipoBadge = `<span class="badge">${t.tipo}</span>`;
+                else tipoBadge = `<span class="badge">${escapeHtml(t.tipo)}</span>`;
+
+                // Partial Split Balance Badge Indicator
+                const balanceBadgeHtml = t.id_transacao_origem ? `<span style="display:inline-block; font-size:0.68rem; color:#f59e0b; font-weight:700; background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.35); border-radius:3px; padding:0 4px;" title="Remaining balance from partial payment #${t.id_transacao_origem}">⚡ Bal #${t.id_transacao_origem}</span>` : '';
 
                 // Reference & Attachments & Linked Inspection
                 let refNotaHtml = '';
@@ -1851,16 +1961,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     vistoriaLinkHtml = `<a href="#inspection-item-${t.id_vistoria}" onclick="highlightInspection(${t.id_vistoria})" class="badge" style="background:rgba(239, 68, 68, 0.15); color:#fca5a5; border:1px solid rgba(239, 68, 68, 0.35); font-size:0.7rem; padding:2px 6px; border-radius:6px; margin-top:3px; text-decoration:none; display:inline-flex; align-items:center; gap:3px; cursor:pointer;" title="Go to Inspection #${t.id_vistoria}">🔍 Inspection #${t.id_vistoria}</a>`;
                 }
 
+                // WhatsApp reminder button & aesthetic chip
+                const formatLembrete = (typeof window.formatarLembreteEstetico === 'function') ? window.formatarLembreteEstetico : ((iso, st) => '');
+                const reminderChipHtml = `<span id="reminder-container-${t.id}">${formatLembrete(t.ultimo_lembrete, t.ultimo_lembrete_por)}</span>`;
+
                 let acoesHtml = '';
                 if (isPending) {
+                    let waBtnHtml = '';
+                    const telVal = data.telefone || data.cliente_telefone;
+                    if (telVal) {
+                        const waTel = (typeof formatWhatsAppNumber === 'function')
+                            ? formatWhatsAppNumber(telVal)
+                            : (() => {
+                                let w = telVal.replace(/\D/g, '');
+                                if (w.startsWith('0')) w = '44' + w.substring(1);
+                                return w;
+                            })();
+                        const bikeRef = (data.placa && data.placa !== '-') ? `for vehicle ${data.placa}` : 'with FF Motors';
+                        const descFinal = t.descricao || (typeof formatarDescricaoTransacao === 'function' ? formatarDescricaoTransacao(t.tipo) : t.tipo);
+                        const waMsg = encodeURIComponent(`Hi ${data.cliente || data.cliente_nome || 'there'}, this is FF Motors Birmingham. Just a friendly reminder regarding your pending ${descFinal} payment of ${formatoMoeda.format(t.valor)} ${bikeRef}. If you have already made this payment, please disregard this note. Thank you!`);
+                        const waLink = waTel ? `https://wa.me/${waTel}?text=${waMsg}` : '#';
+                        waBtnHtml = `<a href="${waLink}" target="_blank" rel="noopener noreferrer" class="btn-action btn-wa-reminder" data-id="${t.id}" style="background:rgba(37,211,102,0.15); border:1px solid rgba(37,211,102,0.35); color:#25d366; padding:4px 8px; font-size:0.8rem; text-decoration:none; display:inline-flex; align-items:center; gap:3px; border-radius:6px; font-weight:600;" title="Send WhatsApp payment reminder">💬 Remind</a>`;
+                    }
+
                     acoesHtml = `
-                        <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">
-                            <button class="btn-action btn-pagar" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor}" style="background:var(--success); padding:4px 10px; font-size:0.8rem;">
-                                Pay
-                            </button>
-                            <button class="btn-action btn-remover" data-id="${t.id}" style="background:rgba(239, 68, 68, 0.15); color:#f87171; border:1px solid rgba(239, 68, 68, 0.3); padding:4px 8px; font-size:0.8rem;">
-                                Delete
-                            </button>
+                        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+                            <div style="display:flex; gap:6px; justify-content:flex-end; align-items:center; flex-wrap:nowrap;">
+                                ${waBtnHtml}
+                                <button class="btn-action btn-pagar" data-id="${t.id}" data-tipo="${t.tipo}" data-valor="${t.valor}" style="background:var(--success); padding:4px 10px; font-size:0.8rem;">
+                                    Pay
+                                </button>
+                                <button class="btn-action btn-remover" data-id="${t.id}" style="background:rgba(239, 68, 68, 0.15); color:#f87171; border:1px solid rgba(239, 68, 68, 0.3); padding:4px 8px; font-size:0.8rem;">
+                                    Delete
+                                </button>
+                            </div>
+                            ${reminderChipHtml}
                         </div>
                     `;
                 } else if (isPaid) {
@@ -1892,13 +2027,33 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 let celulaVencimento = `<span>${dataVenc}</span>`;
                 if (isVencido) {
-                    celulaVencimento = `<span style="color:#f87171; font-weight:600;">${dataVenc} ⚠️</span>`;
+                    const diffTime = Math.max(0, hojeZero.getTime() - vencZero.getTime());
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    let lateText = `${diffDays}d late`;
+                    if (diffDays === 0 || diffDays === 1) {
+                        lateText = '1d late';
+                    } else if (diffDays >= 14) {
+                        const weeks = Math.floor(diffDays / 7);
+                        lateText = `${weeks}w (${diffDays}d)`;
+                    }
+                    celulaVencimento = `
+                        <div style="line-height: 1.2;">
+                            <span style="color:#f87171; font-weight:600; font-size:0.85rem;" title="Charge overdue!">${dataVenc}</span>
+                            <span style="font-size: 0.68rem; color: #fca5a5; font-weight: 700; background: rgba(239, 68, 68, 0.15); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.3); display: inline-block; white-space: nowrap; margin-top: 2px;">${lateText}</span>
+                        </div>
+                    `;
                 }
 
                 tr.innerHTML = `
+                    <td style="font-weight:700; font-size:0.82rem; color:var(--text-secondary); white-space:nowrap;">
+                        #${t.id}
+                    </td>
                     <td>
                         <div style="line-height:1.25;">
-                            ${tipoBadge}
+                            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
+                                ${tipoBadge}
+                                ${balanceBadgeHtml}
+                            </div>
                             ${refNotaHtml}
                             <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:3px;">
                                 ${anexoBadgeHtml}
@@ -1906,13 +2061,42 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         </div>
                     </td>
-                    <td style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">${formatoMoeda.format(t.valor)}</td>
+                    <td style="font-weight:700; font-size:0.95rem; color:var(--text-primary); white-space:nowrap;">${formatoMoeda.format(t.valor)}</td>
                     <td>${celulaVencimento}</td>
                     <td>${celulaPagamento}</td>
                     <td>${statusBadge}</td>
                     <td style="text-align: right; white-space: nowrap;">${acoesHtml}</td>
                 `;
                 tbody.appendChild(tr);
+            });
+
+            // Bind WhatsApp Reminder Buttons for current page
+            tbody.querySelectorAll('.btn-wa-reminder').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    if (!id) return;
+                    try {
+                        const res = await fetch(`/api/financeiro/${id}/lembrete`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        if (res.ok) {
+                            const resJson = await res.json();
+                            const container = document.getElementById(`reminder-container-${id}`);
+                            const formatLembrete = (typeof window.formatarLembreteEstetico === 'function') ? window.formatarLembreteEstetico : ((iso, st) => '');
+                            if (container) {
+                                container.innerHTML = formatLembrete(resJson.ultimo_lembrete || new Date().toISOString(), resJson.ultimo_lembrete_por || 'You');
+                            }
+                            const item = (extratoState.transacoes || []).find(x => String(x.id) === String(id));
+                            if (item) {
+                                item.ultimo_lembrete = resJson.ultimo_lembrete || new Date().toISOString();
+                                item.ultimo_lembrete_por = resJson.ultimo_lembrete_por || 'You';
+                            }
+                        }
+                    } catch(err) {
+                        console.error('Error recording reminder:', err);
+                    }
+                });
             });
 
             // Bind Pay Buttons for current page
@@ -2136,9 +2320,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const btnExtratoNext = document.getElementById('btnExtratoNext');
         if (btnExtratoNext) {
             btnExtratoNext.addEventListener('click', () => {
-                const totalItems = extratoState.transacoes.length;
-                const pageSizeNum = extratoState.pageSize === 'all' ? totalItems : parseInt(extratoState.pageSize, 10);
-                const totalPages = Math.max(1, Math.ceil(totalItems / pageSizeNum));
+                const filteredCount = getFilteredExtrato().length;
+                const pageSizeNum = extratoState.pageSize === 'all' ? filteredCount : parseInt(extratoState.pageSize, 10);
+                const totalPages = Math.max(1, Math.ceil(filteredCount / pageSizeNum));
                 if (extratoState.currentPage < totalPages) {
                     extratoState.currentPage++;
                     renderExtrato();
@@ -2150,6 +2334,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (selectPageSize) {
             selectPageSize.addEventListener('change', () => {
                 extratoState.pageSize = selectPageSize.value;
+                extratoState.currentPage = 1;
+                renderExtrato();
+            });
+        }
+
+        // Setup Filter & Search Listeners
+        const extratoSearchInput = document.getElementById('extratoSearchInput');
+        if (extratoSearchInput) {
+            extratoSearchInput.addEventListener('input', (e) => {
+                extratoState.searchTerm = e.target.value;
+                extratoState.currentPage = 1;
+                renderExtrato();
+            });
+        }
+
+        const extratoFilterStatus = document.getElementById('extratoFilterStatus');
+        if (extratoFilterStatus) {
+            extratoFilterStatus.addEventListener('change', (e) => {
+                extratoState.filterStatus = e.target.value;
+                extratoState.currentPage = 1;
+                renderExtrato();
+            });
+        }
+
+        const btnExtratoClearFilter = document.getElementById('btnExtratoClearFilter');
+        if (btnExtratoClearFilter) {
+            btnExtratoClearFilter.addEventListener('click', () => {
+                extratoState.searchTerm = '';
+                extratoState.filterStatus = 'all';
+                if (extratoSearchInput) extratoSearchInput.value = '';
+                if (extratoFilterStatus) extratoFilterStatus.value = 'all';
                 extratoState.currentPage = 1;
                 renderExtrato();
             });

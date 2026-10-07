@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.29--Financial%20RBAC%2C%20Login%20Redirects%20%26%20Photo%20Zoom-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.30--Contracts%20Density%2C%20Overdue%20Debts%20%26%20Statement%20Tools-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -99,6 +99,17 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Signed Contract Legal Immutability & Live Operational Details:** Printed and PDF agreement documents (`/contratos/<id>/imprimir`) are 100% legally immutable, preserving original customer/bike snapshots and the originally signed payment due day (`dia_pagamento_semanal_original`) regardless of subsequent billing schedule changes. Concurrently, the live contract details screen (`/contratos/<id>`) dynamically reflects updated customer contact data (phone, email, address) and bike status for day-to-day workshop and yard operations.
 * **Instant Clipboard Copy Shortcuts:** One-click copy buttons (`📋`) positioned next to customer contact data (Name, Phone, Email, Registered Address) and motorcycle plate with green checkmark (`✓`) visual feedback.
 * **Deposit Accounting & Settlement:** Security deposit holding, balance calculation, automated deductions when damages or fines occur, and deposit refund processing.
+* **Ultra-Compact Contracts Table & Zero-Scroll Layout (`/contratos`):** High-density design matching the financial ledger (`/financeiro`) with reduced cell padding (`0.35rem 0.55rem`), compact headers (`#`, `Type`, `Customer`, `Vehicle`, `Collection`, `Due / Terms`, `Amount`, `Status`, `Actions`), and automatic customer name/bike model ellipsis, fitting cleanly without horizontal overflow.
+* **Real-Time Pending Issues & Financial Overdue Tracking:**
+  - **Color-Coded Status Dot on ID Column (`#`):** Instant visual scanning showing 🔴 for contracts with overdue debts (including count and amount in tooltip), 🟡 for operational/documental pendências (pre-delivery, V5C, unsigned agreement), and 🟢 for 100% compliant contracts.
+  - **Financial Overdue Warning in `Amount` Column:** Clearly displays `⚠️ Overdue: £...` in red when payments are past due, keeping debt values exclusively in the financial column to avoid duplication and optimize row height.
+  - **Streamlined `Status` Column:** Clear operational status badges (`Active`, `⚠️ Needs Insp/Ins`, `📑 Needs V5C`, `⏳ Unsigned`, `✓ All Clear`).
+  - **Executive Overdue Debts KPI & Quick Filters:** Live `🔴 Overdue Debts` card on the top strip with 1-click filtering, plus dedicated status options (`⚠️ With Pending Issues`, `🔴 Overdue Debts`, `✓ Clean`).
+* **Contract Details Financial Statement Overhaul (`/contratos/<id>`):**
+  - High-density `#` transaction ID column and `⚡ Bal #ID` partial payment tracking pill.
+  - Overdue days counter badge (`Nd late`) for quick collection prioritization.
+  - Direct WhatsApp reminder button (`💬 Remind`) with real-time `✓ Reminded` optimistic badge next to hirer telephone.
+  - Dynamic client-side search/filter bar and live view totals footer (`Total in View`).
 
 ### 🔍 6. Digital Mobile Inspections & Incident Logging
 * **Multi-Angle Camera Capture:** Tailored for yard operators using smartphones to snap vehicle photos at check-out, return check-in, or road incidents.

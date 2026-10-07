@@ -471,25 +471,59 @@
             </div>
             <div id="fin_progress_details" style="margin-top: 6px; font-size: 0.78rem; color: var(--text-secondary); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px;"></div>
         </div>
+        <!-- Financial Statement Filters & Search Bar -->
+        <div id="extratoFilterBar" style="display: flex; gap: 0.65rem; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap;">
+            <!-- Universal Search within Statement -->
+            <div style="flex: 2; min-width: 220px; position: relative;">
+                <input type="text" id="extratoSearchInput" placeholder="Filter statement by type, note, ID or amount..." style="width: 100%; padding: 0.55rem 0.85rem 0.55rem 2.2rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.6); color: var(--text-primary); font-size: 0.85rem; outline: none; box-sizing: border-box;">
+                <svg style="position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: var(--text-secondary); pointer-events: none;" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+
+            <!-- Status Filter -->
+            <div style="flex: 1; min-width: 160px;">
+                <select id="extratoFilterStatus" style="width: 100%; padding: 0.55rem 0.85rem; border-radius: 10px; border: 1px solid var(--border-color); background: rgba(15, 23, 42, 0.6); color: var(--text-primary); font-size: 0.85rem; outline: none; cursor: pointer; box-sizing: border-box;">
+                    <option value="all" selected>All Statuses</option>
+                    <option value="pending">Pending Only</option>
+                    <option value="overdue">🚨 Overdue Only (Vencidos)</option>
+                    <option value="paid">✅ Paid Only</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+
+            <!-- Clear Filter Button -->
+            <button type="button" id="btnExtratoClearFilter" style="display: none; background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.55rem 0.85rem; border-radius: 10px; cursor: pointer; font-size: 0.82rem; font-weight: 500; white-space: nowrap;">
+                ✕ Clear Filter
+            </button>
+        </div>
     </div>
 
     <div class="table-container" style="box-shadow: none; border: 1px solid var(--border-color); flex-grow: 1;">
         <table id="extratoTable">
             <thead>
                 <tr>
+                    <th class="sortable-th" data-sort-field="id" style="width: 55px;" title="Click to sort by ID"># <span class="sort-indicator">⇅</span></th>
                     <th class="sortable-th" data-sort-field="tipo" title="Click to sort by Type">Type <span class="sort-indicator">⇅</span></th>
                     <th class="sortable-th" data-sort-field="valor" title="Click to sort by Amount">Amount <span class="sort-indicator">⇅</span></th>
                     <th class="sortable-th" data-sort-field="data_vencimento" title="Click to sort by Due Date">Due Date <span class="sort-indicator">⇅</span></th>
                     <th class="sortable-th" data-sort-field="data_pagamento" title="Click to sort by Payment Date">Payment Date <span class="sort-indicator">⇅</span></th>
                     <th class="sortable-th" data-sort-field="status" title="Click to sort by Status">Status <span class="sort-indicator">⇅</span></th>
-                    <th style="text-align: right;">Actions</th>
+                    <th style="text-align: right; min-width: 140px;">Actions</th>
                 </tr>
             </thead>
             <tbody id="extratoTableBody">
                 <tr>
-                    <td colspan="6" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Loading statement...</td>
+                    <td colspan="7" style="text-align:center; padding: 2rem; color: var(--text-secondary);">Loading statement...</td>
                 </tr>
             </tbody>
+            <tfoot id="extratoTableFooter" style="background: rgba(15, 23, 42, 0.7); border-top: 2px solid var(--border-color); font-weight: 600; color: var(--text-primary); display: none;">
+                <tr>
+                    <td colspan="2" id="extratoFooterCountText" style="padding: 0.55rem 0.75rem; font-size: 0.82rem; color: var(--text-secondary);">Showing records</td>
+                    <td id="extratoFooterTotalAmount" style="padding: 0.55rem 0.75rem; font-size: 0.95rem; font-weight: 800; color: var(--accent, #ff6b00);">£0.00</td>
+                    <td colspan="4" id="extratoFooterSummaryText" style="text-align: right; padding: 0.55rem 0.75rem; font-size: 0.78rem; color: var(--text-secondary);">Current View Sum</td>
+                </tr>
+            </tfoot>
         </table>
     </div>
 
@@ -1086,5 +1120,5 @@
 </script>
 <script src="/static/js/signature_pad.umd.min.js"></script>
 <script src="/static/js/moto_modal_shared.js?v=7"></script>
-<script src="/static/js/detalhe_contrato.js?v=37"></script>
+<script src="/static/js/detalhe_contrato.js?v=38"></script>
 {% endblock %}

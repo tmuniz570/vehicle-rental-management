@@ -36,12 +36,14 @@ function atualizarKpiCards(kpis) {
     const elPending = document.getElementById('kpiVal_pending_release');
     const elHolds = document.getElementById('kpiVal_deposit_holds');
     const elV5c = document.getElementById('kpiVal_pending_v5c');
+    const elOverdue = document.getElementById('kpiVal_overdue');
 
     if (elRentals) elRentals.textContent = kpis.rentals !== undefined ? kpis.rentals : '-';
     if (elSales) elSales.textContent = kpis.sales !== undefined ? kpis.sales : '-';
     if (elPending) elPending.textContent = kpis.pending_release !== undefined ? kpis.pending_release : '-';
     if (elHolds) elHolds.textContent = kpis.deposit_holds !== undefined ? kpis.deposit_holds : '-';
     if (elV5c) elV5c.textContent = kpis.pending_v5c !== undefined ? kpis.pending_v5c : '-';
+    if (elOverdue) elOverdue.textContent = kpis.overdue !== undefined ? kpis.overdue : '-';
 
     sincronizarKpiCardAtivo();
 }
@@ -55,7 +57,9 @@ function sincronizarKpiCardAtivo() {
         const cStatus = card.dataset.filterStatus || '';
 
         let isActive = false;
-        if (cStatus === 'pending_release' && filterStatus === 'pending_release') {
+        if (cStatus === 'overdue' && filterStatus === 'overdue') {
+            isActive = true;
+        } else if (cStatus === 'pending_release' && filterStatus === 'pending_release') {
             isActive = true;
         } else if (cStatus === 'pending_v5c' && filterStatus === 'pending_v5c') {
             isActive = true;
@@ -157,39 +161,54 @@ async function carregarContratos() {
 
             if (tipo === 'purchase') {
                 tipoBadge = '<span class="badge" style="background: rgba(6, 182, 212, 0.15); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.35); font-weight: 600;">🤝 Purchase</span>';
-                dueTerms = `<span style="color: var(--text-secondary); font-size: 0.85rem;">${safeEscape(c.metodo_pagamento_compra || 'Paid / Credit')}</span>`;
+                dueTerms = `<span style="color: var(--text-secondary); font-size: 0.78rem;">${safeEscape(c.metodo_pagamento_compra || 'Paid / Credit')}</span>`;
                 const total = c.valor_compra_veiculo !== null && c.valor_compra_veiculo !== undefined ? c.valor_compra_veiculo : 0;
-                amountText = `<span style="font-weight: 700; color: #22d3ee;">${gbp.format(total)}</span>`;
+                amountText = `<span style="font-weight: 700; color: #22d3ee; font-size: 0.82rem;">${gbp.format(total)}</span>`;
             } else if (tipo === 'sale_full') {
                 tipoBadge = '<span class="badge" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600;">Sale: Full</span>';
-                dueTerms = '<span style="color: var(--text-secondary); font-size: 0.85rem;">At Signing</span>';
+                dueTerms = '<span style="color: var(--text-secondary); font-size: 0.78rem;">At Signing</span>';
                 const total = c.valor_total_venda !== null && c.valor_total_venda !== undefined ? c.valor_total_venda : 0;
                 const pendente = c.total_pendente !== undefined ? c.total_pendente : 0;
-                const pendenteBadge = pendente > 0 
-                    ? `<span style="font-size:0.75rem; color: var(--text-secondary);" title="Remaining balance on this contract">Balance: ${gbp.format(pendente)}</span>`
-                    : `<span style="font-size:0.75rem; color:#4ade80; font-weight:600;">✓ Paid in Full</span>`;
-                amountText = `<div style="display:flex; flex-direction:column; gap:2px;"><span style="font-weight: 700; color: #4ade80;">${gbp.format(total)}</span>${pendenteBadge}</div>`;
+                const vencido = c.total_vencido !== undefined ? c.total_vencido : 0;
+                let pendenteBadge = '';
+                if (vencido > 0) {
+                    pendenteBadge = `<span style="font-size:0.7rem; color: #f87171; font-weight:700;" title="${c.qtd_vencidas || 1} overdue payment(s) totalling ${gbp.format(vencido)}">⚠️ Overdue: ${gbp.format(vencido)}</span>`;
+                } else if (pendente > 0) {
+                    pendenteBadge = `<span style="font-size:0.7rem; color: var(--text-secondary);" title="Remaining open balance">Bal: ${gbp.format(pendente)}</span>`;
+                } else {
+                    pendenteBadge = `<span style="font-size:0.7rem; color:#4ade80; font-weight:600;">✓ Paid</span>`;
+                }
+                amountText = `<div style="display:flex; flex-direction:column; gap:1px;"><span style="font-weight: 700; color: #4ade80; font-size: 0.82rem;">${gbp.format(total)}</span>${pendenteBadge}</div>`;
             } else if (tipo === 'sale_installment') {
                 tipoBadge = '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-weight: 600;">Sale: Inst.</span>';
-                dueTerms = `<span style="color: var(--text-secondary); font-size: 0.85rem;">Dep: £${parseFloat(c.valor_entrada || 0).toFixed(2)}</span>`;
+                dueTerms = `<span style="color: var(--text-secondary); font-size: 0.78rem;">Dep: £${parseFloat(c.valor_entrada || 0).toFixed(2)}</span>`;
                 const total = c.valor_total_venda !== null && c.valor_total_venda !== undefined ? c.valor_total_venda : 0;
                 const pendente = c.total_pendente !== undefined ? c.total_pendente : (c.saldo_devedor || 0);
-                const pendenteBadge = pendente > 0 
-                    ? `<span style="font-size:0.75rem; color: var(--text-secondary);" title="Remaining balance on this contract">Balance: ${gbp.format(pendente)}</span>`
-                    : `<span style="font-size:0.75rem; color:#4ade80; font-weight:600;" title="All installments fully settled">✓ Fully Paid</span>`;
-                amountText = `<div style="display:flex; flex-direction:column; gap:2px;"><span style="font-weight: 700; color: #fbbf24;">${gbp.format(total)}</span>${pendenteBadge}</div>`;
+                const vencido = c.total_vencido !== undefined ? c.total_vencido : 0;
+                let pendenteBadge = '';
+                if (vencido > 0) {
+                    pendenteBadge = `<span style="font-size:0.7rem; color: #f87171; font-weight:700;" title="${c.qtd_vencidas || 1} overdue installment(s) totalling ${gbp.format(vencido)}">⚠️ Overdue: ${gbp.format(vencido)}</span>`;
+                } else if (pendente > 0) {
+                    pendenteBadge = `<span style="font-size:0.7rem; color: var(--text-secondary);" title="Remaining open balance">Bal: ${gbp.format(pendente)}</span>`;
+                } else {
+                    pendenteBadge = `<span style="font-size:0.7rem; color:#4ade80; font-weight:600;" title="All installments fully settled">✓ Paid</span>`;
+                }
+                amountText = `<div style="display:flex; flex-direction:column; gap:1px;"><span style="font-weight: 700; color: #fbbf24; font-size: 0.82rem;">${gbp.format(total)}</span>${pendenteBadge}</div>`;
             } else {
                 tipoBadge = '<span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600;">Rental</span>';
-                dueTerms = c.dia_pagamento_semanal !== undefined && c.dia_pagamento_semanal !== null ? `<span style="font-weight:600; color: #93c5fd;">${diasSemana[c.dia_pagamento_semanal]}</span>` : '-';
+                dueTerms = c.dia_pagamento_semanal !== undefined && c.dia_pagamento_semanal !== null ? `<span style="font-weight:600; color: #93c5fd; font-size: 0.78rem;">${diasSemana[c.dia_pagamento_semanal]}</span>` : '-';
                 const rentVal = c.valor_aluguel_semanal ? `${gbp.format(c.valor_aluguel_semanal)}/wk` : '-';
                 const pendente = c.total_pendente !== undefined ? c.total_pendente : 0;
+                const vencido = c.total_vencido !== undefined ? c.total_vencido : 0;
                 let pendenteBadge = '';
-                if (pendente > 0) {
-                    pendenteBadge = `<span style="font-size:0.72rem; color: var(--text-secondary);" title="Remaining balance on this contract">Balance: ${gbp.format(pendente)}</span>`;
+                if (vencido > 0) {
+                    pendenteBadge = `<span style="font-size:0.7rem; color: #f87171; font-weight: 700;" title="${c.qtd_vencidas || 1} overdue weekly payment(s) totalling ${gbp.format(vencido)}">⚠️ Overdue: ${gbp.format(vencido)}</span>`;
+                } else if (pendente > 0) {
+                    pendenteBadge = `<span style="font-size:0.7rem; color: var(--text-secondary);" title="Scheduled open balance (not late)">Bal: ${gbp.format(pendente)}</span>`;
                 } else if (c.status === 'Active' || c.status === 'Ativo') {
-                    pendenteBadge = `<span style="font-size:0.72rem; color:#4ade80; font-weight:500;">✓ Up to date</span>`;
+                    pendenteBadge = `<span style="font-size:0.7rem; color:#4ade80; font-weight:500;">✓ Current</span>`;
                 }
-                amountText = `<div style="display:flex; flex-direction:column; gap:2px;"><span style="font-weight:700; color:#f8fafc;">${rentVal}</span>${pendenteBadge}</div>`;
+                amountText = `<div style="display:flex; flex-direction:column; gap:1px;"><span style="font-weight:700; color:#f8fafc; font-size: 0.82rem;">${rentVal}</span>${pendenteBadge}</div>`;
             }
             
             // Status Badge
@@ -213,20 +232,34 @@ async function carregarContratos() {
                 if (!c.tem_vistoria_checkout) tags.push('Insp');
                 if (!c.tem_seguro) tags.push('Ins');
                 const tagStr = tags.length > 0 ? tags.join(' + ') : 'Pending';
-                pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Motorbike cannot be released until check-out photos and insurance certificate are registered">⚠️ Needs ${safeEscape(tagStr)}</span></div>`;
+                pendingWarningBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.68rem; font-weight: 700; white-space: nowrap;" title="Motorbike cannot be released until check-out photos and insurance certificate are registered">⚠️ Needs ${safeEscape(tagStr)}</span>`;
             } else if (c.needs_v5c) {
                 if (c.tem_transfer_proof || (c.transfer_proof_count > 0)) {
-                    pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement has provisional transfer slip on file, awaiting official postal V5C logbook">⏳ Needs V5C (Slip OK)</span></div>`;
+                    pendingWarningBadge = `<span class="badge" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.68rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement has provisional transfer slip on file, awaiting official postal V5C logbook">⏳ Needs V5C (Slip OK)</span>`;
                 } else {
-                    pendingWarningBadge = `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(6, 182, 212, 0.18); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.45); font-size: 0.7rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement pending vehicle Logbook (V5C) attachment">📑 Needs V5C</span></div>`;
+                    pendingWarningBadge = `<span class="badge" style="background: rgba(6, 182, 212, 0.18); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.45); font-size: 0.68rem; font-weight: 700; white-space: nowrap;" title="Purchase agreement pending vehicle Logbook (V5C) attachment">📑 Needs V5C</span>`;
                 }
             }
 
             // Signature Status Pill
             const signPill = c.assinado ?
-                `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.7rem; font-weight: 600; padding: 2px 6px;" title="Agreement digitally signed by customer">✓ Signed</span></div>` :
-                `<div style="margin-top: 4px;"><span class="badge" style="background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.7rem; padding: 2px 6px;" title="Agreement awaiting customer signature">⏳ Unsigned</span></div>`;
+                `<span class="badge" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.68rem; font-weight: 600; white-space: nowrap;" title="Agreement digitally signed by customer">✓ Signed</span>` :
+                `<span class="badge" style="background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.68rem; white-space: nowrap;" title="Agreement awaiting customer signature">⏳ Unsigned</span>`;
             
+            // All-Clear / No Issues Pill (if active and 100% clean)
+            let allClearPill = '';
+            if ((c.status === 'Active' || c.status === 'Ativo') && !c.tem_pendencia) {
+                allClearPill = `<span class="badge" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.68rem; font-weight: 600; white-space: nowrap;" title="No pending issues: up to date, signed, and compliant">✓ All Clear</span>`;
+            }
+
+            const statusCell = `
+                <div style="display: flex; flex-direction: column; gap: 2px; align-items: flex-start;">
+                    <div>${statusBadge}</div>
+                    ${pendingWarningBadge ? `<div>${pendingWarningBadge}</div>` : ''}
+                    ${allClearPill ? `<div>${allClearPill}</div>` : `<div>${signPill}</div>`}
+                </div>
+            `;
+
             const nomeCliente = safeEscape(c.cliente_nome || '-');
             const placa = safeEscape(c.placa || '-');
             const modeloMoto = safeEscape(c.moto_modelo || '');
@@ -240,46 +273,59 @@ async function carregarContratos() {
 
             // Customer Column (Name + WhatsApp + Phone)
             const customerCell = `
-                <div style="display: flex; flex-direction: column; gap: 2px;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="font-weight: 600; white-space: nowrap;" title="${nomeCliente}">${nomeCliente}</span>
+                <div style="display: flex; flex-direction: column; gap: 1px;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <span style="font-weight: 600; max-width: 125px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${nomeCliente}">${nomeCliente}</span>
                         ${waButton}
                     </div>
-                    ${telCliente ? `<div style="font-size: 0.75rem; color: var(--text-secondary); font-family: monospace;">${safeEscape(telCliente)}</div>` : ''}
+                    ${telCliente ? `<div style="font-size: 0.72rem; color: var(--text-secondary); font-family: monospace;">${safeEscape(telCliente)}</div>` : ''}
                 </div>
             `;
 
             // Vehicle Column (Reg Plate + Model + Colour)
             const vehicleDesc = [modeloMoto, corMoto].filter(Boolean).join(' • ');
             const vehicleCell = `
-                <div style="display: flex; flex-direction: column; gap: 3px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
                     <div><span class="badge-plate">${placa}</span></div>
-                    ${vehicleDesc ? `<div style="font-size: 0.75rem; color: var(--text-secondary); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${vehicleDesc}">${vehicleDesc}</div>` : ''}
+                    ${vehicleDesc ? `<div style="font-size: 0.72rem; color: var(--text-secondary); max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${vehicleDesc}">${vehicleDesc}</div>` : ''}
                 </div>
             `;
 
             // Actions Column (View + Print/PDF Agreement)
             const actionsCell = `
-                <div style="display: flex; align-items: center; gap: 5px;">
-                    <a href="/contratos/${c.id}" class="btn-primary" style="padding: 6px 10px; font-size: 0.8rem; font-weight: 500; border-radius: 6px; white-space: nowrap; text-decoration: none;">View</a>
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 4px;">
+                    <a href="/contratos/${c.id}" class="btn-action-view">View</a>
                     <a href="/contratos/${c.id}/imprimir" class="action-icon-btn" title="View / Print Signed Agreement (PDF)">🖨️</a>
                 </div>
             `;
 
             const contractNoteIcon = c.notas_internas 
-                ? `<span style="margin-left: 5px; cursor: help; font-size: 0.85rem;" title="Internal Notes: ${safeEscape(c.notas_internas)}">📝</span>` 
+                ? `<span style="margin-left: 4px; cursor: help; font-size: 0.8rem;" title="Internal Notes: ${safeEscape(c.notas_internas)}">📝</span>` 
                 : '';
 
+            // Pendência Dot Indicator on ID (#) column
+            let pendenciaDot = '';
+            if (c.tem_pendencia) {
+                if (c.tem_pendencia_financeira || (c.total_vencido && c.total_vencido > 0)) {
+                    pendenciaDot = `<span title="⚠️ Pendência Financeira: ${c.qtd_vencidas || 1} cobrança(s) vencida(s) no total de ${gbp.format(c.total_vencido)}" style="cursor:help; margin-left: 2px; font-size: 0.72rem;">🔴</span>`;
+                } else {
+                    const pendTxt = (c.pendencias && c.pendencias.length > 0) ? c.pendencias.join(' • ') : 'Pendente de liberação/assinatura';
+                    pendenciaDot = `<span title="⚠️ Pendência: ${safeEscape(pendTxt)}" style="cursor:help; margin-left: 2px; font-size: 0.72rem;">🟡</span>`;
+                }
+            } else {
+                pendenciaDot = `<span title="✓ Sem pendências (100% regular e em dia)" style="cursor:help; margin-left: 2px; font-size: 0.72rem;">🟢</span>`;
+            }
+
             tr.innerHTML = `
-                <td style="font-weight: 600; color: var(--text-secondary); white-space: nowrap;">#${c.id}${contractNoteIcon}</td>
+                <td style="font-weight: 600; color: var(--text-secondary); white-space: nowrap;">#${c.id}${pendenciaDot}${contractNoteIcon}</td>
                 <td>${tipoBadge}</td>
                 <td>${customerCell}</td>
                 <td>${vehicleCell}</td>
-                <td style="white-space: nowrap;">${dataRetirada}</td>
+                <td style="white-space: nowrap; font-size: 0.8rem;">${dataRetirada}</td>
                 <td>${dueTerms}</td>
                 <td>${amountText}</td>
-                <td>${statusBadge}${pendingWarningBadge}${signPill}</td>
-                <td>${actionsCell}</td>
+                <td>${statusCell}</td>
+                <td style="text-align: right;">${actionsCell}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -319,7 +365,13 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (paramStatus && filterStatus) {
         const ps = paramStatus.toLowerCase();
-        if (ps === 'deposit_hold' || ps === 'quarentena') {
+        if (ps === 'overdue' || ps === 'devedores' || ps === 'atrasados') {
+            filterStatus.value = 'overdue';
+        } else if (ps === 'has_issues' || ps === 'com_pendencias' || ps === 'pendencias') {
+            filterStatus.value = 'has_issues';
+        } else if (ps === 'clean' || ps === 'sem_pendencias' || ps === 'no_issues') {
+            filterStatus.value = 'clean';
+        } else if (ps === 'deposit_hold' || ps === 'quarentena') {
             filterStatus.value = 'Deposit_Hold';
         } else if (ps === 'pending_release' || ps === 'pre-delivery' || ps === 'pendente_liberacao') {
             filterStatus.value = 'pending_release';

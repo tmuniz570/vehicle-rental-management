@@ -704,4 +704,44 @@ function formatWhatsAppNumber(phone) {
 }
 window.formatWhatsAppNumber = formatWhatsAppNumber;
 
+/**
+ * Universal Sleek Reminder Chip Formatter
+ * Displays relative or timestamp badge for payment reminders sent via WhatsApp.
+ */
+function formatarLembreteEstetico(isoStr, staff) {
+    if (!isoStr) return '';
+    try {
+        const d = new Date(isoStr);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / (1000 * 60));
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+        let relText = '';
+        if (diffMins < 2) {
+            relText = 'Just now';
+        } else if (diffMins < 60) {
+            relText = `${diffMins}m ago`;
+        } else if (diffHours < 24 && d.getDate() === now.getDate()) {
+            relText = `Today ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+        } else {
+            relText = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        }
+
+        const safeStaff = staff ? String(staff).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;') : '';
+        const staffStr = safeStaff ? ` by ${safeStaff}` : '';
+        const fullDateStr = d.toLocaleDateString('en-GB') + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const title = `WhatsApp reminder recorded${staffStr} on ${fullDateStr}`;
+
+        return `<span class="badge-reminded-pill" title="${title}" style="display:inline-flex; align-items:center; gap:2px; font-size:0.65rem; font-weight:600; color:#34d399; background:rgba(16, 185, 129, 0.12); border:1px solid rgba(16, 185, 129, 0.28); border-radius:10px; padding:0 5px; letter-spacing:0.2px; white-space:nowrap; line-height:1.2;">
+            <span style="font-size:0.62rem;">✓</span>
+            <span>${relText}</span>
+        </span>`;
+    } catch(e) {
+        return '';
+    }
+}
+window.formatarLembreteEstetico = formatarLembreteEstetico;
+
+
 

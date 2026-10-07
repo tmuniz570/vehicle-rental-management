@@ -42,6 +42,11 @@
         <div class="kpi-value" style="color: #22d3ee;" id="kpiVal_pending_v5c">-</div>
         <div class="kpi-sub">Purchases awaiting logbook</div>
     </div>
+    <div class="kpi-card" data-filter-tipo="" data-filter-status="overdue" id="kpiCard_overdue" title="Click to filter Contracts with Overdue Debts">
+        <div class="kpi-title"><span>Overdue Debts</span> <span>🔴</span></div>
+        <div class="kpi-value" style="color: #f87171;" id="kpiVal_overdue">-</div>
+        <div class="kpi-sub">Contracts with late payments</div>
+    </div>
 </div>
 
 <!-- Advanced Search & Filter Toolbar -->
@@ -64,10 +69,13 @@
         <span style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">Status:</span>
         <select id="filterStatus" class="filter-select">
             <option value="open" selected>Open / In Progress</option>
+            <option value="has_issues" style="color: #f87171; font-weight: 700;">⚠️ With Pending Issues (Any)</option>
+            <option value="overdue" style="color: #ef4444; font-weight: 700;">🔴 Overdue Debts (Financial)</option>
+            <option value="clean" style="color: #4ade80; font-weight: 700;">✓ Clean (No Issues / Up to Date)</option>
             <option value="pending_release" style="color: #fbbf24; font-weight: 700;">⚠️ Pre-Delivery Pending (Needs Insp/Ins)</option>
             <option value="pending_v5c" style="color: #22d3ee; font-weight: 700;">📑 Purchase: Pending V5C Logbook</option>
             <option value="all">All Statuses</option>
-            <option value="Active">Active</option>
+            <option value="Active">Active Only</option>
             <option value="Deposit_Hold">Deposit Holds Only</option>
             <option value="Completed">Completed Only</option>
             <option value="Cancelled">Cancelled Only</option>
@@ -113,15 +121,15 @@
     <table id="contratosTable">
         <thead>
             <tr>
-                <th data-sort-field="id" style="width: 70px;">ID</th>
-                <th data-sort-field="tipo">Type</th>
+                <th data-sort-field="id" style="width: 52px;">#</th>
+                <th data-sort-field="tipo" style="width: 78px;">Type</th>
                 <th data-sort-field="cliente">Customer</th>
-                <th data-sort-field="placa">Vehicle / Reg Plate</th>
-                <th data-sort-field="data_retirada">Collection</th>
-                <th data-sort-field="dia_pagamento_semanal">Due / Terms</th>
-                <th data-sort-field="valor_aluguel_semanal">Amount</th>
-                <th data-sort-field="status">Status & Agreement</th>
-                <th style="min-width: 140px;">Actions</th>
+                <th data-sort-field="placa" style="width: 88px;">Vehicle</th>
+                <th data-sort-field="data_retirada" style="width: 80px;">Collection</th>
+                <th data-sort-field="dia_pagamento_semanal" style="width: 88px;">Due / Terms</th>
+                <th data-sort-field="valor_aluguel_semanal" style="width: 88px;">Amount</th>
+                <th data-sort-field="status" style="width: 95px;">Status</th>
+                <th style="width: 78px; text-align: right;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -137,6 +145,75 @@
 </div>
 
 <style>
+    /* Super Compact & Streamlined High-Density Contracts Table */
+    .table-container {
+        border-radius: 14px;
+    }
+    #contratosTable {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+    #contratosTable th {
+        padding: 0.45rem 0.55rem !important;
+        font-size: 0.7rem !important;
+        letter-spacing: 0.04em !important;
+        font-weight: 700 !important;
+        white-space: nowrap !important;
+        border-bottom: 1px solid var(--border-color);
+        background: rgba(15, 23, 42, 0.75);
+    }
+    #contratosTable td {
+        padding: 0.35rem 0.55rem !important;
+        font-size: 0.82rem !important;
+        line-height: 1.25 !important;
+        vertical-align: middle !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    #contratosTable tr:hover td {
+        background: rgba(255, 255, 255, 0.035);
+    }
+    #contratosTable .badge {
+        padding: 1px 6px !important;
+        font-size: 0.68rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        border-radius: 4px !important;
+        letter-spacing: 0.02em !important;
+    }
+    #contratosTable .badge-plate {
+        padding: 1px 5px !important;
+        font-size: 0.74rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.03em !important;
+        border-radius: 4px !important;
+        line-height: 1.2 !important;
+    }
+    #contratosTable .btn-action-view {
+        padding: 3px 8px !important;
+        font-size: 0.74rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        border-radius: 6px !important;
+        background: var(--accent, #3b82f6);
+        color: #ffffff;
+        text-decoration: none;
+        white-space: nowrap;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+    }
+    #contratosTable .btn-action-view:hover {
+        filter: brightness(1.1);
+        transform: translateY(-1px);
+    }
+    #contratosTable .action-icon-btn {
+        padding: 2px 6px !important;
+        font-size: 0.74rem !important;
+        line-height: 1.2 !important;
+        border-radius: 6px !important;
+    }
     .contracts-kpis-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -229,7 +306,21 @@
         border: 1px solid rgba(34, 197, 94, 0.35);
         color: #4ade80;
         text-decoration: none;
-        font-size: 0.85rem;
+        font-size: 0.75rem;
+        transition: all 0.15s ease;
+    }
+    .btn-wa-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.35);
+        color: #4ade80;
+        text-decoration: none;
+        font-size: 0.75rem;
         transition: all 0.15s ease;
     }
     .btn-wa-link:hover {
@@ -242,13 +333,13 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 5px 8px;
+        padding: 3px 6px;
         border-radius: 6px;
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.12);
         color: #cbd5e1;
         text-decoration: none;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         transition: all 0.15s ease;
     }
     .action-icon-btn:hover {
@@ -260,5 +351,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/contratos.js?v=16"></script>
+<script src="/static/js/contratos.js?v=19"></script>
 {% endblock %}

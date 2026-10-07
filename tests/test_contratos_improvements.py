@@ -42,10 +42,12 @@ class TestContratosImprovements(unittest.TestCase):
             self.assertIn('pending_release', kpis)
             self.assertIn('deposit_holds', kpis)
             self.assertIn('pending_v5c', kpis)
+            self.assertIn('overdue', kpis)
             self.assertIsInstance(kpis['rentals'], int)
             self.assertIsInstance(kpis['sales'], int)
+            self.assertIsInstance(kpis['overdue'], int)
 
-            # 2. Assert items have enriched fields (model, phone, signature, real-time balances)
+            # 2. Assert items have enriched fields (model, phone, signature, real-time balances, pendencias)
             if data['itens']:
                 item = data['itens'][0]
                 self.assertIn('cliente_telefone', item)
@@ -54,6 +56,11 @@ class TestContratosImprovements(unittest.TestCase):
                 self.assertIn('dia_pagamento_semanal', item)
                 self.assertIn('total_pendente', item)
                 self.assertIn('total_pago', item)
+                self.assertIn('total_vencido', item)
+                self.assertIn('qtd_vencidas', item)
+                self.assertIn('tem_pendencia_financeira', item)
+                self.assertIn('tem_pendencia', item)
+                self.assertIn('pendencias', item)
 
             # 3. Test Dia de Pagamento filter (e.g. Monday = 0)
             res_monday = self.client.get('/api/contratos?dia_pagamento=0')
@@ -70,8 +77,21 @@ class TestContratosImprovements(unittest.TestCase):
             data_date = res_date.get_json()
             self.assertIn('itens', data_date)
 
+            # 5. Test Overdue & Pendencias Filters
+            res_overdue = self.client.get('/api/contratos?status=overdue')
+            self.assertEqual(res_overdue.status_code, 200)
+            data_overdue = res_overdue.get_json()
+            for it in data_overdue['itens']:
+                self.assertTrue(it['tem_pendencia_financeira'])
+                self.assertTrue(it['total_vencido'] > 0)
+
+            res_issues = self.client.get('/api/contratos?status=has_issues')
+            self.assertEqual(res_issues.status_code, 200)
+            data_issues = res_issues.get_json()
+            self.assertIn('itens', data_issues)
+
             print(f"\n✓ /api/contratos KPIs validated: {kpis}")
-            print(f"✓ /api/contratos enriched fields and filters (day of week, date range) verified successfully.")
+            print(f"✓ /api/contratos enriched pendencias and overdue filters verified successfully.")
 
 if __name__ == '__main__':
     unittest.main()

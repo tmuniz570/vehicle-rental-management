@@ -4063,6 +4063,61 @@ def listar_contratos():
                 if not any((getattr(d, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for d in get_purchase_contract_v5c_docs(cp))
             ]
             query = query.filter(Contract.id.in_(pending_ids))
+        elif status_filter.lower() in ['overdue', 'devedores', 'atrasados']:
+            london_now = get_london_now()
+            hoje_zero = london_now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            overdue_subq = db.session.query(FinancialTransaction.id_contrato).filter(
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+                FinancialTransaction.data_vencimento < hoje_zero,
+                ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+            ).distinct().subquery()
+            query = query.filter(Contract.id.in_(db.session.query(overdue_subq.c.id_contrato)))
+        elif status_filter.lower() in ['has_issues', 'com_pendencias', 'pendencias']:
+            london_now = get_london_now()
+            hoje_zero = london_now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            overdue_subq = db.session.query(FinancialTransaction.id_contrato).filter(
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+                FinancialTransaction.data_vencimento < hoje_zero,
+                ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+            ).distinct().subquery()
+            
+            checkout_subq = db.session.query(Inspection.id).filter(
+                Inspection.id_contrato == Contract.id,
+                Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
+            ).exists()
+            
+            query = query.filter(
+                db.or_(
+                    Contract.id.in_(db.session.query(overdue_subq.c.id_contrato)),
+                    db.and_(
+                        Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+                        ~Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
+                        db.or_(Contract.url_seguro == None, ~checkout_subq)
+                    ),
+                    Contract.assinatura_cliente_inicial == None
+                )
+            )
+        elif status_filter.lower() in ['clean', 'no_issues', 'sem_pendencias']:
+            london_now = get_london_now()
+            hoje_zero = london_now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            overdue_subq = db.session.query(FinancialTransaction.id_contrato).filter(
+                FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+                FinancialTransaction.data_vencimento < hoje_zero,
+                ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+            ).distinct().subquery()
+            
+            checkout_subq = db.session.query(Inspection.id).filter(
+                Inspection.id_contrato == Contract.id,
+                Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
+            ).exists()
+            
+            query = query.filter(
+                ~Contract.id.in_(db.session.query(overdue_subq.c.id_contrato)),
+                Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
+                Contract.url_seguro != None,
+                checkout_subq,
+                Contract.assinatura_cliente_inicial != None
+            )
         elif status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
             query = query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']))
         elif status_filter.lower() in ['active', 'ativo']:
@@ -4104,26 +4159,32 @@ def listar_contratos():
     order_func = target_col.desc() if sort_order == 'desc' else target_col.asc()
     paginated = query.order_by(order_func).paginate(page=page, per_page=limit, error_out=False)
     
-    # Real-time financial balances: Aggregate unpaid (pending) and paid totals per contract
+    # Real-time financial balances: Aggregate unpaid (pending, overdue) and paid totals per contract
     contract_ids = [c.id for c in paginated.items]
     pendentes_map = {}
     pagos_map = {}
+    vencidos_map = {}
+    vencidos_qtd_map = {}
     if contract_ids:
-        tx_aggs = db.session.query(
-            FinancialTransaction.id_contrato,
-            FinancialTransaction.status,
-            db.func.sum(FinancialTransaction.valor)
-        ).filter(
+        london_now = get_london_now()
+        hoje_zero = london_now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+
+        txs = FinancialTransaction.query.filter(
             FinancialTransaction.id_contrato.in_(contract_ids),
             ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
-        ).group_by(FinancialTransaction.id_contrato, FinancialTransaction.status).all()
+        ).all()
 
-        for cid, st, total_val in tx_aggs:
-            st_norm = (st or '').strip().lower()
+        for tx in txs:
+            st_norm = (tx.status or '').strip().lower()
+            val = float(tx.valor or 0.0)
+            cid = tx.id_contrato
             if st_norm in ['pending', 'pendente']:
-                pendentes_map[cid] = pendentes_map.get(cid, 0.0) + float(total_val or 0.0)
+                pendentes_map[cid] = pendentes_map.get(cid, 0.0) + val
+                if tx.data_vencimento and tx.data_vencimento < hoje_zero:
+                    vencidos_map[cid] = vencidos_map.get(cid, 0.0) + val
+                    vencidos_qtd_map[cid] = vencidos_qtd_map.get(cid, 0) + 1
             elif st_norm in ['paid', 'pago']:
-                pagos_map[cid] = pagos_map.get(cid, 0.0) + float(total_val or 0.0)
+                pagos_map[cid] = pagos_map.get(cid, 0.0) + val
 
     itens = []
     for c in paginated.items:
@@ -4152,6 +4213,26 @@ def listar_contratos():
         tem_transfer_proof = (transfer_proof_count > 0)
         needs_v5c = bool(is_purchase and is_active and not tem_v5c)
 
+        total_vencido = round(vencidos_map.get(c.id, 0.0), 2)
+        qtd_vencidas = vencidos_qtd_map.get(c.id, 0)
+        tem_pendencia_financeira = (total_vencido > 0)
+        
+        # Build consolidated pendencias list
+        pendencias = []
+        if tem_pendencia_financeira:
+            pendencias.append(f"Debt: £{total_vencido:.2f}")
+        if pendente_liberacao:
+            tags = []
+            if not tem_checkout: tags.append('Insp')
+            if not tem_seguro: tags.append('Ins')
+            pendencias.append(f"Needs {' + '.join(tags)}")
+        if needs_v5c:
+            pendencias.append("Needs V5C")
+        if not bool(c.assinatura_cliente_inicial):
+            pendencias.append("Unsigned")
+        
+        tem_pendencia = len(pendencias) > 0
+
         itens.append({
             'id': c.id, 
             'id_cliente': c.id_cliente, 
@@ -4166,6 +4247,11 @@ def listar_contratos():
             'valor_entrada': float(c.valor_entrada) if c.valor_entrada is not None else 0.0,
             'saldo_devedor': float(c.saldo_devedor) if c.saldo_devedor is not None else 0.0,
             'total_pendente': round(pendentes_map.get(c.id, 0.0), 2),
+            'total_vencido': total_vencido,
+            'qtd_vencidas': qtd_vencidas,
+            'tem_pendencia_financeira': tem_pendencia_financeira,
+            'pendencias': pendencias,
+            'tem_pendencia': tem_pendencia,
             'total_pago': round(pagos_map.get(c.id, 0.0), 2),
             'valor_compra_veiculo': float(c.valor_compra_veiculo) if c.valor_compra_veiculo is not None else None,
             'metodo_pagamento_compra': c.metodo_pagamento_compra,
@@ -4230,6 +4316,14 @@ def listar_contratos():
         1 for cp in cand_purchases_kpi 
         if not any((getattr(d, 'categoria_doc', 'v5c') or 'v5c') == 'v5c' for d in get_purchase_contract_v5c_docs(cp))
     )
+
+    london_now_kpi = get_london_now()
+    hoje_zero_kpi = london_now_kpi.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    kpi_overdue = db.session.query(FinancialTransaction.id_contrato).filter(
+        FinancialTransaction.status.in_([TransactionStatus.PENDING.value, 'Pending', 'Pendente']),
+        FinancialTransaction.data_vencimento < hoje_zero_kpi,
+        ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
+    ).distinct().count()
     
     return jsonify({
         'itens': itens,
@@ -4241,7 +4335,8 @@ def listar_contratos():
             'sales': kpi_sales,
             'pending_release': kpi_pendente_liberacao,
             'deposit_holds': kpi_deposit_holds,
-            'pending_v5c': kpi_pending_v5c
+            'pending_v5c': kpi_pending_v5c,
+            'overdue': kpi_overdue
         }
     })
 
@@ -4474,13 +4569,16 @@ def detalhe_contrato(id):
             'status': t.status,
             'forma_pagamento': t.forma_pagamento,
             'detalhes_pagamento': json.loads(t.detalhes_pagamento_json) if t.detalhes_pagamento_json else None,
+            'id_transacao_origem': t.id_transacao_origem,
             'nota': t.nota or (t.vistoria.observacoes if (t.id_vistoria and t.vistoria and t.vistoria.observacoes) else None),
             'nota_pagamento': t.nota_pagamento,
             'url_anexos': t.url_anexos,
             'id_vistoria': t.id_vistoria,
             'registrado_por_nome': t.registrado_por_nome or '',
             'data_vencimento': t.data_vencimento.isoformat() if t.data_vencimento else None,
-            'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None
+            'data_pagamento': t.data_pagamento.isoformat() if t.data_pagamento else None,
+            'ultimo_lembrete': t.ultimo_lembrete.isoformat() if t.ultimo_lembrete else None,
+            'ultimo_lembrete_por': t.ultimo_lembrete_por or ''
         } for t in transacoes_cliente],
         'vistorias': [{
             'id': v.id,
