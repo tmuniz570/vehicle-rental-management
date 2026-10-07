@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, date, timezone, timedelta
 from app import app, db, Contract, Client, Motorcycle, ContractType, ContractStatus, User
 
 class TestContratosImprovements(unittest.TestCase):
@@ -90,8 +90,41 @@ class TestContratosImprovements(unittest.TestCase):
             data_issues = res_issues.get_json()
             self.assertIn('itens', data_issues)
 
+            # 6. Test is_transaction_overdue helper with naive and aware datetimes
+            from app import is_transaction_overdue, LONDON_TZ
+
+            class MockTx:
+                def __init__(self, data_vencimento):
+                    self.data_vencimento = data_vencimento
+
+            # Naive past
+            tx_naive_past = MockTx(datetime(2025, 1, 1, 10, 0, 0))
+            self.assertTrue(is_transaction_overdue(tx_naive_past))
+
+            # Naive future
+            tx_naive_fut = MockTx(datetime(2030, 1, 1, 10, 0, 0))
+            self.assertFalse(is_transaction_overdue(tx_naive_fut))
+
+            # Aware UTC past
+            tx_utc_past = MockTx(datetime(2025, 1, 1, 10, 0, 0, tzinfo=timezone.utc))
+            self.assertTrue(is_transaction_overdue(tx_utc_past))
+
+            # Aware UTC future
+            tx_utc_fut = MockTx(datetime(2030, 1, 1, 10, 0, 0, tzinfo=timezone.utc))
+            self.assertFalse(is_transaction_overdue(tx_utc_fut))
+
+            # Aware London past
+            tx_lon_past = MockTx(datetime(2025, 1, 1, 10, 0, 0, tzinfo=LONDON_TZ))
+            self.assertTrue(is_transaction_overdue(tx_lon_past))
+
+            # Date object past
+            tx_date_past = MockTx(date(2025, 1, 1))
+            self.assertTrue(is_transaction_overdue(tx_date_past))
+
             print(f"\n✓ /api/contratos KPIs validated: {kpis}")
             print(f"✓ /api/contratos enriched pendencias and overdue filters verified successfully.")
+            print(f"✓ is_transaction_overdue timezone-safety (aware & naive) verified successfully.")
 
 if __name__ == '__main__':
     unittest.main()
+

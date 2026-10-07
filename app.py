@@ -97,6 +97,24 @@ def get_london_date():
     """Returns today's date in Europe/London."""
     return get_london_now().date()
 
+def is_transaction_overdue(tx, hoje_date=None):
+    """Safely checks if a financial transaction is overdue, regardless of naive/aware datetime."""
+    if not tx or not tx.data_vencimento:
+        return False
+    if hoje_date is None:
+        hoje_date = get_london_date()
+    venc = tx.data_vencimento
+    if isinstance(venc, datetime):
+        if venc.tzinfo is not None:
+            venc_date = venc.astimezone(LONDON_TZ).date()
+        else:
+            venc_date = venc.date()
+    elif isinstance(venc, date):
+        venc_date = venc
+    else:
+        return False
+    return venc_date < hoje_date
+
 # Thread-safe Rate Limiting for Login (10 attempts per 15 min per IP)
 LOGIN_ATTEMPTS = defaultdict(list)
 LOGIN_LOCK = threading.Lock()
@@ -4166,8 +4184,7 @@ def listar_contratos():
     vencidos_map = {}
     vencidos_qtd_map = {}
     if contract_ids:
-        london_now = get_london_now()
-        hoje_zero = london_now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        hoje_date = get_london_date()
 
         txs = FinancialTransaction.query.filter(
             FinancialTransaction.id_contrato.in_(contract_ids),
@@ -4180,7 +4197,7 @@ def listar_contratos():
             cid = tx.id_contrato
             if st_norm in ['pending', 'pendente']:
                 pendentes_map[cid] = pendentes_map.get(cid, 0.0) + val
-                if tx.data_vencimento and tx.data_vencimento < hoje_zero:
+                if is_transaction_overdue(tx, hoje_date):
                     vencidos_map[cid] = vencidos_map.get(cid, 0.0) + val
                     vencidos_qtd_map[cid] = vencidos_qtd_map.get(cid, 0) + 1
             elif st_norm in ['paid', 'pago']:
