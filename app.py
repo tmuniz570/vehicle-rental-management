@@ -7782,6 +7782,7 @@ if __name__ == '__main__':
     
     # Start APScheduler with Europe/London timezone at 01:00 AM (guarded for Flask reloader)
     if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+        from warmup import run_warmup
         scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
         scheduler.add_job(
             func=run_daily_jobs,
@@ -7789,6 +7790,15 @@ if __name__ == '__main__':
             hour=1,
             minute=0,
             id="daily_rent_and_deposit_jobs",
+            replace_existing=True,
+            misfire_grace_time=3600
+        )
+        scheduler.add_job(
+            func=lambda: run_warmup(origem='System/Scheduler'),
+            trigger="cron",
+            hour=8,
+            minute=0,
+            id="morning_warmup_job",
             replace_existing=True,
             misfire_grace_time=3600
         )

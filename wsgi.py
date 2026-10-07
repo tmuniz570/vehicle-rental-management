@@ -43,7 +43,10 @@ def _acquire_scheduler_lock():
 # Inicia o agendador de tarefas diárias se este for o worker eleito
 if _acquire_scheduler_lock():
     try:
+        from warmup import run_warmup
         scheduler = BackgroundScheduler(timezone=pytz.timezone('Europe/London'))
+        
+        # 1. Rotinas Diárias de Cobranças e Quarentena de Depósitos às 01:00 AM (Londres)
         scheduler.add_job(
             func=run_daily_jobs,
             trigger="cron",
@@ -53,8 +56,23 @@ if _acquire_scheduler_lock():
             replace_existing=True,
             misfire_grace_time=3600
         )
+
+        # 2. Warm-up Matinal de Cache e Conexões às 08:00 AM (Londres, 1h antes da abertura da loja)
+        def _exec_warmup_scheduler():
+            run_warmup(origem='System/Scheduler')
+
+        scheduler.add_job(
+            func=_exec_warmup_scheduler,
+            trigger="cron",
+            hour=8,
+            minute=0,
+            id="morning_warmup_job",
+            replace_existing=True,
+            misfire_grace_time=3600
+        )
+
         scheduler.start()
-        print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Rotinas diárias à 01:00 de Londres, misfire_grace=3600s).")
+        print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Cobranças à 01:00 AM, Warm-up às 08:00 AM Europe/London, misfire_grace=3600s).")
 
         # Auto-recuperação no startup: se as rotinas de hoje ainda não tiverem sido executadas
         # (ex: deploy após 01:00 AM ou restart do serviço), executa em thread assíncrona
@@ -63,9 +81,16 @@ if _acquire_scheduler_lock():
         def _check_and_run_startup_jobs():
             try:
                 import time
+                from app import get_london_now
                 time.sleep(3)
                 print("[WSGI Startup] Executando rotinas diárias de catch-up no boot/deploy...")
                 run_daily_jobs(force=True)
+
+                # Se o servidor inicializar durante a manhã (08:00 às 11:59 AM Londres), executa warm-up de inicialização
+                london_now = get_london_now()
+                if 8 <= london_now.hour < 12:
+                    print(f"[WSGI Startup] Horário matinal detectado ({london_now.strftime('%H:%M %Z')}). Executando warm-up no boot...")
+                    run_warmup(origem='System/StartupBoot')
             except Exception as e_start:
                 print(f"[WSGI Startup Job Error]: {e_start}")
 

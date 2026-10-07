@@ -1,0 +1,32 @@
+{% if current_user.is_authenticated and current_user.pode_alugueis() and not ('claims' in request.path or 'usuario' in request.path) %}
+<!-- Universal Quick Lookup Command Palette Modal (Fixed Menu & Ctrl+K) -->
+<div id="quickLookupModal" class="quick-lookup-modal-backdrop" onclick="handleQuickLookupBackdropClick(event)" style="display: none;">
+    <div class="quick-lookup-modal-dialog" role="dialog" aria-modal="true" aria-label="OmniSearch Command Palette">
+        <div class="quick-lookup-modal-header">
+            <svg class="quick-modal-icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="dashQuickSearch" 
+                   placeholder="Quick lookup: plate, model, customer, contract #..." 
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                   class="quick-modal-input">
+            <button id="dashQuickSearchClear" type="button" onclick="clearQuickSearch()" class="quick-modal-clear-btn" title="Clear search" style="display: none;">✕</button>
+            <button type="button" class="quick-modal-close-btn" onclick="closeQuickLookupModal()" title="Close (Esc)">Esc</button>
+        </div>
+        
+        <!-- Search Results Container -->
+        <div id="dashSearchResults" class="quick-modal-results" style="display: none;"></div>
+        
+        <!-- Palette Footer Tips -->
+        <div class="quick-modal-footer">
+            <div class="quick-modal-tips">
+                <span><kbd>Esc</kbd> Close</span>
+                <span><kbd>Ctrl+K</kbd> Toggle</span>
+                <span><kbd>/</kbd> Focus</span>
+            </div>
+            <div class="quick-modal-brand">FF Motors Quick Lookup</div>
+        </div>
+    </div>
+</div>
+{% endif %}

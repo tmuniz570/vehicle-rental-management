@@ -4,6 +4,40 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.35] — 2026-10-07 — *Native APScheduler Morning Warm-up & Boot Catch-up*
+
+### ⚡ Aquecimento Matinal Nativo (`APScheduler` & `wsgi.py`)
+* **Agendamento Automático Nativo no WSGI (08:00 AM Europe/London)**:
+  - Identificada a causa raiz de o warm-up não estar executando na VM: dependia de cron manual no Linux do SO e **não estava registrado no `APScheduler` interno** do Gunicorn (`wsgi.py`).
+  - Adicionado job `morning_warmup_job` configurado no `APScheduler` de `wsgi.py` (e no fallback `app.py`) para rodar compulsoriamente às **08:00 AM (Europe/London)**, 1 hora antes da abertura da loja.
+  - Execução protegida por lock de processo único (`_acquire_scheduler_lock()`), garantindo que apenas um worker execute a rotina sem concorrência.
+* **Auto-Recuperação no Boot Matinal**:
+  - Implementada verificação em `_check_and_run_startup_jobs`: se o serviço do Gunicorn reiniciar ou receber deploy durante a manhã (08:00 AM às 12:00 PM de Londres), o warm-up é acionado imediatamente no startup.
+* **Rastreabilidade**:
+  - Execuções agora são registradas na tabela `AuditLog` como `SYSTEM_WARMUP` identificando a origem (`System/Scheduler`, `System/StartupBoot` ou `System/CLI`).
+* **Testes Automatizados**:
+  - Novo teste unitário em [tests/test_warmup_and_cleanup_perf.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_warmup_and_cleanup_perf.py) validando o agendamento de `morning_warmup_job` em `wsgi.scheduler`. Total de 75 testes passando com 100% de sucesso.
+
+## [1.9.34] — 2026-10-07 — *Fixed Sidebar Quick Search & Universal Command Palette Modal*
+
+### 🔍 Busca Rápida no Menu Fixo & Command Palette Modal
+* **Posicionamento Fixo e Imutável no Menu Lateral**:
+  - Para resolver variações de posicionamento entre telas com diferentes tamanhos de títulos e botões, o gatilho da busca rápida foi alocado permanentemente no **menu fixo lateral (`.sidebar`)**, logo abaixo da logomarca e acima dos links de navegação.
+  - No modo recolhido (collapsed), contrai elegantemente para um botão de ícone com tooltip flutuante `Search (Ctrl+K)`.
+  - No mobile, ativado via ícone dedicado no cabeçalho superior (`mobile-header`) e dentro da gaveta lateral.
+  - Todos os cabeçalhos de tela (`.page-header` e `index.html`) retornaram aos seus designs nativos, limpos e sem nenhuma interferência visual ou salto de layout.
+* **Command Palette Modal (Raycast / Spotlight)**:
+  - Componente [templates/components/quick_lookup.html](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/templates/components/quick_lookup.html) transformado em um modal com backdrop desfocado (`backdrop-filter: blur(14px)`).
+  - Acesso instantâneo via clique no botão do menu fixo ou através dos atalhos de teclado `Ctrl+K`, `Cmd+K` e `/`.
+  - Fechamento imediato com tecla `Escape`, botão `✕`, botão `Esc` ou clique fora do diálogo.
+* **Escopo e Permissões**:
+  - Exibido em todas as páginas operacionais e expressamente ocultado em **Claims & Storage** (`/claims`) e **Users** (`/usuarios`).
+  - Restrito a usuários com permissão de aluguéis/frota (`current_user.pode_alugueis()`).
+* **Cache Busters Atualizados**:
+  - Incrementados para `styles.css?v=10` e `app_shared.js?v=9`.
+* **Testes Automatizados**:
+  - Suíte em [tests/test_universal_quick_lookup.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_universal_quick_lookup.py) validando o gatilho no menu fixo, a modalidade Command Palette e a exclusão estrita em Claims e Usuários. 74 testes passando com 100% de sucesso.
+
 ## [1.9.32] — 2026-10-07 — *Merge Duplicates Modal Trigger Fix & Cache Buster Bump*
 
 ### 🐛 Correção no Modal "🔀 Merge Duplicates" (`/clientes`)

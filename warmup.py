@@ -13,8 +13,8 @@ sys.path.insert(0, BASE_DIR)
 from app import app, _compilar_dados_dashboard, get_london_now, registrar_log
 from database import db, Client, Motorcycle
 
-def run_warmup():
-    print(f"[{get_london_now().strftime('%Y-%m-%d %H:%M:%S %Z')}] Initializing FF Motors morning warm-up...")
+def run_warmup(origem='System/Warmup'):
+    print(f"[{get_london_now().strftime('%Y-%m-%d %H:%M:%S %Z')}] Initializing FF Motors morning warm-up ({origem})...")
     t0 = time.time()
     
     with app.app_context():
@@ -30,9 +30,9 @@ def run_warmup():
         try:
             registrar_log(
                 'SYSTEM_WARMUP',
-                'System/WarmupScript',
+                origem,
                 None,
-                f"Warm-up CLI matinal executado em {elapsed_ms}ms ({dados.get('total_motos')} motos ativas, {dados.get('contratos_ativos')} contratos ativos)."
+                f"Warm-up matinal executado em {elapsed_ms}ms ({dados.get('total_motos')} motos ativas, {dados.get('contratos_ativos')} contratos ativos)."
             )
         except Exception:
             pass
@@ -44,4 +44,4 @@ def run_warmup():
     return elapsed_ms
 
 if __name__ == '__main__':
-    run_warmup()
+    run_warmup(origem='System/CLI')

@@ -58,5 +58,12 @@ class TestWarmupAndCleanupPerf(unittest.TestCase):
         self.assertIsInstance(valid_files, set)
         print(f"✓ Optimized cleanup_uploads.collect_valid_files() returned {len(valid_files)} valid file entries cleanly")
 
+    def test_warmup_scheduled_in_wsgi(self):
+        import wsgi
+        if hasattr(wsgi, 'scheduler') and wsgi.scheduler:
+            job = wsgi.scheduler.get_job('morning_warmup_job')
+            self.assertIsNotNone(job, "morning_warmup_job must be scheduled in wsgi.scheduler")
+            print("✓ morning_warmup_job is successfully scheduled in wsgi.scheduler at 08:00 AM Europe/London.")
+
 if __name__ == '__main__':
     unittest.main()

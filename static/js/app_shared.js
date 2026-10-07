@@ -743,5 +743,322 @@ function formatarLembreteEstetico(isoStr, staff) {
 }
 window.formatarLembreteEstetico = formatarLembreteEstetico;
 
+/**
+ * Universal HTML Escape Helper
+ */
+if (typeof window.escapeHtml !== 'function') {
+    window.escapeHtml = function(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+}
+
+/**
+ * Universal Currency Formatter (GBP)
+ */
+if (typeof window.formatoMoeda === 'undefined') {
+    window.formatoMoeda = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+}
+
+/**
+ * Universal Quick Lookup Search (Navbar & Dashboard)
+ */
+function initQuickLookup() {
+    const searchInput = document.getElementById('dashQuickSearch');
+    const resultsBox = document.getElementById('dashSearchResults');
+    const clearBtn = document.getElementById('dashQuickSearchClear');
+    const kbdHint = document.getElementById('dashQuickSearchKbd');
+
+    if (!searchInput || !resultsBox) return;
+
+    let searchDebounceTimeout = null;
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+        if (kbdHint) kbdHint.style.display = query ? 'none' : 'block';
+
+        if (searchDebounceTimeout) clearTimeout(searchDebounceTimeout);
+        if (!query || query.length < 2) {
+            resultsBox.style.display = 'none';
+            resultsBox.innerHTML = '';
+            return;
+        }
+
+        searchDebounceTimeout = setTimeout(async () => {
+            try {
+                resultsBox.innerHTML = '<div style="padding: 0.75rem; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">Searching...</div>';
+                resultsBox.style.display = 'block';
+
+                const res = await fetch(`/api/busca-rapida?q=${encodeURIComponent(query)}`);
+                if (!res.ok) {
+                    if (res.status === 403) {
+                        resultsBox.style.display = 'none';
+                        return;
+                    }
+                    throw new Error(`HTTP ${res.status}`);
+                }
+                const data = await res.json();
+
+                const motos = data.motos || [];
+                const clientes = data.clientes || [];
+                const contratos = data.contratos || [];
+
+                if (motos.length === 0 && clientes.length === 0 && contratos.length === 0) {
+                    resultsBox.innerHTML = '<div style="padding: 0.85rem; text-align: center; color: var(--text-secondary); font-size: 0.85rem;">No motorbikes, customers, or contracts found.</div>';
+                    return;
+                }
+
+                let outHtml = '';
+
+                // 1. Motorbikes Section
+                if (motos.length > 0) {
+                    outHtml += `<div class="search-section-title" style="color: var(--accent);">🛵 Motorbikes (${motos.length})</div>`;
+                    motos.forEach(m => {
+                        let statusColor = 'var(--text-secondary)';
+                        if (m.status === 'Available') statusColor = 'var(--success)';
+                        else if (m.status === 'Rented') statusColor = 'var(--accent)';
+                        else if (m.status === 'Maintenance') statusColor = '#f59e0b';
+                        else if (m.status === 'Pound') statusColor = '#ef4444';
+                        else if (m.status === 'Sold') statusColor = '#94a3b8';
+
+                        const motoFleetUrl = `/motos?search=${encodeURIComponent(m.placa)}&status=all`;
+                        const agreementId = m.contract_id || m.contrato_ativo_id;
+
+                        const hirerTel = m.hirer_telefone || '';
+                        const hirerWaNum = (hirerTel && typeof formatWhatsAppNumber === 'function') ? formatWhatsAppNumber(hirerTel) : '';
+                        const hirerWaMsg = encodeURIComponent(`Hello ${m.hirer_name || m.cliente_atual || ''}, this is FF Motors regarding motorbike ${m.placa || ''}: `);
+                        const hirerWaBtn = hirerWaNum ? `<a href="https://wa.me/${hirerWaNum}?text=${hirerWaMsg}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.82rem;" title="WhatsApp ${escapeHtml(m.hirer_name || m.cliente_atual)}" onclick="event.stopPropagation();">💬</a>` : '';
+
+                        outHtml += `
+                            <div class="search-result-card">
+                                <a href="${motoFleetUrl}" class="search-card-main">
+                                    <div class="search-card-header">
+                                        <span class="badge" style="font-family: monospace; font-weight: 700; font-size: 0.85rem; padding: 2px 6px; background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-color);">
+                                            ${escapeHtml(m.placa)}
+                                        </span>
+                                        <strong style="font-size: 0.88rem; color: var(--text-primary);">
+                                            ${escapeHtml(m.modelo)}
+                                        </strong>
+                                        <small style="color: var(--text-secondary);">(${escapeHtml(m.cor || 'Bike')})</small>
+                                        <span style="font-size: 0.75rem; font-weight: 600; color: ${statusColor}; margin-left: auto;">● ${escapeHtml(m.status)}</span>
+                                    </div>
+                                    <div class="search-card-details">
+                                        ${(m.hirer_name || m.cliente_atual) ? `<span>👤 Driver: <strong style="color: var(--text-primary);">${escapeHtml(m.hirer_name || m.cliente_atual)}</strong>${hirerWaBtn}</span>` : `<span style="color: var(--text-secondary);">No active driver</span>`}
+                                        ${m.milhagem ? `<span style="margin-left: 8px;">• ${Number(m.milhagem).toLocaleString()} miles</span>` : ''}
+                                    </div>
+                                </a>
+                                <div class="search-card-actions">
+                                    ${agreementId ? `
+                                        <a href="/contratos/${agreementId}" class="dash-search-btn accent" title="Open Contract #${agreementId}">
+                                            Agreement #${agreementId} ↗
+                                        </a>
+                                    ` : ''}
+                                    <a href="${motoFleetUrl}" class="dash-search-btn" title="View Motorbike in Fleet">
+                                        Fleet ↗
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                // 2. Customers Section
+                if (clientes.length > 0) {
+                    if (motos.length > 0) outHtml += `<div style="height: 1px; background: var(--border-color); margin: 6px 0;"></div>`;
+                    outHtml += `<div class="search-section-title" style="color: #60a5fa;">👤 Customers (${clientes.length})</div>`;
+                    clientes.forEach(c => {
+                        const clientUrl = `/clientes?search=${encodeURIComponent(c.nome)}`;
+                        const agreementId = c.contract_id || c.contrato_ativo_id;
+
+                        let typeBadge = '';
+                        if (c.contract_type) {
+                            let typeName = c.contract_type;
+                            if (typeName === 'Sale_Installment') typeName = 'Financed';
+                            else if (typeName === 'Sale_Full') typeName = 'Sale';
+                            else if (typeName === 'Rent') typeName = 'Rental';
+                            typeBadge = `<span class="badge" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(59,130,246,0.14); color: #60a5fa; border: 1px solid rgba(59,130,246,0.28); flex-shrink: 0; font-weight: 600;">${escapeHtml(typeName)}</span>`;
+                        }
+
+                        const waNum = (c.telefone && typeof formatWhatsAppNumber === 'function') ? formatWhatsAppNumber(c.telefone) : '';
+                        const custWaMsg = encodeURIComponent(`Hello ${c.nome || ''}, this is FF Motors: `);
+                        const waBtn = waNum ? `<a href="https://wa.me/${waNum}?text=${custWaMsg}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; margin-left:4px; font-size:0.85rem;" title="Chat with ${escapeHtml(c.nome)} on WhatsApp" onclick="event.stopPropagation();">💬</a>` : '';
+
+                        outHtml += `
+                            <div class="search-result-card">
+                                <a href="${clientUrl}" class="search-card-main">
+                                    <div class="search-card-header">
+                                        <span style="font-size: 0.95rem; flex-shrink: 0;">👤</span>
+                                        <strong style="font-size: 0.88rem; color: var(--text-primary);">
+                                            ${escapeHtml(c.nome)}
+                                        </strong>
+                                        ${typeBadge}
+                                    </div>
+                                    <div class="search-card-details">
+                                        ${c.moto_placa ? `<span style="color: var(--accent); font-weight: 600; flex-shrink: 0;">🛵 ${escapeHtml(c.moto_placa)}</span>` : ''}
+                                        ${c.telefone ? `<span style="display:inline-flex; align-items:center;">📞 ${escapeHtml(c.telefone)}${waBtn}</span>` : ''}
+                                        ${c.email ? `<span style="margin-left: 6px;">✉️ ${escapeHtml(c.email)}</span>` : ''}
+                                        ${(!c.telefone && !c.email && !c.moto_placa) ? `<span>No active contract or contact info</span>` : ''}
+                                    </div>
+                                </a>
+                                <div class="search-card-actions">
+                                    ${agreementId ? `
+                                        <a href="/contratos/${agreementId}" class="dash-search-btn green" title="Open Agreement #${agreementId}">
+                                            Agreement #${agreementId} ↗
+                                        </a>
+                                    ` : ''}
+                                    <a href="${clientUrl}" class="dash-search-btn" title="View Customer Profile">
+                                        Customer ↗
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                // 3. Contracts Section
+                if (contratos.length > 0) {
+                    if (motos.length > 0 || clientes.length > 0) outHtml += `<div style="height: 1px; background: var(--border-color); margin: 6px 0;"></div>`;
+                    outHtml += `<div class="search-section-title" style="color: #c084fc;">📄 Agreements & Contracts (${contratos.length})</div>`;
+                    contratos.forEach(ct => {
+                        const contractUrl = `/contratos/${ct.id}`;
+                        let typeBadgeClr = 'background: rgba(255,102,0,0.15); color: var(--accent); border: 1px solid rgba(255,102,0,0.3);';
+                        if (ct.tipo === 'Sale_Installment' || ct.tipo === 'Sale_Full') {
+                            typeBadgeClr = 'background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3);';
+                        } else if (ct.tipo === 'Purchase') {
+                            typeBadgeClr = 'background: rgba(6,182,212,0.15); color: #22d3ee; border: 1px solid rgba(6,182,212,0.3);';
+                        }
+
+                        const curFmt = (typeof formatoMoeda !== 'undefined') ? formatoMoeda : new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
+
+                        outHtml += `
+                            <div class="search-result-card">
+                                <a href="${contractUrl}" class="search-card-main">
+                                    <div class="search-card-header">
+                                        <span class="badge" style="font-family: monospace; font-weight: 700; font-size: 0.85rem; padding: 2px 6px; background: rgba(255,255,255,0.08); color: var(--text-primary); border: 1px solid var(--border-color);">
+                                            #${ct.id}
+                                        </span>
+                                        <span class="badge" style="${typeBadgeClr} font-size: 0.72rem; padding: 1px 6px;">
+                                            ${escapeHtml(ct.tipo)}
+                                        </span>
+                                        <span style="font-family: monospace; font-weight: 600; font-size: 0.82rem; color: var(--text-primary);">
+                                            ${escapeHtml(ct.placa)}
+                                        </span>
+                                        <span class="badge" style="font-size: 0.7rem; padding: 1px 6px; background: rgba(255,255,255,0.05); color: var(--text-secondary); margin-left: auto;">
+                                            ${escapeHtml(ct.status)}
+                                        </span>
+                                    </div>
+                                    <div class="search-card-details">
+                                        <span>👤 Customer: <strong style="color: var(--text-primary);">${escapeHtml(ct.cliente)}</strong></span>
+                                        ${ct.valor ? `<span style="margin-left: 8px;">• ${curFmt.format(Number(ct.valor))}</span>` : ''}
+                                    </div>
+                                </a>
+                                <div class="search-card-actions">
+                                    <a href="${contractUrl}" class="dash-search-btn accent" title="Open Contract #${ct.id}">
+                                        Open ↗
+                                    </a>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                resultsBox.innerHTML = outHtml;
+            } catch (err) {
+                console.error('Quick lookup error:', err);
+                resultsBox.innerHTML = '<div style="padding: 0.75rem; text-align: center; color: #f87171; font-size: 0.85rem;">Error searching records.</div>';
+            }
+        }, 220);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeQuickLookupModal();
+        }
+    });
+
+    // Global keyboard shortcut: Ctrl+K, Cmd+K, or '/' (when not typing in other inputs)
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            e.preventDefault();
+            const modal = document.getElementById('quickLookupModal');
+            if (modal && modal.style.display !== 'none') {
+                closeQuickLookupModal();
+            } else {
+                openQuickLookupModal();
+            }
+        } else if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+            e.preventDefault();
+            openQuickLookupModal();
+        } else if (e.key === 'Escape') {
+            closeQuickLookupModal();
+        }
+    });
+}
+
+function openQuickLookupModal() {
+    const modal = document.getElementById('quickLookupModal');
+    const searchInput = document.getElementById('dashQuickSearch');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    document.body.classList.add('quick-lookup-open');
+    if (searchInput) {
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.select();
+        }, 50);
+    }
+}
+window.openQuickLookupModal = openQuickLookupModal;
+
+function closeQuickLookupModal() {
+    const modal = document.getElementById('quickLookupModal');
+    const searchInput = document.getElementById('dashQuickSearch');
+    if (!modal) return;
+    modal.style.display = 'none';
+    document.body.classList.remove('quick-lookup-open');
+    if (searchInput) {
+        searchInput.blur();
+    }
+}
+window.closeQuickLookupModal = closeQuickLookupModal;
+
+function handleQuickLookupBackdropClick(e) {
+    if (e.target && e.target.id === 'quickLookupModal') {
+        closeQuickLookupModal();
+    }
+}
+window.handleQuickLookupBackdropClick = handleQuickLookupBackdropClick;
+
+function clearQuickSearch() {
+    const searchInput = document.getElementById('dashQuickSearch');
+    const resultsBox = document.getElementById('dashSearchResults');
+    const clearBtn = document.getElementById('dashQuickSearchClear');
+
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.focus();
+    }
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (resultsBox) {
+        resultsBox.style.display = 'none';
+        resultsBox.innerHTML = '';
+    }
+}
+window.clearQuickSearch = clearQuickSearch;
+
+// Auto-initialize on DOM ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initQuickLookup);
+} else {
+    initQuickLookup();
+}
+
+
 
 
