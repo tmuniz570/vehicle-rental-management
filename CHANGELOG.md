@@ -4,6 +4,22 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.38] — 2026-10-08 — *Daily Media Cleanup Activity Log & Native Scheduler*
+
+### 🧹 Limpeza Diária na Trilha de Auditoria (Activity Log)
+* **Registro Compulsório em `logs_auditoria` (`cleanup_uploads.py`)**:
+  - A rotina de limpeza autônoma de arquivos órfãos (`run_cleanup()`) agora gera compulsoriamente um evento na trilha de auditoria (`AuditLog`) com a ação `CLEANUP_UPLOADS` e entidade `System/Storage`.
+  - Registra com precisão a contagem de arquivos órfãos excluídos, espaço em disco liberado (em MB), arquivos válidos preservados e arquivos de sistema/demonstração protegidos. Em modo de simulação (`--dry-run`), registra como preview auditável sem remover mídias.
+* **Agendamento Nativo no APScheduler (`wsgi.py` & `app.py` às 06:00 AM Europe/London)**:
+  - Adicionado o job `daily_orphan_uploads_cleanup_job` diretamente no scheduler interno do Gunicorn/Flask, garantindo execução autônoma diária mesmo sem dependência exclusiva de cron no SO da VM.
+* **Endpoint de Automação `/api/jobs/cleanup-uploads`**:
+  - Nova rota administrativa protegida por autenticação de cron (`check_cron_auth()`) suportando disparos manuais ou via API com parâmetro opcional `{"dry_run": true}`.
+* **Filtros e Badges Visuais no Painel de Usuários (`/usuarios`)**:
+  - Adicionado filtro de ação `Media / Uploads Cleanup` (`CLEANUP_UPLOADS`) e módulo `System & Storage` (`System`) nos dropdowns de auditoria (`usuarios.html`).
+  - Badge visual estilizado com destaque (`🧹 CLEANUP UPLOADS`) em tom teal suave em `usuarios.js`.
+* **Suíte de Testes Automatizados**:
+  - Ampliado módulo [tests/test_warmup_and_cleanup_perf.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_warmup_and_cleanup_perf.py) cobrindo criação do log de auditoria, execução do endpoint e agendamento no WSGI. Total de 81 testes passando com 100% de sucesso.
+
 ## [1.9.37] — 2026-10-08 — *Security & Privacy Hardening, XSS Shielding & Credential Governance*
 
 ### 🛡️ Auditoria de Segurança e Privacidade

@@ -143,7 +143,17 @@ def run_cleanup(dry_run=False, verbose=False):
 
     if not os.path.exists(UPLOAD_FOLDER):
         print(f"Uploads folder '{UPLOAD_FOLDER}' does not exist. Nothing to clean.")
-        return
+        return {
+            "success": True,
+            "dry_run": dry_run,
+            "scanned_files": 0,
+            "valid_files": 0,
+            "protected_files": 0,
+            "orphans_found": 0,
+            "deleted_count": 0,
+            "bytes_saved": 0,
+            "mb_saved": 0.0
+        }
 
     # Collect demo asset names from static/demo_assets to ensure they are never deleted
     protected_demo_assets = set()
@@ -218,6 +228,42 @@ def run_cleanup(dry_run=False, verbose=False):
         print(f"✓ Cleanup finished! Successfully deleted {deleted_count} orphan file(s).")
         print(f"✓ Total disk space freed: {mb_saved:.2f} MB ({total_bytes_saved:,} bytes)")
     print("=======================================================\n")
+
+    # Registro de auditoria compulsório no Activity Log
+    try:
+        from app import registrar_log
+        with app.app_context():
+            if dry_run:
+                descricao = (
+                    f"Simulação de limpeza de uploads (Dry-Run): {len(orphans)} arquivo(s) órfão(s) detectado(s), "
+                    f"{mb_saved:.2f} MB potenciais a liberar ({valid_count} arquivos em uso protegidos, {protected_count} demo/sistema)."
+                )
+            else:
+                descricao = (
+                    f"Limpeza diária de uploads executada: {deleted_count} arquivo(s) órfão(s) excluído(s), "
+                    f"{mb_saved:.2f} MB liberados em disco ({valid_count} arquivos válidos preservados, {protected_count} demo/sistema protegidos)."
+                )
+            registrar_log(
+                acao='CLEANUP_UPLOADS',
+                entidade='System/Storage',
+                entidade_id=None,
+                descricao=descricao
+            )
+            print("[AuditLog] Evento 'CLEANUP_UPLOADS' registrado com sucesso no Activity Log.")
+    except Exception as e_log:
+        print(f"[AuditLog Error]: Falha ao registrar log de auditoria da limpeza: {e_log}")
+
+    return {
+        "success": True,
+        "dry_run": dry_run,
+        "scanned_files": len(all_disk_entries),
+        "valid_files": valid_count,
+        "protected_files": protected_count,
+        "orphans_found": len(orphans),
+        "deleted_count": deleted_count,
+        "bytes_saved": total_bytes_saved,
+        "mb_saved": round(mb_saved, 2)
+    }
 
 if __name__ == '__main__':
     dry_run = '--dry-run' in sys.argv or '-d' in sys.argv

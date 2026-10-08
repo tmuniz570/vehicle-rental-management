@@ -718,6 +718,8 @@ async function carregarAuditoria() {
                 acaoBadge = `<span class="badge" style="background:rgba(14,165,233,0.18); color:#38bdf8; border:1px solid rgba(14,165,233,0.3);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
             } else if (aUpper.includes('CLAIM')) {
                 acaoBadge = `<span class="badge" style="background:rgba(236,72,153,0.18); color:#f472b6; border:1px solid rgba(236,72,153,0.3);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
+            } else if (aUpper === 'CLEANUP_UPLOADS') {
+                acaoBadge = `<span class="badge" style="background:rgba(20,184,166,0.18); color:#2dd4bf; border:1px solid rgba(20,184,166,0.35); font-weight:600;" title="Automated Orphan Uploads Cleanup">🧹 ${escapeHtml(a.replace(/_/g, ' '))}</span>`;
             } else if (aUpper.includes('JOB') || aUpper.includes('CLEANUP') || aUpper.includes('CLOSING') || aUpper.includes('CHARGE')) {
                 acaoBadge = `<span class="badge" style="background:rgba(100,116,139,0.25); color:#cbd5e1; border:1px solid rgba(100,116,139,0.35);" title="${escapeHtml(a)}">${escapeHtml(a.replace(/_/g, ' '))}</span>`;
             } else {

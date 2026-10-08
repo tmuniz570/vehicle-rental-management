@@ -7717,6 +7717,29 @@ def api_limpar_cobrancas_duplicadas():
         "dados": resultado
     }), 200
 
+@app.route('/api/jobs/cleanup-uploads', methods=['GET', 'POST'])
+def api_jobs_cleanup_uploads():
+    """
+    Rota administrativa / cron para varredura e limpeza diária de mídias órfãs.
+    Aceita {"dry_run": true} ou ?dry_run=true para apenas simular sem apagar.
+    Registra automaticamente a execução no Activity Log (AuditLog).
+    """
+    if not check_cron_auth():
+        return jsonify({'error': 'Unauthorized', 'message': 'Chave de cron ou privilégio administrativo requerido.'}), 403
+
+    dados = request.get_json(silent=True) or {}
+    dry_run = dados.get('dry_run', request.args.get('dry_run', 'false'))
+    if isinstance(dry_run, str):
+        dry_run = dry_run.lower() in ('true', '1', 'yes')
+
+    from cleanup_uploads import run_cleanup
+    resultado = run_cleanup(dry_run=dry_run)
+    return jsonify({
+        "success": True,
+        "message": f"Limpeza concluída ({resultado.get('deleted_count', 0)} arquivos apagados, {resultado.get('mb_saved', 0)} MB liberados)." if not dry_run else f"Simulação concluída ({resultado.get('orphans_found', 0)} órfãos detectados, {resultado.get('mb_saved', 0)} MB potenciais a liberar).",
+        "dados": resultado
+    }), 200
+
 def run_daily_jobs(force=False):
     with app.app_context():
         london_date_str = get_london_date().strftime('%Y-%m-%d')
@@ -7799,6 +7822,16 @@ if __name__ == '__main__':
             hour=1,
             minute=0,
             id="daily_rent_and_deposit_jobs",
+            replace_existing=True,
+            misfire_grace_time=3600
+        )
+        from cleanup_uploads import run_cleanup
+        scheduler.add_job(
+            func=lambda: run_cleanup(dry_run=False),
+            trigger="cron",
+            hour=6,
+            minute=0,
+            id="daily_orphan_uploads_cleanup_job",
             replace_existing=True,
             misfire_grace_time=3600
         )

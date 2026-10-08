@@ -57,7 +57,22 @@ if _acquire_scheduler_lock():
             misfire_grace_time=3600
         )
 
-        # 2. Warm-up Matinal de Cache e Conexões às 08:00 AM (Londres, 1h antes da abertura da loja)
+        # 2. Limpeza Diária de Uploads Órfãos às 06:00 AM (Londres)
+        def _exec_cleanup_scheduler():
+            from cleanup_uploads import run_cleanup
+            run_cleanup(dry_run=False)
+
+        scheduler.add_job(
+            func=_exec_cleanup_scheduler,
+            trigger="cron",
+            hour=6,
+            minute=0,
+            id="daily_orphan_uploads_cleanup_job",
+            replace_existing=True,
+            misfire_grace_time=3600
+        )
+
+        # 3. Warm-up Matinal de Cache e Conexões às 08:00 AM (Londres, 1h antes da abertura da loja)
         def _exec_warmup_scheduler():
             run_warmup(origem='System/Scheduler')
 
@@ -72,7 +87,7 @@ if _acquire_scheduler_lock():
         )
 
         scheduler.start()
-        print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Cobranças à 01:00 AM, Warm-up às 08:00 AM Europe/London, misfire_grace=3600s).")
+        print(f"[WSGI] APScheduler iniciado com sucesso no Worker PID {os.getpid()} (Cobranças 01:00, Limpeza 06:00, Warm-up 08:00 AM Europe/London, misfire_grace=3600s).")
 
         # Auto-recuperação no startup: se as rotinas de hoje ainda não tiverem sido executadas
         # (ex: deploy após 01:00 AM ou restart do serviço), executa em thread assíncrona

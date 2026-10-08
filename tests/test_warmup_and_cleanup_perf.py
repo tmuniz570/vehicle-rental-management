@@ -65,5 +65,44 @@ class TestWarmupAndCleanupPerf(unittest.TestCase):
             self.assertIsNotNone(job, "morning_warmup_job must be scheduled in wsgi.scheduler")
             print("✓ morning_warmup_job is successfully scheduled in wsgi.scheduler at 08:00 AM Europe/London.")
 
+    def test_cleanup_uploads_scheduled_in_wsgi(self):
+        import wsgi
+        if hasattr(wsgi, 'scheduler') and wsgi.scheduler:
+            job = wsgi.scheduler.get_job('daily_orphan_uploads_cleanup_job')
+            self.assertIsNotNone(job, "daily_orphan_uploads_cleanup_job must be scheduled in wsgi.scheduler")
+            print("✓ daily_orphan_uploads_cleanup_job is successfully scheduled in wsgi.scheduler at 06:00 AM Europe/London.")
+
+    def test_cleanup_uploads_records_audit_log(self):
+        from database import AuditLog
+        from cleanup_uploads import run_cleanup
+        # Run cleanup in dry-run mode to ensure safe execution
+        result = run_cleanup(dry_run=True)
+        self.assertTrue(result.get('success'))
+        self.assertTrue(result.get('dry_run'))
+
+        # Verify audit log entry was created
+        log = AuditLog.query.filter_by(acao='CLEANUP_UPLOADS').order_by(AuditLog.id.desc()).first()
+        self.assertIsNotNone(log, "AuditLog entry for CLEANUP_UPLOADS must exist")
+        self.assertEqual(log.entidade, 'System/Storage')
+        self.assertIn("Simulação de limpeza de uploads", log.descricao)
+        print(f"✓ CLEANUP_UPLOADS registered in AuditLog: {log.descricao}")
+
+    def test_cleanup_uploads_endpoint_with_cron_key(self):
+        # Request with valid X-Cron-Key should succeed
+        res = self.client.post(
+            '/api/jobs/cleanup-uploads',
+            json={'dry_run': True},
+            headers={
+                'X-Cron-Key': 'ffmotors-internal-cron-key-2026',
+                'X-Forwarded-For': '203.0.113.195'
+            }
+        )
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data.get('success'))
+        self.assertIn('dados', data)
+        self.assertTrue(data['dados'].get('dry_run'))
+        print("✓ POST /api/jobs/cleanup-uploads returned 200 and logged to AuditLog successfully")
+
 if __name__ == '__main__':
     unittest.main()
