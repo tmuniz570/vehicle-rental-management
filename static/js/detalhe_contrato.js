@@ -1417,6 +1417,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (labelSigIni) labelSigIni.textContent = '1. Start of Rental Signature';
         }
 
+        const anexos = data.anexos || [];
+        const anexosIniciais = anexos.filter(a => a.tipo !== 'return_contract');
+        const anexosRetorno = anexos.filter(a => a.tipo === 'return_contract');
+
         const badgeSigIni = document.getElementById('badge_sig_inicial');
         const boxSigIniContent = document.getElementById('box_sig_inicial_content');
         const btnAssinarIni = document.getElementById('btnAssinarInicialTouch');
@@ -1425,27 +1429,81 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (badgeSigIni) {
                 badgeSigIni.textContent = 'Signed';
                 badgeSigIni.className = 'badge badge-success';
+                badgeSigIni.style.background = '';
+                badgeSigIni.style.color = '';
+                badgeSigIni.style.border = '';
             }
             if (boxSigIniContent) {
                 const dataAssina = data.data_assinatura_inicial_uk || data.data_assinatura_inicial || '';
+                const extraDocs = anexosIniciais.length > 0 ? `<div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px;">📁 ${anexosIniciais.length} physical scan(s) also on file</div>` : '';
                 boxSigIniContent.innerHTML = `
                     <img src="${data.assinatura_cliente_inicial}" alt="Client Signature" style="max-height: 60px; max-width: 180px; object-fit: contain; margin-bottom: 4px;">
                     <span style="font-size: 0.72rem; color: #4ade80; font-weight: 600;">✓ Digitally Signed on ${dataAssina}</span>
+                    ${extraDocs}
                 `;
             }
             if (btnAssinarIni) btnAssinarIni.style.display = 'none';
+        } else if (anexosIniciais.length > 0) {
+            // Contrato assinado fisicamente no papel, impresso e anexado
+            if (badgeSigIni) {
+                badgeSigIni.textContent = 'Signed (Paper Scan)';
+                badgeSigIni.className = 'badge';
+                badgeSigIni.style.background = 'rgba(6, 182, 212, 0.15)';
+                badgeSigIni.style.color = '#22d3ee';
+                badgeSigIni.style.border = '1px solid rgba(6, 182, 212, 0.4)';
+            }
+            if (boxSigIniContent) {
+                const dataAssina = data.data_assinatura_inicial_uk || data.data_assinatura_inicial || anexosIniciais[0].data_criacao || '';
+                const firstDoc = anexosIniciais[0];
+                boxSigIniContent.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px; width: 100%; justify-content: center; padding: 4px 0;">
+                        <span style="font-size: 2rem;">📄</span>
+                        <div style="text-align: left;">
+                            <div style="font-size: 0.84rem; color: #4ade80; font-weight: 700;">
+                                ✓ Physically Signed Agreement Attached
+                            </div>
+                            <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;">
+                                ${anexosIniciais.length} scanned page(s) / PDF document on file ${dataAssina ? `• Attached on ${dataAssina}` : ''}
+                            </div>
+                            <div style="margin-top: 5px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                <a href="${firstDoc.url_arquivo}" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                    View Attached Document ↗
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (btnAssinarIni) {
+                btnAssinarIni.style.display = 'inline-flex';
+                btnAssinarIni.textContent = '✍️ Sign on Screen Also';
+                btnAssinarIni.title = 'Add digital touch signature in addition to attached paper scan';
+            }
         } else {
             if (badgeSigIni) {
                 badgeSigIni.textContent = 'Pending Signature';
                 badgeSigIni.className = 'badge badge-warning';
+                badgeSigIni.style.background = '';
+                badgeSigIni.style.color = '';
+                badgeSigIni.style.border = '';
             }
             if (boxSigIniContent) {
                 const docName = isPurchaseContrato ? 'used vehicle purchase agreement' : (isVenda ? 'vehicle purchase agreement' : 'start of rental');
                 boxSigIniContent.innerHTML = `
-                    <span style="color: var(--text-secondary); font-size: 0.85rem;">Client signature pending for ${docName}.</span>
+                    <div style="text-align: center;">
+                        <span style="color: var(--text-secondary); font-size: 0.85rem; display: block; margin-bottom: 4px;">
+                            Client signature pending for ${docName}.
+                        </span>
+                        <span style="font-size: 0.74rem; color: var(--text-secondary);">
+                            Sign on screen below OR print, physically sign and click <strong>"Attach Scans / Photos"</strong>.
+                        </span>
+                    </div>
                 `;
             }
-            if (btnAssinarIni) btnAssinarIni.style.display = 'inline-flex';
+            if (btnAssinarIni) {
+                btnAssinarIni.style.display = 'inline-flex';
+                btnAssinarIni.textContent = '✍️ Sign on Screen Now';
+            }
         }
 
         const cardSigDev = document.getElementById('card_sig_devolucao');
@@ -1461,20 +1519,62 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (badgeSigDev) {
                 badgeSigDev.textContent = 'Signed';
                 badgeSigDev.className = 'badge badge-success';
+                badgeSigDev.style.background = '';
+                badgeSigDev.style.color = '';
+                badgeSigDev.style.border = '';
             }
             if (boxSigDevContent) {
                 const dataAssinaDev = data.data_assinatura_devolucao_uk || data.data_assinatura_devolucao || '';
+                const extraDocsDev = anexosRetorno.length > 0 ? `<div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px;">📁 ${anexosRetorno.length} return scan(s) also on file</div>` : '';
                 boxSigDevContent.innerHTML = `
                     <img src="${data.assinatura_cliente_devolucao}" alt="Return Signature" style="max-height: 60px; max-width: 180px; object-fit: contain; margin-bottom: 4px;">
                     <span style="font-size: 0.72rem; color: #4ade80; font-weight: 600;">✓ Return Signed on ${dataAssinaDev}</span>
+                    ${extraDocsDev}
                 `;
             }
             if (btnAssinarDev) btnAssinarDev.style.display = 'none';
+        } else if (anexosRetorno.length > 0) {
+            if (badgeSigDev) {
+                badgeSigDev.textContent = 'Signed (Paper Scan)';
+                badgeSigDev.className = 'badge';
+                badgeSigDev.style.background = 'rgba(6, 182, 212, 0.15)';
+                badgeSigDev.style.color = '#22d3ee';
+                badgeSigDev.style.border = '1px solid rgba(6, 182, 212, 0.4)';
+            }
+            if (boxSigDevContent) {
+                const dataAssinaDev = data.data_assinatura_devolucao_uk || data.data_assinatura_devolucao || anexosRetorno[0].data_criacao || '';
+                const firstDevDoc = anexosRetorno[0];
+                boxSigDevContent.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 12px; width: 100%; justify-content: center; padding: 4px 0;">
+                        <span style="font-size: 2rem;">📄</span>
+                        <div style="text-align: left;">
+                            <div style="font-size: 0.84rem; color: #4ade80; font-weight: 700;">
+                                ✓ Physically Signed Return Term Attached
+                            </div>
+                            <div style="font-size: 0.74rem; color: var(--text-secondary); margin-top: 2px;">
+                                ${anexosRetorno.length} return scan page(s) / PDF on file ${dataAssinaDev ? `• Attached on ${dataAssinaDev}` : ''}
+                            </div>
+                            <div style="margin-top: 5px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                                <a href="${firstDevDoc.url_arquivo}" target="_blank" style="color: #60a5fa; text-decoration: none; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+                                    View Return Document ↗
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            if (btnAssinarDev) {
+                btnAssinarDev.style.display = 'inline-flex';
+                btnAssinarDev.textContent = '✍️ Sign Return on Screen Also';
+            }
         } else {
             if (stLower === 'deposit_hold' || stLower === 'quarentena_deposito' || isCompleted) {
                 if (badgeSigDev) {
                     badgeSigDev.textContent = 'Pending Return Signature';
                     badgeSigDev.className = 'badge badge-warning';
+                    badgeSigDev.style.background = '';
+                    badgeSigDev.style.color = '';
+                    badgeSigDev.style.border = '';
                 }
                 if (boxSigDevContent) {
                     boxSigDevContent.innerHTML = `
@@ -1488,6 +1588,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     badgeSigDev.className = 'badge';
                     badgeSigDev.style.background = 'rgba(255,255,255,0.05)';
                     badgeSigDev.style.color = 'var(--text-secondary)';
+                    badgeSigDev.style.border = '';
                 }
                 if (boxSigDevContent) {
                     boxSigDevContent.innerHTML = `
@@ -1501,7 +1602,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Render Anexos de Contrato
         const anexosCount = document.getElementById('anexos_count');
         const anexosList = document.getElementById('anexos_list');
-        const anexos = data.anexos || [];
 
         if (anexosCount) anexosCount.textContent = anexos.length;
         if (anexosList) {

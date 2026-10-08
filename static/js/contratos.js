@@ -172,9 +172,9 @@ async function carregarContratos() {
                 const vencido = c.total_vencido !== undefined ? c.total_vencido : 0;
                 let pendenteBadge = '';
                 if (vencido > 0) {
-                    pendenteBadge = `<span style="font-size:0.7rem; color: #f87171; font-weight:700;" title="${c.qtd_vencidas || 1} overdue payment(s) totalling ${gbp.format(vencido)}">⚠️ Overdue: ${gbp.format(vencido)}</span>`;
+                    pendenteBadge = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-link badge-financial-overdue" title="${c.qtd_vencidas || 1} overdue payment(s) totalling ${gbp.format(vencido)} • Open in Financial Center">⚠️ Overdue: ${gbp.format(vencido)}</a>`;
                 } else if (pendente > 0) {
-                    pendenteBadge = `<span style="font-size:0.7rem; color: var(--text-secondary);" title="Remaining open balance">Bal: ${gbp.format(pendente)}</span>`;
+                    pendenteBadge = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-link badge-financial-bal" title="Remaining open balance: ${gbp.format(pendente)} • Open in Financial Center">Bal: ${gbp.format(pendente)}</a>`;
                 } else {
                     pendenteBadge = `<span style="font-size:0.7rem; color:#4ade80; font-weight:600;">✓ Paid</span>`;
                 }
@@ -187,9 +187,9 @@ async function carregarContratos() {
                 const vencido = c.total_vencido !== undefined ? c.total_vencido : 0;
                 let pendenteBadge = '';
                 if (vencido > 0) {
-                    pendenteBadge = `<span style="font-size:0.7rem; color: #f87171; font-weight:700;" title="${c.qtd_vencidas || 1} overdue installment(s) totalling ${gbp.format(vencido)}">⚠️ Overdue: ${gbp.format(vencido)}</span>`;
+                    pendenteBadge = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-link badge-financial-overdue" title="${c.qtd_vencidas || 1} overdue installment(s) totalling ${gbp.format(vencido)} • Open in Financial Center">⚠️ Overdue: ${gbp.format(vencido)}</a>`;
                 } else if (pendente > 0) {
-                    pendenteBadge = `<span style="font-size:0.7rem; color: var(--text-secondary);" title="Remaining open balance">Bal: ${gbp.format(pendente)}</span>`;
+                    pendenteBadge = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-link badge-financial-bal" title="Remaining open balance: ${gbp.format(pendente)} • Open in Financial Center">Bal: ${gbp.format(pendente)}</a>`;
                 } else {
                     pendenteBadge = `<span style="font-size:0.7rem; color:#4ade80; font-weight:600;" title="All installments fully settled">✓ Paid</span>`;
                 }
@@ -202,9 +202,9 @@ async function carregarContratos() {
                 const vencido = c.total_vencido !== undefined ? c.total_vencido : 0;
                 let pendenteBadge = '';
                 if (vencido > 0) {
-                    pendenteBadge = `<span style="font-size:0.7rem; color: #f87171; font-weight: 700;" title="${c.qtd_vencidas || 1} overdue weekly payment(s) totalling ${gbp.format(vencido)}">⚠️ Overdue: ${gbp.format(vencido)}</span>`;
+                    pendenteBadge = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-link badge-financial-overdue" title="${c.qtd_vencidas || 1} overdue weekly payment(s) totalling ${gbp.format(vencido)} • Open in Financial Center">⚠️ Overdue: ${gbp.format(vencido)}</a>`;
                 } else if (pendente > 0) {
-                    pendenteBadge = `<span style="font-size:0.7rem; color: var(--text-secondary);" title="Scheduled open balance (not late)">Bal: ${gbp.format(pendente)}</span>`;
+                    pendenteBadge = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-link badge-financial-bal" title="Scheduled open balance (not late): ${gbp.format(pendente)} • Open in Financial Center">Bal: ${gbp.format(pendente)}</a>`;
                 } else if (c.status === 'Active' || c.status === 'Ativo') {
                     pendenteBadge = `<span style="font-size:0.7rem; color:#4ade80; font-weight:500;">✓ Current</span>`;
                 }
@@ -241,10 +241,18 @@ async function carregarContratos() {
                 }
             }
 
-            // Signature Status Pill
-            const signPill = c.assinado ?
-                `<span class="badge" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.68rem; font-weight: 600; white-space: nowrap;" title="Agreement digitally signed by customer">✓ Signed</span>` :
-                `<span class="badge" style="background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.68rem; white-space: nowrap;" title="Agreement awaiting customer signature">⏳ Unsigned</span>`;
+            // Signature Status Pill (Digital touch or Physically Signed on Paper)
+            let signPill = '';
+            if (c.assinado) {
+                if (c.metodo_assinatura === 'physical' || (!c.assinatura_cliente_inicial && c.num_anexos_iniciais > 0)) {
+                    const docCount = c.num_anexos_iniciais || 1;
+                    signPill = `<span class="badge" style="background: rgba(6, 182, 212, 0.14); color: #22d3ee; border: 1px solid rgba(6, 182, 212, 0.35); font-size: 0.68rem; font-weight: 600; white-space: nowrap;" title="Physically signed contract printed & attached (${docCount} page/scan on file)">📄 Signed (Paper)</span>`;
+                } else {
+                    signPill = `<span class="badge" style="background: rgba(34, 197, 94, 0.12); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.25); font-size: 0.68rem; font-weight: 600; white-space: nowrap;" title="Agreement digitally signed by customer">✓ Signed</span>`;
+                }
+            } else {
+                signPill = `<span class="badge" style="background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.2); font-size: 0.68rem; white-space: nowrap;" title="Agreement awaiting customer signature (digital touch or physical scan upload)">⏳ Unsigned</span>`;
+            }
             
             // All-Clear / No Issues Pill (if active and 100% clean)
             let allClearPill = '';
@@ -307,7 +315,7 @@ async function carregarContratos() {
             let pendenciaDot = '';
             if (c.tem_pendencia) {
                 if (c.tem_pendencia_financeira || (c.total_vencido && c.total_vencido > 0)) {
-                    pendenciaDot = `<span title="⚠️ Pendência Financeira: ${c.qtd_vencidas || 1} cobrança(s) vencida(s) no total de ${gbp.format(c.total_vencido)}" style="cursor:help; margin-left: 2px; font-size: 0.72rem;">🔴</span>`;
+                    pendenciaDot = `<a href="/financeiro?contrato_id=${c.id}" class="badge-financial-dot" title="⚠️ Pendência Financeira: ${c.qtd_vencidas || 1} cobrança(s) vencida(s) no total de ${gbp.format(c.total_vencido)} • Abrir no Financeiro">🔴</a>`;
                 } else {
                     const pendTxt = (c.pendencias && c.pendencias.length > 0) ? c.pendencias.join(' • ') : 'Pendente de liberação/assinatura';
                     pendenciaDot = `<span title="⚠️ Pendência: ${safeEscape(pendTxt)}" style="cursor:help; margin-left: 2px; font-size: 0.72rem;">🟡</span>`;

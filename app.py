@@ -2260,14 +2260,11 @@ def listar_clientes():
         ~FinancialTransaction.tipo.in_([TransactionType.DEPOSIT_REFUND.value, 'Deposit_Refund', 'Devolucao_Deposito'])
     ).exists()
 
-    missing_docs_cond = db.or_(
+    missing_licence_cond = db.or_(
         Client.url_habilitacao == None,
-        Client.url_habilitacao == '',
-        Client.url_habilitacao_verso == None,
-        Client.url_habilitacao_verso == '',
-        Client.url_comprovante_endereco == None,
-        Client.url_comprovante_endereco == ''
+        Client.url_habilitacao == ''
     )
+    missing_docs_cond = missing_licence_cond
 
     if status_filter:
         if status_filter in ['active', 'active_deals', 'active_drivers', 'active_hirers']:
@@ -2276,10 +2273,10 @@ def listar_clientes():
             query = query.filter(~active_contract_subq)
         elif status_filter in ['overdue', 'debts', 'late']:
             query = query.filter(overdue_tx_subq)
-        elif status_filter in ['missing_docs', 'missing_licence', 'incomplete']:
-            query = query.filter(missing_docs_cond)
+        elif status_filter in ['missing_licence', 'missing_docs', 'no_licence', 'incomplete']:
+            query = query.filter(missing_licence_cond)
         elif status_filter in ['clean', 'compliant']:
-            query = query.filter(~overdue_tx_subq, ~missing_docs_cond)
+            query = query.filter(~overdue_tx_subq, ~missing_licence_cond)
 
     sort_map = {
         'id': Client.id,
@@ -2368,16 +2365,15 @@ def listar_clientes():
         has_proof_address = bool(c.url_comprovante_endereco)
         
         missing_docs = []
-        if not has_licence_front: missing_docs.append('Licence Front')
-        if not has_licence_back: missing_docs.append('Licence Back')
-        if not has_proof_address: missing_docs.append('Proof of Address')
+        if not has_licence_front:
+            missing_docs.append('Licence Front')
         
         if has_overdue:
             status_dot = 'danger'
             status_dot_title = f"{ov['qtd_vencidas']} overdue payment{'s' if ov['qtd_vencidas'] > 1 else ''} (£{ov['total_vencido']:.2f})"
-        elif missing_docs:
+        elif not has_licence_front:
             status_dot = 'warning'
-            status_dot_title = f"Missing: {', '.join(missing_docs)}"
+            status_dot_title = "Missing Driving Licence (Front)"
         else:
             status_dot = 'success'
             status_dot_title = "All clear / Up to date"
@@ -2397,6 +2393,7 @@ def listar_clientes():
             'has_cbt': has_cbt,
             'has_proof_address': has_proof_address,
             'missing_docs': missing_docs,
+            'missing_licence': not has_licence_front,
             'notas_internas': c.notas_internas,
             'status_dot': status_dot,
             'status_dot_title': status_dot_title,
@@ -2433,7 +2430,7 @@ def listar_clientes():
     kpi_overdue_count = overdue_stats.count if overdue_stats else 0
     kpi_overdue_amount = round(float(overdue_stats.sum_tot or 0.0), 2) if overdue_stats else 0.0
 
-    kpi_missing_docs = Client.query.filter(missing_docs_cond).count()
+    kpi_missing_licence = Client.query.filter(missing_licence_cond).count()
 
     return jsonify({
         'itens': itens,
@@ -2445,7 +2442,8 @@ def listar_clientes():
             'active_hirers': kpi_active_hirers,
             'overdue_count': kpi_overdue_count,
             'overdue_amount': kpi_overdue_amount,
-            'missing_docs': kpi_missing_docs
+            'missing_licence': kpi_missing_licence,
+            'missing_docs': kpi_missing_licence
         }
     })
 
@@ -3678,7 +3676,11 @@ def sync_purchase_contract_status(contrato_id_or_obj, auto_commit=False):
     docs_ciclo = get_purchase_contract_v5c_docs(contrato)
     v5c_oficiais = [d for d in docs_ciclo if getattr(d, 'categoria_doc', 'v5c') == 'v5c']
     tem_v5c = (len(v5c_oficiais) > 0)
-    tem_assinatura = bool(contrato.assinatura_cliente_inicial)
+    tem_anexo_ini = db.session.query(ContractAttachment.id).filter(
+        ContractAttachment.id_contrato == contrato.id,
+        ContractAttachment.tipo != 'return_contract'
+    ).first()
+    tem_assinatura = bool(contrato.assinatura_cliente_inicial or tem_anexo_ini)
     
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     alterou = False
@@ -3697,7 +3699,7 @@ def sync_purchase_contract_status(contrato_id_or_obj, auto_commit=False):
         # Só pode reabrir se NÃO houver contratos posteriores
         if not has_subsequent_contracts and contrato.status in [ContractStatus.COMPLETED.value, 'Completed', 'Finalizado']:
             contrato.status = ContractStatus.ACTIVE.value
-            motivo = "ausência do documento de Logbook (V5C)" if not tem_v5c else "ausência de assinatura do vendedor"
+            motivo = "ausência do documento de Logbook (V5C)" if not tem_v5c else "ausência de assinatura do vendedor (digital ou papel)"
             registrar_log(
                 'CONTRACT_REOPENED',
                 'Contract',
@@ -4176,7 +4178,20 @@ def upload_anexos_contrato(id):
                 db.session.add(novo_anexo)
                 salvos.append(novo_anexo)
 
+        # Sincronizar data de assinatura caso ainda não estivesse registrada
+        agora_londres = get_london_now().replace(tzinfo=None)
+        if tipo_anexo != 'return_contract' and not contrato.data_assinatura_inicial:
+            contrato.data_assinatura_inicial = agora_londres
+        elif tipo_anexo == 'return_contract' and not contrato.data_assinatura_devolucao:
+            contrato.data_assinatura_devolucao = agora_londres
+
         db.session.commit()
+
+        # Se for contrato de compra, sincronizar conclusão com novo documento
+        if contrato.tipo_contrato in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+            sync_purchase_contract_status(contrato)
+            db.session.commit()
+
         operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
         registrar_log('ATTACHMENT_UPLOADED', 'Contract', id, f"{len(salvos)} anexo(s) ({tipo_anexo}) anexados ao Contrato #{id} por {operador}")
 
@@ -4208,9 +4223,14 @@ def deletar_anexo_contrato(anexo_id):
             return jsonify({'error': 'Attachment not found', 'erro': 'Anexo não encontrado'}), 404
 
         id_contrato = anexo.id_contrato
+        contrato = db.session.get(Contract, id_contrato)
         delete_file_if_exists(anexo.url_arquivo)
         db.session.delete(anexo)
         db.session.commit()
+
+        if contrato and contrato.tipo_contrato in [ContractType.PURCHASE.value, 'Purchase', 'Compra']:
+            sync_purchase_contract_status(contrato)
+            db.session.commit()
 
         operador = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
         registrar_log('ATTACHMENT_DELETED', 'Contract', id_contrato, f"Anexo #{anexo_id} excluído do Contrato #{id_contrato} por {operador}")
@@ -4522,6 +4542,14 @@ def listar_contratos():
                 Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
             ).exists()
             
+            has_initial_sig_subq = db.or_(
+                Contract.assinatura_cliente_inicial != None,
+                db.session.query(ContractAttachment.id).filter(
+                    ContractAttachment.id_contrato == Contract.id,
+                    ContractAttachment.tipo != 'return_contract'
+                ).exists()
+            )
+            
             query = query.filter(
                 db.or_(
                     Contract.id.in_(db.session.query(overdue_subq.c.id_contrato)),
@@ -4530,7 +4558,7 @@ def listar_contratos():
                         ~Contract.tipo_contrato.in_([ContractType.PURCHASE.value, 'Purchase', 'Compra']),
                         db.or_(Contract.url_seguro == None, ~checkout_subq)
                     ),
-                    Contract.assinatura_cliente_inicial == None
+                    ~has_initial_sig_subq
                 )
             )
         elif status_filter.lower() in ['clean', 'no_issues', 'sem_pendencias']:
@@ -4547,12 +4575,20 @@ def listar_contratos():
                 Inspection.tipo.in_([InspectionType.CHECK_OUT.value, 'Check-out', 'Saída', 'Saida'])
             ).exists()
             
+            has_initial_sig_subq = db.or_(
+                Contract.assinatura_cliente_inicial != None,
+                db.session.query(ContractAttachment.id).filter(
+                    ContractAttachment.id_contrato == Contract.id,
+                    ContractAttachment.tipo != 'return_contract'
+                ).exists()
+            )
+
             query = query.filter(
                 ~Contract.id.in_(db.session.query(overdue_subq.c.id_contrato)),
                 Contract.status.in_([ContractStatus.ACTIVE.value, 'Active', 'Ativo']),
                 Contract.url_seguro != None,
                 checkout_subq,
-                Contract.assinatura_cliente_inicial != None
+                has_initial_sig_subq
             )
         elif status_filter.lower() in ['deposit_hold', 'quarentena_deposito', 'quarentena']:
             query = query.filter(Contract.status.in_([ContractStatus.DEPOSIT_HOLD.value, 'Deposit_Hold', 'Quarentena_Deposito']))
@@ -4601,6 +4637,7 @@ def listar_contratos():
     pagos_map = {}
     vencidos_map = {}
     vencidos_qtd_map = {}
+    anexos_iniciais_map = {}
     if contract_ids:
         hoje_date = get_london_date()
 
@@ -4620,6 +4657,16 @@ def listar_contratos():
                     vencidos_qtd_map[cid] = vencidos_qtd_map.get(cid, 0) + 1
             elif st_norm in ['paid', 'pago']:
                 pagos_map[cid] = pagos_map.get(cid, 0.0) + val
+
+        # Carregar contagem de anexos de contrato físico/escaneado em lote
+        anexos_counts = db.session.query(
+            ContractAttachment.id_contrato,
+            db.func.count(ContractAttachment.id)
+        ).filter(
+            ContractAttachment.id_contrato.in_(contract_ids),
+            ContractAttachment.tipo != 'return_contract'
+        ).group_by(ContractAttachment.id_contrato).all()
+        anexos_iniciais_map = {cid: cnt for cid, cnt in anexos_counts}
 
     itens = []
     for c in paginated.items:
@@ -4651,6 +4698,9 @@ def listar_contratos():
         total_vencido = round(vencidos_map.get(c.id, 0.0), 2)
         qtd_vencidas = vencidos_qtd_map.get(c.id, 0)
         tem_pendencia_financeira = (total_vencido > 0)
+
+        num_anexos_iniciais = anexos_iniciais_map.get(c.id, 0)
+        tem_assinatura_inicial = bool(c.assinatura_cliente_inicial) or (num_anexos_iniciais > 0)
         
         # Build consolidated pendencias list
         pendencias = []
@@ -4663,7 +4713,7 @@ def listar_contratos():
             pendencias.append(f"Needs {' + '.join(tags)}")
         if needs_v5c:
             pendencias.append("Needs V5C")
-        if not bool(c.assinatura_cliente_inicial):
+        if not tem_assinatura_inicial:
             pendencias.append("Unsigned")
         
         tem_pendencia = len(pendencias) > 0
@@ -4707,7 +4757,10 @@ def listar_contratos():
             'needs_v5c': needs_v5c,
             'v5c_count': v5c_count,
             'transfer_proof_count': transfer_proof_count,
-            'assinado': bool(c.assinatura_cliente_inicial),
+            'assinado': tem_assinatura_inicial,
+            'metodo_assinatura': 'digital' if c.assinatura_cliente_inicial else ('physical' if num_anexos_iniciais > 0 else None),
+            'num_anexos_iniciais': num_anexos_iniciais,
+            'tem_anexo_assinado': (num_anexos_iniciais > 0),
             'data_assinatura_inicial': c.data_assinatura_inicial.isoformat() if c.data_assinatura_inicial else None,
             'notas_internas': c.notas_internas
         })
@@ -4890,6 +4943,17 @@ def detalhe_contrato(id):
     has_transfer_doc = (num_transfer > 0)
     needs_v5c_doc = bool(is_purchase and c.status in [ContractStatus.ACTIVE.value, 'Active', 'Ativo'] and not has_v5c_doc)
 
+    anexos_iniciais = [a for a in (c.anexos or []) if a.tipo != 'return_contract']
+    anexos_retorno = [a for a in (c.anexos or []) if a.tipo == 'return_contract']
+    data_sig_ini = (
+        c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial
+        else (anexos_iniciais[0].data_criacao.strftime('%d/%m/%Y %H:%M') if anexos_iniciais else None)
+    )
+    data_sig_dev = (
+        c.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_devolucao
+        else (anexos_retorno[0].data_criacao.strftime('%d/%m/%Y %H:%M') if anexos_retorno else None)
+    )
+
     return jsonify({
         'id': c.id,
         'tipo_contrato': getattr(c, 'tipo_contrato', 'Rent') or 'Rent',
@@ -4951,11 +5015,17 @@ def detalhe_contrato(id):
             'has_photos': bool(t.url_fotos)
         } for t in (moto.trackers or [])] if (moto and hasattr(moto, 'trackers') and moto.trackers) else [],
         'assinatura_cliente_inicial': c.assinatura_cliente_inicial,
-        'data_assinatura_inicial': c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial else None,
-        'data_assinatura_inicial_uk': c.data_assinatura_inicial.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_inicial else None,
+        'data_assinatura_inicial': data_sig_ini,
+        'data_assinatura_inicial_uk': data_sig_ini,
+        'assinado_inicial': bool(c.assinatura_cliente_inicial or len(anexos_iniciais) > 0),
+        'metodo_assinatura_inicial': 'digital' if c.assinatura_cliente_inicial else ('physical' if len(anexos_iniciais) > 0 else None),
+        'anexos_iniciais_count': len(anexos_iniciais),
         'assinatura_cliente_devolucao': c.assinatura_cliente_devolucao,
-        'data_assinatura_devolucao': c.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_devolucao else None,
-        'data_assinatura_devolucao_uk': c.data_assinatura_devolucao.strftime('%d/%m/%Y %H:%M') if c.data_assinatura_devolucao else None,
+        'data_assinatura_devolucao': data_sig_dev,
+        'data_assinatura_devolucao_uk': data_sig_dev,
+        'assinado_devolucao': bool(c.assinatura_cliente_devolucao or len(anexos_retorno) > 0),
+        'metodo_assinatura_devolucao': 'digital' if c.assinatura_cliente_devolucao else ('physical' if len(anexos_retorno) > 0 else None),
+        'anexos_retorno_count': len(anexos_retorno),
         'anexos': [{
             'id': a.id,
             'tipo': a.tipo,

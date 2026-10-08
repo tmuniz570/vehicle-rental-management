@@ -347,9 +347,56 @@
         color: #ffffff;
         border-color: rgba(255, 255, 255, 0.25);
     }
+    .badge-financial-link {
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        transition: all 0.18s ease;
+        border-radius: 4px;
+        padding: 1px 4px;
+        margin: -1px -4px;
+        cursor: pointer;
+        width: fit-content;
+    }
+    .badge-financial-link.badge-financial-overdue {
+        font-size: 0.7rem;
+        color: #f87171;
+        font-weight: 700;
+    }
+    .badge-financial-link.badge-financial-overdue:hover {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.14);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        transform: translateY(-0.5px);
+    }
+    .badge-financial-link.badge-financial-bal {
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+    }
+    .badge-financial-link.badge-financial-bal:hover {
+        color: var(--accent, #ff6b00);
+        background: rgba(255, 107, 0, 0.12);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        transform: translateY(-0.5px);
+    }
+    .badge-financial-dot {
+        text-decoration: none;
+        margin-left: 2px;
+        font-size: 0.72rem;
+        display: inline-block;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+        line-height: 1;
+    }
+    .badge-financial-dot:hover {
+        transform: scale(1.35);
+    }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/contratos.js?v=19"></script>
+<script src="/static/js/contratos.js?v=21"></script>
 {% endblock %}

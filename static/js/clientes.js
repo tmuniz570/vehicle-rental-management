@@ -217,7 +217,9 @@ async function carregarClientes() {
             if (kpiSubOverdue && data.kpis.overdue_amount !== undefined) {
                 kpiSubOverdue.textContent = `Total: £${Number(data.kpis.overdue_amount).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             }
-            if (kpiMissingDocs) kpiMissingDocs.textContent = data.kpis.missing_docs !== undefined ? data.kpis.missing_docs : '-';
+            if (kpiMissingDocs) {
+                kpiMissingDocs.textContent = data.kpis.missing_licence !== undefined ? data.kpis.missing_licence : (data.kpis.missing_docs !== undefined ? data.kpis.missing_docs : '-');
+            }
         }
         
         if (clientes.length === 0) {
@@ -245,7 +247,10 @@ async function carregarClientes() {
                 dotGlow = 'rgba(245,158,11,0.5)';
             }
             const dotTitle = escapeHtml(c.status_dot_title || 'Customer status');
-            const statusDotHtml = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${dotColor}; box-shadow:0 0 6px ${dotGlow}; margin-right:4px; vertical-align:middle;" title="${dotTitle}"></span>`;
+            let statusDotHtml = `<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${dotColor}; box-shadow:0 0 6px ${dotGlow}; margin-right:4px; vertical-align:middle;" title="${dotTitle}"></span>`;
+            if (c.status_dot === 'danger' || c.overdue_count > 0) {
+                statusDotHtml = `<a href="/financeiro?cliente_id=${c.id}&cliente_nome=${encodeURIComponent(c.nome || '')}" style="display:inline-block; margin-right:4px; vertical-align:middle; text-decoration:none; cursor:pointer;" title="${dotTitle} • Click to open in Financial Center"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${dotColor}; box-shadow:0 0 8px ${dotGlow}; transition:transform 0.15s ease;" onmouseover="this.style.transform='scale(1.4)'" onmouseout="this.style.transform='scale(1)'"></span></a>`;
+            }
 
             // Customer Name & Note
             const noteBadge = c.notas_internas 
@@ -301,21 +306,21 @@ async function carregarClientes() {
             }
 
             // Financial Status / Debts
-            let finStatusHtml = '<span class="badge" style="background:rgba(34,197,94,0.12); color:#4ade80; border:1px solid rgba(34,197,94,0.3);">✓ Up to date</span>';
+            let finStatusHtml = `<a href="/financeiro?cliente_id=${c.id}&cliente_nome=${encodeURIComponent(c.nome || '')}&status=all" class="badge badge-financial-link badge-financial-clean" title="Up to date (no overdue debts) • Click to open financial history">✓ Up to date</a>`;
             if (c.overdue_count > 0) {
-                finStatusHtml = `<span class="badge" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.35); font-weight:700;" title="${c.overdue_count} overdue payments">🔴 £${Number(c.overdue_amount).toFixed(2)} (${c.overdue_count} late)</span>`;
+                finStatusHtml = `<a href="/financeiro?cliente_id=${c.id}&cliente_nome=${encodeURIComponent(c.nome || '')}" class="badge badge-financial-link badge-financial-overdue" title="${c.overdue_count} overdue payment(s) totalling £${Number(c.overdue_amount).toFixed(2)} • Click to manage in Financial Center">🔴 £${Number(c.overdue_amount).toFixed(2)} (${c.overdue_count} late)</a>`;
             }
 
-            // Documents
+            // Documents - Focused on Driving Licence Front
             const docsList = [];
             if (c.url_habilitacao) {
-                docsList.push(`<a href="javascript:void(0)" onclick="abrirLightbox('${escapeHtml(c.url_habilitacao)}', 'Driving Licence (Front) - ${escapeHtml(c.nome)}')" class="doc-chip" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);" title="View Driving Licence Front">🪪 Licence (F)</a>`);
+                docsList.push(`<a href="javascript:void(0)" onclick="abrirLightbox('${escapeHtml(c.url_habilitacao)}', 'Driving Licence (Front) - ${escapeHtml(c.nome)}')" class="doc-chip" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);" title="View Driving Licence Front">🪪 Licence</a>`);
+            } else {
+                docsList.push(`<span class="badge" style="background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.35); font-weight:600;" title="Driving Licence (Front) not uploaded">⚠️ Missing Licence</span>`);
             }
+
             if (c.url_habilitacao_verso) {
-                docsList.push(`<a href="javascript:void(0)" onclick="abrirLightbox('${escapeHtml(c.url_habilitacao_verso)}', 'Driving Licence (Back) - ${escapeHtml(c.nome)}')" class="doc-chip" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);" title="View Driving Licence Back">🪪 Licence (B)</a>`);
-            }
-            if (!c.url_habilitacao && !c.url_habilitacao_verso) {
-                docsList.push(`<span class="badge" style="background:rgba(245,158,11,0.12); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);" title="Driving Licence not uploaded">⚠️ No Licence</span>`);
+                docsList.push(`<a href="javascript:void(0)" onclick="abrirLightbox('${escapeHtml(c.url_habilitacao_verso)}', 'Driving Licence (Back) - ${escapeHtml(c.nome)}')" class="doc-chip" style="background:rgba(56,189,248,0.12); color:#7dd3fc; border:1px solid rgba(56,189,248,0.25);" title="View Driving Licence Back">🪪 Back</a>`);
             }
 
             if (c.url_cbt) {
@@ -324,8 +329,6 @@ async function carregarClientes() {
 
             if (c.url_comprovante_endereco) {
                 docsList.push(`<a href="javascript:void(0)" onclick="abrirLightbox('${escapeHtml(c.url_comprovante_endereco)}', 'Proof of Address - ${escapeHtml(c.nome)}')" class="doc-chip" style="background:rgba(192,132,252,0.15); color:#c084fc; border:1px solid rgba(192,132,252,0.3);" title="View Proof of Address">🏠 Proof</a>`);
-            } else {
-                docsList.push(`<span class="badge" style="background:rgba(245,158,11,0.12); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);" title="Proof of Address not uploaded">⚠️ No Proof</span>`);
             }
 
             const docsCellHtml = `<div style="display:flex; flex-wrap:wrap; gap:3px;">${docsList.join('')}</div>`;
@@ -500,7 +503,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncKpiCardsState() {
         kpiCards.forEach(card => {
             const fVal = card.getAttribute('data-filter-status') || '';
-            if (statusFiltro === fVal) {
+            const isMatch = (statusFiltro === fVal) || 
+                            (statusFiltro === 'missing_licence' && fVal === 'missing_docs') ||
+                            (statusFiltro === 'missing_docs' && fVal === 'missing_licence');
+            if (isMatch) {
                 card.classList.add('active');
             } else {
                 card.classList.remove('active');

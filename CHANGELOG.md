@@ -4,6 +4,84 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.43] — 2026-10-08 — *Customers Missing Driving Licence Focus on Front*
+
+### 🪪 Foco Exclusivo na Frente da Habilitação na Central de Clientes
+* **Substituição de "Missing Documents" por "Missing Driving Licence"**:
+  - Na tela `/clientes` e na API `/api/clientes`, o filtro e os alertas de documentação pendente foram calibrados para focar exclusivamente na **Frente da Driving Licence** (`url_habilitacao`), removendo a exigência restritiva do verso e do comprovante de endereço para status de conformidade:
+    1. **Card Executivo de KPI**: Atualizado para `Missing Licence` (🪪) com subtexto `Missing driving licence (front)`.
+    2. **Filtro de Status**: Dropdown atualizado para `⚠️ Missing Driving Licence` (`missing_licence`, retrocompatível com `missing_docs`).
+    3. **Ponto de Status do Cliente (Status Dot)**: Quando o cliente não possui a frente da CNH, exibe o ponto amarelo `🟡` com título `Missing Driving Licence (Front)`. Se a frente estiver em dia, o ponto exibe verde `🟢` (`All clear / Up to date`).
+    4. **Coluna de Documentos**:
+       - Exibe `🪪 Licence` se a frente foi enviada.
+       - Exibe com destaque `⚠️ Missing Licence` (âmbar) se a frente não estiver no cadastro.
+       - Se o verso (`🪪 Back`), CBT (`📜 CBT`) ou comprovante (`🏠 Proof`) tiverem sido anexados, eles aparecem como chips adicionais sem gerar falsos alertas de pendência caso ausentes.
+* **Backend `/api/clientes` (`app.py`)**:
+  - `missing_licence_cond` avalia `Client.url_habilitacao == None | Client.url_habilitacao == ''`.
+  - Contagem do KPI `missing_licence` e filtro `status=missing_licence` ajustados para a nova regra.
+* **Atualização Visual & Cachebuster**:
+  - Atualizado cachebuster em `templates/clientes.html` (`v=9`).
+  - 100% dos 83 testes automatizados aprovados com sucesso.
+
+## [1.9.42] — 2026-10-08 — *Customers Direct Financial Navigation & Customer Ledger Filter*
+
+### 👤 Links Diretos da Central de Clientes para o Financeiro
+* **Navegação em 1 Clique da Central de Clientes (`/clientes`) para o Financeiro (`/financeiro`)**:
+  - Na tela de clientes (`/clientes`), os operadores agora contam com links diretos e contextuais para a central financeira filtrados especificamente para aquele cliente (`/financeiro?cliente_id=<id>&cliente_nome=<nome>`):
+    1. **Badge de Débito em Atraso na Coluna Financeira (`🔴 £... (late)`)**: Clicar no valor do débito em atraso do cliente redireciona imediatamente para o Financeiro com o filtro do cliente ativo, mostrando as parcelas/semanas vencidas e pendentes prontas para receber baixa, cobrança ou emissão de recibo.
+    2. **Badge Regular (`✓ Up to date`)**: Clicar no status de adimplência do cliente abre o Financeiro exibindo o histórico financeiro completo do cliente (`status=all`).
+    3. **Ponto de Status Vermelho (`🔴`) na Coluna `#`**: Quando o cliente possui débitos em atraso (`status_dot === 'danger'`), o ponto vermelho torna-se um link clicável direto para o Financeiro.
+    - A coluna *Actions* foi mantida limpa e objetiva (apenas `+ Deal` e `Edit`), evitando sobrecarga de informação visual na tabela.
+* **Design & Experiência Visual**:
+  - Estilização consistente em Dark Glassmorphism com as classes `.badge-financial-link`, `.badge-financial-overdue` e `.badge-financial-clean`.
+  - Microinterações com hover brilhante, elevação suave (`translateY(-1px)`), glow avermelhado para débitos e tooltip contextual.
+  - Navegação em mesma aba preservando o fluxo de trabalho dos operadores.
+  - Cachebuster atualizado em `templates/clientes.html` (`v=8`).
+* **Testes Automatizados**:
+  - Expandido o conjunto de testes em [tests/test_contratos_financial_link.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_contratos_financial_link.py) cobrindo a filtragem por `cliente_id` na API `/api/financeiro` e a presença dos elementos e estilos no template e script de clientes (100% dos 83 testes aprovados).
+
+## [1.9.41] — 2026-10-08 — *Contracts Direct Financial Navigation & Exact Contract Filter*
+
+### 💳 Links Diretos de Pendências Financeiras da Central de Contratos para o Financeiro
+* **Navegação em 1 Clique para a Central Financeira (`/financeiro`)**:
+  - Na tela de contratos (`/contratos`), todos os indicadores de pendência financeira agora são links clicáveis inteligentes que levam diretamente ao módulo Financeiro com o filtro exato pré-aplicado para aquele contrato específico (`/financeiro?contrato_id=<id>`):
+    1. **Badges de Débito em Atraso (`⚠️ Overdue: £...`)**: Em todas as modalidades de contrato (Aluguel semanal, Venda Parcelada e Venda à Vista), clicar no badge redireciona para a central financeira, exibindo imediatamente as cobranças em aberto do contrato.
+    2. **Badges de Saldo Pendente (`Bal: £...`)**: Clicar no saldo em aberto de contratos de aluguel ou parcelamento redireciona para as cobranças pendentes do contrato.
+    3. **Ponto de Status Vermelho (`🔴`) na Coluna `#`**: O indicador de pendência financeira na coluna do ID agora é clicável, permitindo acesso instantâneo ao módulo financeiro.
+* **Leitura Automática de Parâmetros de Filtro no Financeiro (`financeiro.js`)**:
+  - O script de inicialização do Financeiro agora consome os parâmetros `contrato_id` (ou `contrato`), `cliente_id` e `placa` diretamente da URL (`window.location.search`), ativando de forma automática a pill visual de filtro exato (`📋 Contract #<id>`), o botão `Clear Filters` e a filtragem no backend `/api/financeiro`.
+* **Design & Experiência de Uso (Dark Glassmorphism)**:
+  - Adicionadas classes CSS dedicadas (`.badge-financial-link`, `.badge-financial-overdue`, `.badge-financial-bal`, `.badge-financial-dot`) com microinterações refinadas: transição de cor, underline sutil no hover, elevação suave (`transform: translateY(-0.5px)`) e ampliação suave do ponto de status (`transform: scale(1.35)`).
+  - Cumprida estritamente a regra de navegação em mesma aba (sem `_blank`) para telas internas do sistema.
+  - Atualizados os cachebusters de scripts em `templates/contratos.html` (`v=21`) e `templates/financeiro.html` (`v=24`).
+* **Testes Automatizados**:
+  - Criado o teste [tests/test_contratos_financial_link.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_contratos_financial_link.py) garantindo que `/api/financeiro?contrato_id=<id>` filtra com exatidão as transações do contrato e que os elementos interativos de link e estilos estão presentes nos templates e scripts (100% dos 83 testes passando).
+
+## [1.9.40] — 2026-10-08 — *Physical Signed Contract Recognition & Dual Signature Architecture*
+
+### 📄 Reconhecimento de Contratos Impressos e Assinados Fisicamente
+* **Causa Raiz Resolvida**:
+  - Quando os operadores imprimiam o contrato, colhiam a assinatura física do cliente à caneta e anexavam as fotos/scans do documento assinado via modal *"Attach Scans / Photos"*, o sistema continuava marcando o contrato com a pendência `Unsigned`, badge `⏳ Unsigned` e ponto amarelo `🟡` na lista de contratos. Isso ocorria porque o backend avaliava estritamente o campo `assinatura_cliente_inicial` (destinado apenas à assinatura digital por toque na tela), ignorando os comprovantes de contrato físico anexados em `ContractAttachment`.
+* **Arquitetura Dual de Assinaturas (Digital Touch vs. Physical Paper Scan)**:
+  - O sistema agora reconhece formalmente ambos os métodos legítimos de celebração de contrato:
+    1. **Assinatura Digital em Tela (`digital`)**: Captura vetorial/touch na tela (`assinatura_cliente_inicial`), exibindo badge `✓ Signed` (verde).
+    2. **Contrato Físico Impresso & Assinado (`physical`)**: Documento impresso, assinado fisicamente à caneta e digitalizado/fotografado nos anexos do contrato (`ContractAttachment` com `tipo != 'return_contract'`), exibindo badge estilizado `📄 Signed (Paper)` (ciano) e limpando compulsoriamente a pendência `Unsigned`.
+* **Eliminação de Falsos Positivos de Pendência na Central de Contratos (`/contratos`)**:
+  - A API `/api/contratos` agora avalia em lote os anexos de contrato físico sem queries N+1.
+  - Contratos com termo assinado em papel deixam de ter a tag `"Unsigned"` na lista consolidada de pendências.
+  - A coluna `#` exibe o ponto de status verde `🟢` (100% regular) quando não houver outras pendências operacionais ou débitos em atraso.
+  - Os filtros de status `Clean (No Issues / Up to Date)` e `With Pending Issues (Any)` foram calibrados para reconhecer contratos físicos assinados como plenamente conformes.
+* **Experiência Visual e Interativa na Tela de Detalhes (`/contratos/<id>`)**:
+  - No card *Agreement & Signatures*, caso o contrato possua anexo físico de páginas assinadas, o box de assinatura exibe com clareza: `✓ Physically Signed Agreement Attached`, indicando a quantidade de páginas/scans anexados, data de envio e botão de atalho direto para visualizar o arquivo (`View Attached Document ↗`).
+  - O botão de ação oferece `✍️ Sign on Screen Also` para casos em que o operador deseje também coletar a assinatura touch adicionalmente.
+  - Aplicada a mesma lógica para o termo de encerramento/devolução (`card_sig_devolucao` com `return_contract`).
+* **Sincronização do Ciclo de Vida em Contratos de Compra (`Purchase`)**:
+  - Em `sync_purchase_contract_status`, o anexo físico do contrato assinado pelo vendedor agora cumpre o requisito de assinatura para finalização do contrato (`Completed`) junto ao anexo do Logbook V5C oficial.
+* **Auto-Heal e Sincronização Retroativa de Timestamps (`database.py` & `init_db`)**:
+  - Implementada rotina autônoma de migração e auto-cura no boot do sistema (`init_db`): sincroniza retroativamente `data_assinatura_inicial` e `data_assinatura_devolucao` a partir da data de upload dos anexos para todos os contratos legados que possuíam o documento físico arquivado.
+* **Suíte de Testes Automatizados**:
+  - Novo módulo de testes em [tests/test_physical_signed_contract_attachments.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_physical_signed_contract_attachments.py) validando o ciclo completo: status Unsigned antes de anexar, transição para `assinado=True` (`physical`) pós-upload, remoção da pendência em `/api/contratos`, enriquecimento da API de detalhes e reversão correta se todos os anexos forem excluídos.
+
 ## [1.9.39] — 2026-10-08 — *Batch Upload Collision Shield, File Isolation & V5C Integrity Safeguard*
 
 ### 🛡️ Blindagem Contra Colisão em Batch Upload & Integridade de Arquivos

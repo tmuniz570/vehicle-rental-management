@@ -868,6 +868,24 @@ document.addEventListener('DOMContentLoaded', () => {
         searchInputEl.value = paramSearch;
     }
 
+    // Exact Filters from URL (Contract, Customer, Bike Plate)
+    const paramContrato = urlParams.get('contrato_id') || urlParams.get('contrato');
+    if (paramContrato) {
+        filtroExatoContrato = parseInt(paramContrato, 10) || paramContrato;
+    }
+
+    const paramClienteId = urlParams.get('cliente_id');
+    const paramClienteNome = urlParams.get('cliente_nome') || urlParams.get('cliente');
+    if (paramClienteId) {
+        filtroExatoClienteId = parseInt(paramClienteId, 10) || paramClienteId;
+        filtroExatoClienteNome = paramClienteNome || `#${paramClienteId}`;
+    }
+
+    const paramPlaca = urlParams.get('placa');
+    if (paramPlaca) {
+        filtroExatoPlaca = paramPlaca;
+    }
+
     // Initial Data Fetch
     carregarKpis();
     carregarFinanceiro();

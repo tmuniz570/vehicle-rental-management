@@ -35,10 +35,10 @@
         <div class="kpi-value" style="color: #f87171;" id="kpiVal_overdue">-</div>
         <div class="kpi-sub" id="kpiSub_overdue">Late payments pending</div>
     </div>
-    <div class="kpi-card" data-filter-status="missing_docs" id="kpiCard_missing_docs" title="Click to filter Missing Driving Licence or Proof">
-        <div class="kpi-title"><span>Missing Documents</span> <span>⚠️</span></div>
+    <div class="kpi-card" data-filter-status="missing_licence" id="kpiCard_missing_docs" title="Click to filter Missing Driving Licence (Front)">
+        <div class="kpi-title"><span>Missing Licence</span> <span>🪪</span></div>
         <div class="kpi-value" style="color: #fbbf24;" id="kpiVal_missing_docs">-</div>
-        <div class="kpi-sub">Needs Licence / Proof upload</div>
+        <div class="kpi-sub">Missing driving licence (front)</div>
     </div>
 </div>
 
@@ -53,7 +53,7 @@
             <option value="active">⚡ Active Deals (On Road)</option>
             <option value="no_deal">⚪ Inactive / No Active Deal</option>
             <option value="overdue" style="color: #f87171;">🔴 Overdue Debts</option>
-            <option value="missing_docs" style="color: #fbbf24;">⚠️ Missing Documents</option>
+            <option value="missing_licence" style="color: #fbbf24;">⚠️ Missing Driving Licence</option>
             <option value="clean" style="color: #4ade80;">✓ Clean (Compliant & Up to date)</option>
         </select>
     </div>
@@ -357,6 +357,42 @@
         background: rgba(255, 255, 255, 0.14);
         border-color: rgba(255, 255, 255, 0.25);
     }
+    .badge-financial-link {
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        transition: all 0.18s ease;
+        cursor: pointer;
+    }
+    .badge-financial-link.badge-financial-overdue {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        font-weight: 700;
+    }
+    .badge-financial-link.badge-financial-overdue:hover {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.25);
+        border-color: rgba(239, 68, 68, 0.5);
+        transform: translateY(-1px);
+        text-decoration: underline !important;
+        text-underline-offset: 2px;
+        box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+    }
+    .badge-financial-link.badge-financial-clean {
+        background: rgba(34, 197, 94, 0.12);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .badge-financial-link.badge-financial-clean:hover {
+        color: #22c55e;
+        background: rgba(34, 197, 94, 0.2);
+        border-color: rgba(34, 197, 94, 0.45);
+        transform: translateY(-1px);
+        text-decoration: underline !important;
+        text-underline-offset: 2px;
+    }
 
     /* Clipboard Copy micro-button */
     .btn-copy-chip {
@@ -501,5 +537,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/clientes.js?v=7"></script>
+<script src="/static/js/clientes.js?v=9"></script>
 {% endblock %}

@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.39--Upload%20Collision%20Shield-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.43--Missing%20Licence%20&%20Direct%20Financial%20Links-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -66,6 +66,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 
 ### 👥 3. Customer Relationship Management
 * **Driver Records & UK Compliance:** Full tracking of client contact info, residential address, DVLA Driving Licence (dedicated Front & Back uploads), Compulsory Basic Training (CBT) certificate tracking, and utility proof uploads.
+* **Missing Driving Licence Compliance Filter:** Customer compliance filter focusing strictly on the Driving Licence Front (`url_habilitacao`), distinguishing fully authorized drivers from those with missing driving licence documents, complete with dynamic compliance badges and zero clutter.
+* **1-Click Direct Financial Deep Link:** Direct navigation from customer debt alerts and debit amounts on `/clientes` to `/financeiro?cliente_id=<id>`, immediately loading all financial ledger records for that client while preserving a clean, unencumbered Actions column.
 * **Deep-Link Customer Search & ID Match:** Direct URL parameter filtering (`/clientes?search=...`) with exact ID match prioritization (`db.case`), enabling instant customer discovery when clicking "View Client" from any contract detail screen.
 * **1-Tap WhatsApp Integration:** Automatic normalization and international formatting of UK phone numbers (`+447...`) allowing instant WhatsApp chat links from any contract or customer card.
 
@@ -104,6 +106,8 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Ultra-Compact Contracts Table & Zero-Scroll Layout (`/contratos`):** High-density design matching the financial ledger (`/financeiro`) with reduced cell padding (`0.35rem 0.55rem`), compact headers (`#`, `Type`, `Customer`, `Vehicle`, `Collection`, `Due / Terms`, `Amount`, `Status`, `Actions`), and automatic customer name/bike model ellipsis, fitting cleanly without horizontal overflow.
 * **Real-Time Pending Issues & Financial Overdue Tracking:**
   - **Color-Coded Status Dot on ID Column (`#`):** Instant visual scanning showing 🔴 for contracts with overdue debts (including count and amount in tooltip), 🟡 for operational/documental pendências (pre-delivery, V5C, unsigned agreement), and 🟢 for 100% compliant contracts.
+  - **Dual Contract Signature Architecture (Physical & Digital):** Automatic recognition of scanned paper contracts (`ContractAttachment`). An attached physical signed document automatically clears false-positive `⏳ Unsigned` flags, reflecting compliant status across tables and contract overview screens without requiring digital touch signing.
+  - **1-Click Financial Deep Link for Debts & Pendencies:** Direct clickable navigation from overdue debt amounts and pending balance indicators on `/contratos` to `/financeiro?contrato_id=<id>`, immediately isolating the financial ledger to that specific agreement.
   - **Financial Overdue Warning in `Amount` Column:** Clearly displays `⚠️ Overdue: £...` in red when payments are past due, keeping debt values exclusively in the financial column to avoid duplication and optimize row height.
   - **Streamlined `Status` Column:** Clear operational status badges (`Active`, `⚠️ Needs Insp/Ins`, `📑 Needs V5C`, `⏳ Unsigned`, `✓ All Clear`).
   - **Executive Overdue Debts KPI & Quick Filters:** Live `🔴 Overdue Debts` card on the top strip with 1-click filtering, plus dedicated status options (`⚠️ With Pending Issues`, `🔴 Overdue Debts`, `✓ Clean`).
@@ -130,7 +134,7 @@ The system features an installable **PWA (Progressive Web App)** interface with 
   - Custom date inputs automatically deselect quick pills to eliminate visual contradictions.
 * **Centralized Financial Management Hub (`/financeiro`):** Comprehensive executive command center for financial operations with real-time KPI cards (Pending Collections, Overdue Debts, Collected Today, This Week / Month), 1-click date shortcut pills (Today, Yesterday, Week, Month, All Time), dynamic search, and multi-criteria filters (Status, Type, Method, Date Range, Page Size).
 * **High-Density Table Layout (Ultra-Compact):** Cell padding reduced by >50% (`0.35rem 0.55rem`) with tight `line-height: 1.25`, reducing row height to ~35px and doubling the visible records per viewport. Concise column headers (`#`, `Contr.`, `Customer`, `Bike`, `Type`, `Amount`, `Due Date`, `Payment`, `Status`, `Actions`) save over 160px of horizontal width, completely eliminating horizontal scroll bars on standard screens and laptops.
-* **Exact 1-Click Inline Filters:** Clicking inline search icons on contracts (`🔍`), customer names, or registration plates applies strict backend SQL parameters (`contrato_id`, `cliente_id`, `placa`) instead of fuzzy text searching, with an active filter pill indicator (`#activeFilterPillContainer`) for 100% exact filtering.
+* **Exact 1-Click Inline Filters & Deep Links:** Clicking inline search icons on contracts (`🔍`), customer names, or registration plates applies strict backend SQL parameters (`contrato_id`, `cliente_id`, `placa`) instead of fuzzy text searching, with an active filter pill indicator (`#activeFilterPillContainer`) for 100% exact filtering. Direct incoming URL parameters (`/financeiro?contrato_id=...` or `/financeiro?cliente_id=...`) automatically apply the exact filter with 1-click reset options.
 * **Executive Daily Closing Sheet (`/financeiro/fechamento-caixa/print`):** Dedicated formal A4 printable statement for end-of-day register reconciliation, featuring a Grand Total Collected banner, payment method breakdowns, a physical cash drawer balancing box (opening float, expected cash, counted cash, variance), an itemized chronological payment ledger, and formal signature lines for cashier and manager safe drops.
 * **High Debt Risk Badge (`🔴 N Late`):** Proactive visual risk indicator automatically flagging customers who accumulate 2 or more overdue charges (`data_vencimento < inicio_hoje`), strictly excluding future scheduled weeks.
 * **Aesthetic WhatsApp Reminder Micro-Badge:** Compact horizontal translucent emerald badge (`✓ Just now`, `✓ Today 14:20`, `✓ 2h ago`, `✓ Yesterday`) aligned directly next to customer phone numbers, with full hover tooltips (operator name and exact recorded timestamp) and optimistic instant UI updates upon sending.

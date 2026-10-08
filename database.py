@@ -542,6 +542,43 @@ def init_db(app):
                             WHERE tipo_contrato IS NULL;
                         """))
                         conn.commit()
+
+                        # Auto-heal: synchronize data_assinatura_inicial/devolucao for contracts with attached paper scans
+                        conn.execute(db.text("""
+                            UPDATE contratos
+                            SET data_assinatura_inicial = (
+                                SELECT MIN(ca.data_criacao)
+                                FROM contrato_anexos ca
+                                WHERE ca.id_contrato = contratos.id
+                                  AND (ca.tipo IS NULL OR ca.tipo != 'return_contract')
+                            )
+                            WHERE data_assinatura_inicial IS NULL
+                              AND EXISTS (
+                                SELECT 1
+                                FROM contrato_anexos ca
+                                WHERE ca.id_contrato = contratos.id
+                                  AND (ca.tipo IS NULL OR ca.tipo != 'return_contract')
+                              );
+                        """))
+                        conn.commit()
+
+                        conn.execute(db.text("""
+                            UPDATE contratos
+                            SET data_assinatura_devolucao = (
+                                SELECT MIN(ca.data_criacao)
+                                FROM contrato_anexos ca
+                                WHERE ca.id_contrato = contratos.id
+                                  AND ca.tipo = 'return_contract'
+                            )
+                            WHERE data_assinatura_devolucao IS NULL
+                              AND EXISTS (
+                                SELECT 1
+                                FROM contrato_anexos ca
+                                WHERE ca.id_contrato = contratos.id
+                                  AND ca.tipo = 'return_contract'
+                              );
+                        """))
+                        conn.commit()
                     except Exception as backfill_err:
                         print(f"[DB Auto-Migration] Backfill info: {backfill_err}")
                     
