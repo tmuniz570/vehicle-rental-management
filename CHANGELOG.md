@@ -4,6 +4,24 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.39] — 2026-10-08 — *Batch Upload Collision Shield, File Isolation & V5C Integrity Safeguard*
+
+### 🛡️ Blindagem Contra Colisão em Batch Upload & Integridade de Arquivos
+* **Resolução da Sobrescrita de Fotos em Lote (iOS Safari / Mobile Camera)**:
+  - Identificada e corrigida a causa raiz da duplicidade e perda de fotos de V5C: no iPhone/iOS Safari, capturas sucessivas via câmera (`capture="environment"`) recebem o nome idêntico `image.jpg`. No backend anterior de `upload_v5c_moto`, fotos enviadas no mesmo segundo geravam o mesmo nome físico no disco (`timestamp_v5c_placa_image.webp`), fazendo com que a 2ª foto (páginas internas) sobrescrevesse a 1ª foto (capa). O banco criava 2 linhas apontando para o mesmo arquivo físico. Ao excluir uma das linhas, o arquivo compartilhado era apagado do disco, quebrando o outro registro (404).
+* **Tokens Criptográficos Únicos (UUID) e Indexação Sequencial**:
+  - Geração de nomes físicos no disco em `upload_v5c_moto` e `adicionar_tracker_moto` agora incorpora compulsoriamente o índice da página (`idx+1`) e um token hexadecimal único (`uuid.uuid4().hex[:8]`), tornando matematicamente impossível qualquer colisão ou sobrescrita no disco.
+* **Exclusão Segura com Proteção Contra Arquivo Compartilhado**:
+  - Em `remover_v5c_moto` e `remover_tracker_moto`, o backend agora verifica se qualquer outro registro no banco ainda referencia o mesmo arquivo físico (`outros_usos == 0`) antes de executar `os.remove()`. Se houver registros legados compartilhando o arquivo, apenas o registro solicitado é excluído do banco, preservando o arquivo físico para a outra linha.
+* **Renomeação Dinâmica Client-Side no Acumulador (`moto_modal_shared.js?v=8`)**:
+  - Ao capturar fotos da câmera ou selecionar da galeria, o acumulador renomeia os arquivos no navegador com índice de página e timestamp (`v5c_page_N_timestamp.ext`), forçando nomes de partes multipart exclusivos no `FormData`. Atualizado cache-buster em `motos.html` e `detalhe_contrato.html`.
+* **Proteção Global Preventiva em 100% dos Uploads do Sistema**:
+  - Aplicada a mesma blindagem com UUID em todos os pontos de upload do ecossistema: Clientes (CNH Frente, Verso, CBT e Endereço), Contratos (Inspeções e Apólice de Seguro), Anexos de Contratos, Cobranças Financeiras, Vistorias e Comprovantes de Quarentena.
+* **Ferramenta de Diagnóstico & Desacoplamento (`diagnose_v5c.py`)**:
+  - Novo script CLI (`python diagnose_v5c.py [--fix]`) para auditar a base de V5C, localizar arquivos órfãos ou duplicados e clonar fisicamente arquivos compartilhados para garantir independência total de cada registro.
+* **Suíte de Testes Automatizados**:
+  - Novo módulo de testes em [tests/test_v5c_batch_upload_collision.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_v5c_batch_upload_collision.py) simulando envio de múltiplas fotos com o mesmo nome `image.jpg`, validação de pixels de cores distintas (vermelho/azul) comprovando ausência de sobrescrita, teste de exclusão segura e fotos de rastreadores. 100% aprovado.
+
 ## [1.9.38] — 2026-10-08 — *Daily Media Cleanup Activity Log & Native Scheduler*
 
 ### 🧹 Limpeza Diária na Trilha de Auditoria (Activity Log)

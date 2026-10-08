@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.38--Daily%20Cleanup%20Audit%20Log-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.39--Upload%20Collision%20Shield-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -21,7 +21,7 @@
 
 **FF Motors Management System** is an end-to-end web application developed to automate and streamline motorcycle rental operations. Built specifically to handle day-to-day motorcycle fleet management, client agreements, security deposit accounting, and digital vehicle inspections directly from the rental yard using smartphones or desktop computers.
 
-The system features an installable **PWA (Progressive Web App)** interface with a custom **mobile bottom navigation bar**, client-side image compression for mobile cameras, automated recurring weekly rent generation, multi-payment split methods with partial settlements, multi-page V5C logbook uploads, and instant receipt printing.
+The system features an installable **PWA (Progressive Web App)** interface with a custom **mobile bottom navigation bar**, client-side image compression for mobile cameras, automated recurring weekly rent generation, multi-payment split methods with partial settlements, multi-page V5C logbook uploads with cryptographic collision shield, and instant receipt printing.
 
 ---
 
@@ -51,8 +51,10 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **DVLA SORN (Statutory Off Road Notification) Support:** Native toggle for vehicles officially declared off-road (SORN) with DVLA. Automatically disables Road Tax expiry dates, displays a distinctive `🛡️ SORN` badge in the fleet list, supports quick search (`search=sorn`), and excludes off-road bikes from false-positive Road Tax dashboard alerts.
 * **Missing V5C Tracking & Alerts:** Fleet vehicles without V5C registration logbooks feature an eye-catching `⚠️ No V5C` badge in the fleet table, quick filtering (`/motos?v5c=missing`), and an amber alert badge on contract cards.
 * **Maintenance Workflow:** One-click dispatch of motorbikes to the workshop with maintenance reason logging and quick release back to the active fleet.
-* **V5C Logbook Multi-Page Management, Mobile Multi-Shot Camera & High-Res Zoom:**
+* **V5C Logbook Multi-Page Management, Mobile Multi-Shot Camera & Cryptographic Collision Shield:**
   - Dedicated multi-shot camera accumulator (`capture="environment"` and gallery picker) allowing operators to photograph multi-page V5C logbooks (Page 1, Page 2, Page 3...) consecutively on iPhone/Safari without reloading or uploading one-by-one.
+  - **Cryptographic File Collision Shield:** Incorporates unique sequence indexing and 8-byte hex UUID tokens (`uuid.uuid4().hex[:8]`) alongside client-side file renaming, preventing iOS camera `image.jpg` files from overwriting each other in batch uploads.
+  - **Safe Deletion Guard:** Prevents physical file deletion if other records reference the same file on disk, avoiding broken links.
   - Interactive preview grid with thumbnail, file size, click-to-zoom preview, and per-page discard button before batch uploading.
   - Single-click batch upload (`POST /api/motos/<placa>/v5c`) supporting image and digital PDF formats.
   - **High-Resolution Photo Zoom (Driving Licence & Inspection Standard):** V5C cards and Tracker photo galleries feature `🔍 Enlarge` badges, direct `↗ Full` links for opening original full-resolution files in new tabs (`target="_blank"` with native pinch-to-zoom), and an interactive lightbox viewer with 2x zoom toggle, smooth pan/scroll, and ESC keyboard support.

@@ -872,7 +872,11 @@ document.addEventListener('DOMContentLoaded', () => {
         v5cCameraInput.addEventListener('change', () => {
             if (v5cCameraInput.files && v5cCameraInput.files.length > 0) {
                 for (let i = 0; i < v5cCameraInput.files.length; i++) {
-                    selectedV5CFiles.push(v5cCameraInput.files[i]);
+                    const originalFile = v5cCameraInput.files[i];
+                    const ext = originalFile.name.includes('.') ? originalFile.name.split('.').pop() : 'jpg';
+                    const customName = `v5c_page_${selectedV5CFiles.length + 1}_${Date.now()}.${ext}`;
+                    const uniqueFile = new File([originalFile], customName, { type: originalFile.type });
+                    selectedV5CFiles.push(uniqueFile);
                 }
                 v5cCameraInput.value = ''; // Reset so iPhone camera can take multiple page photos consecutively
                 renderV5CStagedPreview();
@@ -885,7 +889,11 @@ document.addEventListener('DOMContentLoaded', () => {
         v5cGalleryInput.addEventListener('change', () => {
             if (v5cGalleryInput.files && v5cGalleryInput.files.length > 0) {
                 for (let i = 0; i < v5cGalleryInput.files.length; i++) {
-                    selectedV5CFiles.push(v5cGalleryInput.files[i]);
+                    const originalFile = v5cGalleryInput.files[i];
+                    const ext = originalFile.name.includes('.') ? originalFile.name.split('.').pop() : 'jpg';
+                    const customName = `v5c_page_${selectedV5CFiles.length + 1}_${Date.now()}_${i + 1}.${ext}`;
+                    const uniqueFile = new File([originalFile], customName, { type: originalFile.type });
+                    selectedV5CFiles.push(uniqueFile);
                 }
                 v5cGalleryInput.value = '';
                 renderV5CStagedPreview();
@@ -921,8 +929,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentContratoId) {
                 formData.append('id_contrato', currentContratoId);
             }
-            selectedV5CFiles.forEach(file => {
-                formData.append('v5c_arquivos', file);
+            selectedV5CFiles.forEach((file, idx) => {
+                const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
+                const uploadName = `v5c_p${idx + 1}_${Date.now()}_${idx + 1}.${ext}`;
+                formData.append('v5c_arquivos', file, uploadName);
             });
 
             if (btnUploadV5C) {
@@ -995,7 +1005,11 @@ document.addEventListener('DOMContentLoaded', () => {
         trackerCameraInput.addEventListener('change', () => {
             if (trackerCameraInput.files && trackerCameraInput.files.length > 0) {
                 for (let i = 0; i < trackerCameraInput.files.length; i++) {
-                    selectedTrackerPhotos.push(trackerCameraInput.files[i]);
+                    const originalFile = trackerCameraInput.files[i];
+                    const ext = originalFile.name.includes('.') ? originalFile.name.split('.').pop() : 'jpg';
+                    const customName = `tracker_${selectedTrackerPhotos.length + 1}_${Date.now()}.${ext}`;
+                    const uniqueFile = new File([originalFile], customName, { type: originalFile.type });
+                    selectedTrackerPhotos.push(uniqueFile);
                 }
                 trackerCameraInput.value = ''; // Reset so mobile camera can be used repeatedly
                 renderTrackerPhotosPreview();
@@ -1008,7 +1022,11 @@ document.addEventListener('DOMContentLoaded', () => {
         trackerGalleryInput.addEventListener('change', () => {
             if (trackerGalleryInput.files && trackerGalleryInput.files.length > 0) {
                 for (let i = 0; i < trackerGalleryInput.files.length; i++) {
-                    selectedTrackerPhotos.push(trackerGalleryInput.files[i]);
+                    const originalFile = trackerGalleryInput.files[i];
+                    const ext = originalFile.name.includes('.') ? originalFile.name.split('.').pop() : 'jpg';
+                    const customName = `tracker_${selectedTrackerPhotos.length + 1}_${Date.now()}_${i + 1}.${ext}`;
+                    const uniqueFile = new File([originalFile], customName, { type: originalFile.type });
+                    selectedTrackerPhotos.push(uniqueFile);
                 }
                 trackerGalleryInput.value = '';
                 renderTrackerPhotosPreview();
@@ -1049,9 +1067,11 @@ document.addEventListener('DOMContentLoaded', () => {
             formData.append('tipo_propriedade', propriedade);
             formData.append('observacoes', observacoes);
 
-            // Append all accumulated tracker photos
-            selectedTrackerPhotos.forEach(file => {
-                formData.append('fotos', file);
+            // Append all accumulated tracker photos with unique names
+            selectedTrackerPhotos.forEach((file, idx) => {
+                const ext = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
+                const uploadName = `tracker_p${idx + 1}_${Date.now()}_${idx + 1}.${ext}`;
+                formData.append('fotos', file, uploadName);
             });
 
             if (btnSubmitTracker) {

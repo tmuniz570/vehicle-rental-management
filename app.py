@@ -2,6 +2,7 @@ import os
 import re
 import json
 import secrets
+import uuid
 import hmac
 import time
 import threading
@@ -2108,28 +2109,28 @@ def criar_cliente():
     if 'habilitacao' in request.files:
         f = request.files['habilitacao']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_hab = f"/static/uploads/{nome_salvo}"
 
     if 'habilitacao_verso' in request.files:
         f = request.files['habilitacao_verso']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_verso_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_verso_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_hab_verso = f"/static/uploads/{nome_salvo}"
 
     if 'cbt' in request.files:
         f = request.files['cbt']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_cbt_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_cbt_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_cbt = f"/static/uploads/{nome_salvo}"
             
     if 'comprovante_endereco' in request.files:
         f = request.files['comprovante_endereco']
         if f.filename:
-            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_comp_end_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_comp_end_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_comp_end = f"/static/uploads/{nome_salvo}"
             
@@ -2503,28 +2504,28 @@ def atualizar_cliente(id):
         if 'habilitacao' in request.files:
             f = request.files['habilitacao']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_habilitacao = f"/static/uploads/{nome_salvo}"
 
         if 'habilitacao_verso' in request.files:
             f = request.files['habilitacao_verso']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_verso_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_verso_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_habilitacao_verso = f"/static/uploads/{nome_salvo}"
 
         if 'cbt' in request.files:
             f = request.files['cbt']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_cbt_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_cbt_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_cbt = f"/static/uploads/{nome_salvo}"
                 
         if 'comprovante_endereco' in request.files:
             f = request.files['comprovante_endereco']
             if f.filename:
-                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_comp_end_{f.filename}")
+                nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_comp_end_{f.filename}")
                 nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
                 cliente.url_comprovante_endereco = f"/static/uploads/{nome_salvo}"
     
@@ -3281,7 +3282,7 @@ def upload_v5c_moto(placa):
     salvos = []
     operador_atual = current_user.nome if (current_user and current_user.is_authenticated) else 'System'
     
-    for f in arquivos:
+    for idx, f in enumerate(arquivos):
         if not f or not f.filename:
             continue
         if not is_allowed_file(f.filename):
@@ -3291,7 +3292,8 @@ def upload_v5c_moto(placa):
         tipo_arq = 'pdf' if ext == 'pdf' else 'image'
         safe_orig = werkzeug.utils.secure_filename(f.filename) or f"{categoria_doc}_{placa_clean}.{ext}"
         prefixo = "transfer_slip" if categoria_doc == 'transfer_proof' else "v5c"
-        nome_final = f"{int(get_local_now().timestamp())}_{prefixo}_{placa_clean}_{safe_orig}"
+        unique_token = uuid.uuid4().hex[:8]
+        nome_final = f"{int(get_local_now().timestamp())}_{idx+1}_{unique_token}_{prefixo}_{placa_clean}_{safe_orig}"
         
         if tipo_arq == 'pdf':
             caminho = os.path.join(app.config['UPLOAD_FOLDER'], nome_final)
@@ -3370,7 +3372,12 @@ def remover_v5c_moto(placa, v5c_id):
         if v5c.url_arquivo:
             clean_name = os.path.basename(v5c.url_arquivo)
             disk_path = os.path.join(app.config['UPLOAD_FOLDER'], clean_name)
-            if os.path.exists(disk_path):
+            # Proteção contra exclusão física de arquivo compartilhado por outros registros
+            outros_usos = MotorcycleV5C.query.filter(
+                MotorcycleV5C.id != v5c.id,
+                MotorcycleV5C.url_arquivo == v5c.url_arquivo
+            ).count()
+            if outros_usos == 0 and os.path.exists(disk_path):
                 os.remove(disk_path)
     except Exception as e:
         app.logger.warning(f"Failed to delete physical file {v5c.url_arquivo}: {e}")
@@ -3436,10 +3443,11 @@ def adicionar_tracker_moto(placa):
     if not fotos and 'foto' in request.files:
         fotos = [request.files['foto']]
         
-    for f in fotos:
+    for idx, f in enumerate(fotos):
         if f and f.filename and is_allowed_file(f.filename):
             safe_orig = werkzeug.utils.secure_filename(f.filename) or 'tracker.jpg'
-            nome_final = f"{int(get_local_now().timestamp())}_tracker_{placa_clean}_{safe_orig}"
+            unique_token = uuid.uuid4().hex[:8]
+            nome_final = f"{int(get_local_now().timestamp())}_{idx+1}_{unique_token}_tracker_{placa_clean}_{safe_orig}"
             nome_salvo = salvar_arquivo_otimizado(f, nome_final)
             fotos_urls.append(f"/static/uploads/{nome_salvo}")
             
@@ -3489,9 +3497,15 @@ def remover_tracker_moto(placa, tracker_id):
             u_clean = u.strip()
             if u_clean:
                 try:
-                    fpath = os.path.join(app.config['UPLOAD_FOLDER'], os.path.basename(u_clean))
-                    if os.path.exists(fpath):
-                        os.remove(fpath)
+                    clean_name = os.path.basename(u_clean)
+                    disk_path = os.path.join(app.config['UPLOAD_FOLDER'], clean_name)
+                    # Verifica se outro tracker ainda aponta para esta foto física
+                    outros_trackers = MotorcycleTracker.query.filter(
+                        MotorcycleTracker.id != tracker.id,
+                        MotorcycleTracker.url_fotos.like(f"%{clean_name}%")
+                    ).count()
+                    if outros_trackers == 0 and os.path.exists(disk_path):
+                        os.remove(disk_path)
                 except Exception as e:
                     app.logger.warning(f"Failed to remove tracker photo {u_clean}: {e}")
                     
@@ -3786,7 +3800,7 @@ def criar_contrato():
     for i, foto in enumerate(fotos):
         if foto and foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
-            nome_arquivo = f"{timestamp}_{i}_{filename}"
+            nome_arquivo = f"{timestamp}_{i}_{uuid.uuid4().hex[:8]}_{filename}"
             nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
             urls_fotos.append(f"/static/uploads/{nome_salvo}")
             
@@ -3797,7 +3811,7 @@ def criar_contrato():
     arq_seguro = request.files.get('seguro')
     if arq_seguro and arq_seguro.filename:
         filename_seguro = werkzeug.utils.secure_filename(arq_seguro.filename)
-        nome_seguro = f"{timestamp}_seguro_{filename_seguro}"
+        nome_seguro = f"{timestamp}_seguro_{uuid.uuid4().hex[:8]}_{filename_seguro}"
         nome_salvo = salvar_arquivo_otimizado(arq_seguro, nome_seguro)
         url_seguro = f"/static/uploads/{nome_salvo}"
 
@@ -4003,7 +4017,7 @@ def atualizar_seguro_contrato(id):
         if f.filename:
             if not is_allowed_file(f.filename):
                 return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
-            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_seguro_upd_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_seguro_upd_{uuid.uuid4().hex[:8]}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             contrato.url_seguro = f"/static/uploads/{nome_salvo}"
             db.session.commit()
@@ -4149,7 +4163,7 @@ def upload_anexos_contrato(id):
                 base_name = os.path.splitext(orig_name)[0]
                 sec_base = werkzeug.utils.secure_filename(base_name) or f"doc_{i}"
                 sec_name = f"{sec_base}{ext}"
-                nome_arq = f"{timestamp}_anexo_{id}_{i}_{sec_name}"
+                nome_arq = f"{timestamp}_anexo_{id}_{i}_{uuid.uuid4().hex[:8]}_{sec_name}"
                 nome_salvo = salvar_arquivo_otimizado(arq, nome_arq)
                 url_arquivo = f"/static/uploads/{nome_salvo}"
 
@@ -5062,7 +5076,7 @@ def criar_cobranca(id):
                 if not is_allowed_file(foto.filename):
                     return jsonify({'error': 'Invalid attachment format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de anexo inválido. Permitido apenas JPG, PNG, WEBP e PDF.'}), 400
                 filename = werkzeug.utils.secure_filename(foto.filename)
-                nome_arquivo = f"{timestamp}_cob_{i}_{filename}"
+                nome_arquivo = f"{timestamp}_cob_{i}_{uuid.uuid4().hex[:8]}_{filename}"
                 nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
                 urls_anexos.append(f"/static/uploads/{nome_salvo}")
 
@@ -5146,7 +5160,7 @@ def criar_vistoria():
     for i, foto in enumerate(fotos):
         if foto.filename:
             filename = werkzeug.utils.secure_filename(foto.filename)
-            nome_arquivo = f"{timestamp}_{i}_{filename}"
+            nome_arquivo = f"{timestamp}_{i}_{uuid.uuid4().hex[:8]}_{filename}"
             nome_salvo = salvar_arquivo_otimizado(foto, nome_arquivo)
             urls_fotos.append(f"/static/uploads/{nome_salvo}")
             
@@ -7448,7 +7462,7 @@ def finalizar_quarentena(id):
         if f.filename:
             if not is_allowed_file(f.filename):
                 return jsonify({'error': 'Invalid file format. Only JPG, PNG, WEBP, and PDF documents are allowed.', 'erro': 'Formato de arquivo inválido.'}), 400
-            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{f.filename}")
+            nome_arq = werkzeug.utils.secure_filename(f"{int(get_local_now().timestamp())}_{uuid.uuid4().hex[:8]}_{f.filename}")
             nome_salvo = salvar_arquivo_otimizado(f, nome_arq)
             url_comprovante = f"/static/uploads/{nome_salvo}"
             
