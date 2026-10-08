@@ -26,6 +26,7 @@ from sqlalchemy.orm import joinedload, contains_eager, selectinload
 import werkzeug.utils
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
+import markupsafe
 
 load_dotenv()
 
@@ -140,7 +141,9 @@ def clear_failed_logins(ip):
 # Configurações de Cookie de Sessão
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-if os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or (os.environ.get('FLASK_ENV') == 'production' and os.environ.get('HTTPS') == 'on'):
+if os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('true', '1') or (
+    os.environ.get('FLASK_ENV') == 'production' and os.environ.get('SESSION_COOKIE_SECURE', '').lower() not in ('false', '0')
+):
     app.config['SESSION_COOKIE_SECURE'] = True
 
 # Segurança de Sessão: Expiração por Inatividade (padrão 8 horas = 28800s) e Duração Máxima
@@ -1497,8 +1500,8 @@ def criar_usuario():
     if not nome or not email or not password:
         return jsonify({'error': 'Name, email, and password are required'}), 400
         
-    if len(password) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    if len(password) < 8:
+        return jsonify({'error': 'Password must be at least 8 characters long', 'erro': 'A senha deve ter no mínimo 8 caracteres'}), 400
         
     if User.query.filter_by(email=email).first():
         return jsonify({'error': 'An account with this email address already exists'}), 400
@@ -1613,8 +1616,8 @@ def atualizar_usuario(user_id):
         
     # Check if updating password
     if 'password' in data and data['password']:
-        if len(data['password']) < 6:
-            return jsonify({'error': 'Password must be at least 6 characters'}), 400
+        if len(data['password']) < 8:
+            return jsonify({'error': 'Password must be at least 8 characters long', 'erro': 'A senha deve ter no mínimo 8 caracteres'}), 400
         user.set_password(data['password'])
         alteracoes.append("senha redefinida")
         
@@ -1693,8 +1696,8 @@ def alterar_propria_senha():
     if not current_user.check_password(senha_atual):
         return jsonify({'error': 'A senha atual informada está incorreta.'}), 400
 
-    if len(nova_senha) < 6:
-        return jsonify({'error': 'A nova senha deve ter no mínimo 6 caracteres.'}), 400
+    if len(nova_senha) < 8:
+        return jsonify({'error': 'A nova senha deve ter no mínimo 8 caracteres.'}), 400
 
     if nova_senha != confirmar_senha:
         return jsonify({'error': 'A confirmação de senha não confere com a nova senha.'}), 400
@@ -6371,14 +6374,14 @@ def relatorio_financeiro_pdf():
         }
 
         filtro_desc = []
-        if status_filtro: filtro_desc.append(f"Status: {status_filtro}")
+        if status_filtro: filtro_desc.append(f"Status: {markupsafe.escape(status_filtro)}")
         elif pendentes: filtro_desc.append("Status: Pending")
-        if tipo_filtro: filtro_desc.append(f"Type: {tipo_filtro}")
-        if metodo_filtro: filtro_desc.append(f"Method: {metodo_filtro}")
+        if tipo_filtro: filtro_desc.append(f"Type: {markupsafe.escape(tipo_filtro)}")
+        if metodo_filtro: filtro_desc.append(f"Method: {markupsafe.escape(metodo_filtro)}")
         nome_campo = "Payment Date" if campo_data == 'pagamento' else "Due Date"
-        if data_inicio or data_fim: filtro_desc.append(f"Date ({nome_campo}): {data_inicio or 'Any'} to {data_fim or 'Any'}")
-        if search: filtro_desc.append(f"Search: '{search}'")
-        filtro_label = " &bull; ".join(filtro_desc) if filtro_desc else "All Transactions"
+        if data_inicio or data_fim: filtro_desc.append(f"Date ({nome_campo}): {markupsafe.escape(data_inicio or 'Any')} to {markupsafe.escape(data_fim or 'Any')}")
+        if search: filtro_desc.append(f"Search: '{markupsafe.escape(search)}'")
+        filtro_label = " &bull; ".join(str(f) for f in filtro_desc) if filtro_desc else "All Transactions"
 
         return render_template(
             'relatorio_financeiro.html',
@@ -7354,6 +7357,12 @@ def get_dashboard():
         resp_data = _compilar_dados_dashboard(include_claims=pode_claims)
     elif pode_claims:
         resp_data = _compilar_dados_claims_dashboard()
+
+    # Checagem de segurança discreta para a conta mestre
+    if current_user.is_authenticated and current_user.pode_admin():
+        is_master = bool(current_user.email and current_user.email.strip().lower() == "tmuniz570@gmail.com")
+        if is_master and current_user.check_password("Admin123!"):
+            resp_data['aviso_senha_padrao'] = True
 
     return jsonify(resp_data)
 

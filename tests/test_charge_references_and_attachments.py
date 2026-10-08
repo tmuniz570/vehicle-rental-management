@@ -55,21 +55,23 @@ class TestChargeReferencesAndAttachments(unittest.TestCase):
             db.session.add(self.moto)
             db.session.commit()
 
-        self.contrato = Contract.query.filter_by(status=ContractStatus.ACTIVE.value).first()
-        if not self.contrato:
-            self.contrato = Contract(
-                id_cliente=self.client_obj.id,
-                placa=self.moto.placa,
-                tipo_contrato="Rent",
-                status=ContractStatus.ACTIVE.value,
-                valor_aluguel_semanal=100.0,
-                cliente_nome=self.client_obj.nome,
-                moto_placa=self.moto.placa
-            )
-            db.session.add(self.contrato)
-            db.session.commit()
+        self.contrato = Contract(
+            id_cliente=self.client_obj.id,
+            placa=self.moto.placa,
+            tipo_contrato="Rent",
+            status=ContractStatus.ACTIVE.value,
+            valor_aluguel_semanal=100.0,
+            cliente_nome=self.client_obj.nome,
+            moto_placa=self.moto.placa
+        )
+        db.session.add(self.contrato)
+        db.session.commit()
 
     def tearDown(self):
+        FinancialTransaction.query.filter_by(id_contrato=self.contrato.id).delete()
+        Inspection.query.filter_by(id_contrato=self.contrato.id).delete()
+        db.session.delete(self.contrato)
+        db.session.commit()
         self.app_context.pop()
 
     def test_create_charge_with_reference_and_attachment(self):

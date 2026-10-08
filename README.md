@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-black?style=for-the-badge&logo=flask&logoColor=white)
-![Version](https://img.shields.io/badge/Version-1.9.36--Universal%20Command%20Palette%20%26%20Global%20Sidebar-success?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-1.9.37--Security%20Hardening%20%26%20UK%20GDPR-success?style=for-the-badge)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-3-003B57?style=for-the-badge&logo=sqlite&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-Ready-orange?style=for-the-badge&logo=pwa&logoColor=white)
@@ -181,6 +181,14 @@ The system features an installable **PWA (Progressive Web App)** interface with 
 * **Dual WSGI Production Server:** Configured with `Waitress` for multi-threaded Windows/Local deployment and `Gunicorn` with `Procfile` and `gunicorn_config.py` for cloud Linux deployments (GCP, AWS, Render, Railway).
 * **Point-in-Time Backups & Disaster Recovery:** Automated utilities for snapshot archives (`backup.py`), database restore (`restore.py`), and demo data seeding (`seed_data.py`).
 
+### 🛡️ 8. Security Hardening & UK GDPR Compliance
+* **Reflected XSS Shielding:** Comprehensive input sanitization with `markupsafe.escape()` on all search and filter parameters across executive financial statements and A4 PDF reports.
+* **Resilient HTTPS Cookie Governance (`SESSION_COOKIE_SECURE`):** Automatic enforcement of `Secure` cookie attributes when running in production (`FLASK_ENV=production`), safeguarding authentication session tokens against unencrypted transport.
+* **Strict Credential Policy (NIST/OWASP 8+ Characters):** Enforces a minimum 8-character password threshold for operator accounts, password resets, and user profile management, synchronized across backend APIs and frontend forms.
+* **Proactive Master Account Security Monitor:** Real-time dashboard audit flagging if the root administrator account (`tmuniz570@gmail.com`) is still using initial default factory credentials, providing a prominent 1-click update path.
+* **UK GDPR PII Protection & Media Governance:** Strict `@login_required` access control on `/static/uploads/`, aggressive anti-cache headers (`Cache-Control: private, no-store`), and Content-Security-Policy sandbox preventing unauthorized exposure of driving licences, utility proofs, or V5C logbooks.
+* **Streamlined Reverse Proxy Architecture:** Centralized `ProxyFix` layer ensuring accurate real-client IP attribution across `AuditLog` events without proxy hop duplication.
+
 ---
 
 ## 🛠️ Technology Stack
@@ -305,6 +313,7 @@ FF Motors APP/
 │   ├── DEPLOY_E_BANCO_DE_DADOS.md # Zero-downtime deploy & database migration manual
 │   └── plano_claims_modular.md   # Claims module architecture and permissions design
 ├── tests/
+│   ├── test_security_audit.py         # Automated tests for XSS shielding, password policies & security alerts
 │   ├── test_concurrency_and_deduplication.py# Tests for multi-worker concurrency, idempotency & cleanup
 │   ├── test_motos_v5c_trackers.py      # Tests for V5C document management & GPS trackers
 │   └── test_vendas_contratos.py        # Automated tests for sales workflow, extras & insurance rules

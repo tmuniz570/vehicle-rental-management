@@ -1005,6 +1005,29 @@
             const alertas = await res.json();
             
             let html = '';
+            
+            // 0. Master Account Security Warning (if root admin is still on initial factory password)
+            if (dashData && dashData.aviso_senha_padrao) {
+                html += `
+                    <div class="glass-card mb-3" style="border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.08); padding: 1rem 1.25rem; border-radius: 12px; margin-bottom: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                            <div>
+                                <h4 style="color: #f87171; margin: 0 0 0.25rem 0; font-size: 0.95rem; font-weight: 700;">
+                                    🛡️ Master Security Notice: Default Password In Use
+                                </h4>
+                                <p style="margin: 0; color: var(--text-secondary); font-size: 0.85rem;">
+                                    Your root administrator account (<strong>tmuniz570@gmail.com</strong>) is still using the initial system password (<code>Admin123!</code>). For full security and GDPR compliance, please change your password.
+                                </p>
+                            </div>
+                            <div>
+                                <button type="button" onclick="if (window.openPerfilModal) window.openPerfilModal();" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.82rem; background: #dc2626; border-color: #ef4444; cursor: pointer;">
+                                    🔑 Change Password Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
 
             // 1. Process contract & compliance alerts (Deposit Hold, Insurance Due, Insurance Cancelled)
             if (alertas && alertas.length > 0) {

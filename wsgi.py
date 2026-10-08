@@ -98,10 +98,8 @@ if _acquire_scheduler_lock():
     except Exception as e:
         print(f"[WSGI] Aviso do agendador: {e}")
 
-# Habilita suporte a Proxy Reverso (Cloudflare, Render, AWS ALB, Nginx)
-# Garante que request.remote_addr seja o IP real do cliente na trilha de auditoria e url_for use HTTPS
-from werkzeug.middleware.proxy_fix import ProxyFix
-app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+# O suporte a Proxy Reverso (Nginx / Cloudflare) já é configurado de forma centralizada em app.py
+# (ProxyFix com x_for=1, x_proto=1, x_host=1, x_prefix=1) para evitar duplicação de camadas de proxy.
 
 # Expõe as referências padrão para servidores WSGI (Gunicorn, Waitress, uWSGI)
 application = app

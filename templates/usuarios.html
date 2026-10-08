@@ -349,7 +349,7 @@
                     <button type="button" onclick="gerarSenhaAleatoria()" style="background: none; border: none; color: var(--accent); font-size: 0.75rem; cursor: pointer; padding: 0;">Generate Random</button>
                 </div>
                 <div style="position: relative;">
-                    <input type="password" id="novo_password" required minlength="6" placeholder="At least 6 characters" style="width:100%; padding:0.75rem 2.75rem 0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <input type="password" id="novo_password" required minlength="8" placeholder="At least 8 characters" style="width:100%; padding:0.75rem 2.75rem 0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                     <button type="button" onclick="togglePasswordVisibility('novo_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer;" title="Toggle Password">
                         👁️
                     </button>
@@ -421,7 +421,7 @@
                     <span style="font-size: 0.75rem; color: var(--text-secondary);">Leave blank to keep current</span>
                 </div>
                 <div style="position: relative;">
-                    <input type="password" id="edit_password" minlength="6" placeholder="Enter new password (optional)" style="width:100%; padding:0.75rem 2.75rem 0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
+                    <input type="password" id="edit_password" minlength="8" placeholder="Enter new password (min. 8 characters)" style="width:100%; padding:0.75rem 2.75rem 0.75rem 1rem; border-radius:10px; border:1px solid var(--border-color); background:rgba(0,0,0,0.25); color:var(--text-primary);">
                     <button type="button" onclick="togglePasswordVisibility('edit_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-secondary); cursor: pointer;" title="Toggle Password">
                         👁️
                     </button>

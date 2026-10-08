@@ -4,6 +4,23 @@ Todas as alterações notáveis, correções de bugs, novos recursos e melhorias
 
 O formato segue as diretrizes do [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e este projeto adere ao [Versionamento Semântico (SemVer)](https://semver.org/lang/pt-BR/).
 
+## [1.9.37] — 2026-10-08 — *Security & Privacy Hardening, XSS Shielding & Credential Governance*
+
+### 🛡️ Auditoria de Segurança e Privacidade
+* **Blindagem contra Reflected XSS (`relatorio_financeiro.html` & `app.py`)**:
+  - Sanitização via `markupsafe.escape()` para todos os parâmetros de busca e filtro recebidos via query string antes da interpolação na descrição do relatório A4, eliminando vetores de injeção de script refletido.
+* **Resiliência de Cookies HTTPS (`SESSION_COOKIE_SECURE`)**:
+  - Configuração de `SESSION_COOKIE_SECURE = True` ativada automaticamente quando `FLASK_ENV == 'production'`, mesmo sem depender de variável externa de proxy `HTTPS=on`.
+* **Desduplicação de Camada de ProxyFix**:
+  - `ProxyFix` mantido centralizado em `app.py` e removido de `wsgi.py`, eliminando a duplicação de camadas de proxy e garantindo a resolução correta e fidedigna do IP do cliente na trilha de auditoria (`AuditLog`).
+* **Elevação da Política de Senhas (Mínimo de 8 Caracteres)**:
+  - Validação de tamanho mínimo de senha aumentada de 6 para 8 caracteres na criação de operadores (`/api/usuarios`), redefinição administrativa e alteração de senha de perfil (`/api/perfil/alterar-senha`), alinhado a padrões OWASP/NIST.
+  - Formulários no frontend (`usuarios.html` e modal de perfil em `layout.html`) atualizados com `minlength="8"`.
+* **Monitoramento e Alerta da Senha Mestre Inicial**:
+  - Checagem automática no payload do Dashboard (`/api/dashboard`): se a conta mestre (`tmuniz570@gmail.com`) for detectada utilizando a senha de fábrica (`Admin123!`), um alerta visual discreto é renderizado no topo do painel com botão de ação rápida para alteração de credenciais.
+* **Suíte de Testes de Segurança**:
+  - Novo módulo de testes em [tests/test_security_audit.py](file:///c:/Users/tmuni/Downloads/FF%20Motors%20APP/tests/test_security_audit.py) cobrindo sanitização XSS, enforçamento de 8 caracteres e detecção de credenciais padrão. Total de 78 testes automatizados aprovados com 100% de sucesso.
+
 ## [1.9.36] — 2026-10-07 — *Global Sidebar Quick Search across All Views*
 
 ### 🔍 Disponibilidade Irrestrita no Menu Lateral
